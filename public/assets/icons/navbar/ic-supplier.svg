@@ -1,0 +1,11 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Warehouse base -->
+  <path d="M3 20V10L12 4L21 10V20H3Z" fill="#1877F2" opacity="0.32"/>
+  <!-- Warehouse roof -->
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M2 10L12 3L22 10V20H2V10Z" fill="#1877F2"/>
+  <!-- Boxes inside the warehouse -->
+  <rect x="7" y="14" width="4" height="4" fill="#1877F2"/>
+  <rect x="13" y="14" width="4" height="4" fill="#1877F2"/>
+  <!-- Door of the warehouse -->
+  <path d="M9 20V16H15V20H9Z" fill="#1877F2"/>
+</svg>

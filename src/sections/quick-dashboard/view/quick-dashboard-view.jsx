@@ -1,0 +1,682 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
+import Badge from '@mui/material/Badge';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import CardContent from '@mui/material/CardContent';
+import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
+import Select from '@mui/material/Select';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+import Table from '@mui/material/Table';
+import TableRow from '@mui/material/TableRow';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import Grid from '@mui/material/Unstable_Grid2';
+import Tooltip from '@mui/material/Tooltip';
+
+import { fCurrency } from 'src/utils/format-number';
+import { DashboardContent } from 'src/layouts/dashboard';
+import { useAuthContext } from 'src/auth/hooks';
+import { useCurrencyFormat } from 'src/hooks/use-currency-format';
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import axiosInstance from 'src/utils/axios';
+
+// ----------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------
+
+function getStoreIdFromStorage() {
+  try {
+    const raw = localStorage.getItem('activeWorkspace');
+    if (raw) {
+      const { id } = JSON.parse(raw);
+      return id ? Number(id) : null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function fTime(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function fDateShort(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'pos'];
+
+// ----------------------------------------------------------------------
+// Stat Card
+// ----------------------------------------------------------------------
+
+function StatCard({ icon, label, value, color = 'primary.main', loading }) {
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 1.5,
+              bgcolor: `${color}20`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Iconify icon={icon} width={26} sx={{ color }} />
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {label}
+            </Typography>
+            {loading ? (
+              <CircularProgress size={18} sx={{ mt: 0.5 }} />
+            ) : (
+              <Typography variant="h5" fontWeight={700}>
+                {value}
+              </Typography>
+            )}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Search result row / card
+// ----------------------------------------------------------------------
+
+function ItemCard({ item, onAdd }) {
+  return (
+    <Card
+      onClick={() => onAdd(item)}
+      sx={{
+        p: 1.5,
+        cursor: 'pointer',
+        border: '1px solid',
+        borderColor: 'divider',
+        transition: 'all 0.15s',
+        '&:hover': { borderColor: 'primary.main', boxShadow: 2, transform: 'translateY(-1px)' },
+      }}
+    >
+      <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: 1,
+            bgcolor: item.type === 'product' ? 'info.lighter' : 'warning.lighter',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Iconify
+            icon={item.type === 'product' ? 'solar:box-bold' : 'solar:hand-stars-bold'}
+            width={20}
+            sx={{ color: item.type === 'product' ? 'info.dark' : 'warning.dark' }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={600} noWrap>
+            {item.name}
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              {fCurrency(item.price)}
+            </Typography>
+            {item.stock != null && (
+              <Chip
+                size="small"
+                label={`Qty: ${item.stock}`}
+                color={item.stock > 5 ? 'success' : item.stock > 0 ? 'warning' : 'error'}
+                sx={{ height: 18, fontSize: 10 }}
+              />
+            )}
+          </Stack>
+        </Box>
+        <Iconify icon="eva:plus-fill" width={18} sx={{ color: 'primary.main', flexShrink: 0 }} />
+      </Stack>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Cart row
+// ----------------------------------------------------------------------
+
+function CartRow({ item, onQtyChange, onRemove }) {
+  const { currencySymbol } = useCurrencyFormat();
+  return (
+    <TableRow>
+      <TableCell sx={{ py: 1, pl: 0 }}>
+        <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 140 }}>
+          {item.name}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {currencySymbol}{item.unit_price.toLocaleString()}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ py: 1 }} align="center">
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
+            <Iconify icon="eva:minus-fill" width={14} />
+          </IconButton>
+          <Typography variant="body2" sx={{ minWidth: 20, textAlign: 'center' }}>
+            {item.quantity}
+          </Typography>
+          <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
+            <Iconify icon="eva:plus-fill" width={14} />
+          </IconButton>
+        </Stack>
+      </TableCell>
+      <TableCell sx={{ py: 1, pr: 0 }} align="right">
+        <Typography variant="body2" fontWeight={600}>
+          {fCurrency(item.subtotal)}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ py: 1, pr: 0, pl: 0.5 }} align="right">
+        <IconButton size="small" color="error" onClick={() => onRemove(item.cartId)} sx={{ p: 0.5 }}>
+          <Iconify icon="eva:trash-2-outline" width={16} />
+        </IconButton>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Main view
+// ----------------------------------------------------------------------
+
+export function QuickDashboardView() {
+  const { user } = useAuthContext();
+  const { currencySymbol } = useCurrencyFormat();
+  const searchRef = useRef(null);
+
+  const storeId = getStoreIdFromStorage();
+
+  // Today stats
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Recent sales
+  const [recentSales, setRecentSales] = useState([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+
+  // Search
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  // Cart
+  const [cart, setCart] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── Data fetching ──────────────────────────────────────────────
+
+  const fetchStats = useCallback(async () => {
+    if (!storeId) { setStatsLoading(false); return; }
+    try {
+      setStatsLoading(true);
+      const res = await axiosInstance.get('/api/quick-dashboard/today-stats', {
+        params: { store_id: storeId },
+      });
+      setStats(res.data);
+    } catch {
+      // silently show zeros
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [storeId]);
+
+  const fetchRecent = useCallback(async () => {
+    if (!storeId) { setRecentLoading(false); return; }
+    try {
+      setRecentLoading(true);
+      const res = await axiosInstance.get('/api/quick-dashboard/recent-sales', {
+        params: { store_id: storeId, limit: 8 },
+      });
+      setRecentSales(res.data?.sales || []);
+    } catch {
+      // silent
+    } finally {
+      setRecentLoading(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    fetchStats();
+    fetchRecent();
+    // Auto-focus search on mount
+    setTimeout(() => searchRef.current?.focus(), 300);
+  }, [fetchStats, fetchRecent]);
+
+  // ── Search (debounced) ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (!query.trim() || !storeId) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSearching(true);
+        const res = await axiosInstance.get('/api/quick-dashboard/search', {
+          params: { query: query.trim(), store_id: storeId, limit: 20 },
+        });
+        setSearchResults(res.data?.results || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, storeId]);
+
+  // ── Cart logic ─────────────────────────────────────────────────
+
+  const addToCart = useCallback((item) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.cartId === `${item.type}-${item.id}`);
+      if (existing) {
+        return prev.map((c) =>
+          c.cartId === existing.cartId
+            ? { ...c, quantity: c.quantity + 1, subtotal: (c.quantity + 1) * c.unit_price }
+            : c
+        );
+      }
+      return [
+        ...prev,
+        {
+          cartId: `${item.type}-${item.id}`,
+          id: item.id,
+          type: item.type,
+          name: item.name,
+          unit_price: item.price,
+          quantity: 1,
+          subtotal: item.price,
+        },
+      ];
+    });
+  }, []);
+
+  const changeQty = useCallback((cartId, delta) => {
+    setCart((prev) => {
+      return prev
+        .map((c) => {
+          if (c.cartId !== cartId) return c;
+          const newQty = c.quantity + delta;
+          if (newQty < 1) return null;
+          return { ...c, quantity: newQty, subtotal: newQty * c.unit_price };
+        })
+        .filter(Boolean);
+    });
+  }, []);
+
+  const removeFromCart = useCallback((cartId) => {
+    setCart((prev) => prev.filter((c) => c.cartId !== cartId));
+  }, []);
+
+  const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
+
+  // ── Checkout ───────────────────────────────────────────────────
+
+  const handleCheckout = async () => {
+    if (!cart.length) { toast.warning('Cart is empty.'); return; }
+    if (!storeId) { toast.error('No active store selected.'); return; }
+    try {
+      setSubmitting(true);
+      const currencyCode = localStorage.getItem('current_currency') || 'NGN';
+      await axiosInstance.post('/api/quick-dashboard/sale', {
+        store_id: storeId,
+        items: cart.map(({ id, type, name, quantity, unit_price, subtotal }) => ({
+          id,
+          type,
+          name,
+          quantity,
+          unit_price,
+          subtotal,
+        })),
+        payment_method: paymentMethod,
+        currency_code: currencyCode,
+      });
+      toast.success(`Sale of ${fCurrency(cartTotal)} completed! 🎉`);
+      setCart([]);
+      setQuery('');
+      setSearchResults([]);
+      // Refresh stats and recent sales
+      await Promise.all([fetchStats(), fetchRecent()]);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── No store guard ─────────────────────────────────────────────
+
+  if (!storeId) {
+    return (
+      <DashboardContent>
+        <Alert severity="warning" sx={{ mt: 3 }}>
+          No store selected. Please select an active store from the Store Dashboard first.
+        </Alert>
+      </DashboardContent>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────────────
+
+  return (
+    <DashboardContent maxWidth="xl">
+      {/* Page header */}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            ⚡ Quick Dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Record a sale in under 30 seconds · {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Typography>
+        </Box>
+        <Tooltip title="Refresh stats">
+          <IconButton onClick={() => { fetchStats(); fetchRecent(); }}>
+            <Iconify icon="eva:refresh-fill" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+
+      {/* ── TODAY STATS ROW ── */}
+      <Grid container spacing={2} mb={3}>
+        <Grid xs={6} sm={3}>
+          <StatCard
+            icon="solar:dollar-minimalistic-bold"
+            label="Today's Revenue"
+            value={fCurrency(stats?.total_revenue ?? 0)}
+            color="success.main"
+            loading={statsLoading}
+          />
+        </Grid>
+        <Grid xs={6} sm={3}>
+          <StatCard
+            icon="solar:cart-large-bold"
+            label="Transactions"
+            value={stats?.total_transactions ?? 0}
+            color="info.main"
+            loading={statsLoading}
+          />
+        </Grid>
+        <Grid xs={6} sm={3}>
+          <StatCard
+            icon="solar:star-bold"
+            label="Top Item"
+            value={stats?.top_item?.name ?? '—'}
+            color="warning.main"
+            loading={statsLoading}
+          />
+        </Grid>
+        <Grid xs={6} sm={3}>
+          <StatCard
+            icon="solar:clock-circle-bold"
+            label="Peak Hour"
+            value={stats?.peak_hour ?? '—'}
+            color="primary.main"
+            loading={statsLoading}
+          />
+        </Grid>
+      </Grid>
+
+      {/* ── QUICK SALE + RECENT SALES ROW ── */}
+      <Grid container spacing={2} alignItems="flex-start">
+
+        {/* ── LEFT: Search & Results ── */}
+        <Grid xs={12} md={5}>
+          <Card sx={{ height: '100%' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
+                Search Products &amp; Services
+              </Typography>
+              <TextField
+                inputRef={searchRef}
+                fullWidth
+                size="small"
+                placeholder="Type name or SKU…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      {searching
+                        ? <CircularProgress size={16} />
+                        : <Iconify icon="eva:search-fill" width={20} sx={{ color: 'text.disabled' }} />
+                      }
+                    </InputAdornment>
+                  ),
+                  endAdornment: query ? (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => { setQuery(''); setSearchResults([]); }}>
+                        <Iconify icon="eva:close-fill" width={16} />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : null,
+                }}
+              />
+            </Box>
+
+            <Box sx={{ p: 2, maxHeight: 420, overflowY: 'auto' }}>
+              {searchResults.length === 0 && !searching && query && (
+                <Box textAlign="center" py={4}>
+                  <Iconify icon="eva:search-fill" width={40} sx={{ color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary" variant="body2">No results for "{query}"</Typography>
+                </Box>
+              )}
+              {searchResults.length === 0 && !query && (
+                <Box textAlign="center" py={5}>
+                  <Iconify icon="solar:keyboard-bold" width={48} sx={{ color: 'text.disabled', mb: 1.5 }} />
+                  <Typography color="text.secondary">
+                    Start typing to search products &amp; services
+                  </Typography>
+                </Box>
+              )}
+              <Stack spacing={1}>
+                {searchResults.map((item) => (
+                  <ItemCard key={`${item.type}-${item.id}`} item={item} onAdd={addToCart} />
+                ))}
+              </Stack>
+            </Box>
+          </Card>
+        </Grid>
+
+        {/* ── CENTER: Cart ── */}
+        <Grid xs={12} md={4}>
+          <Card sx={{ height: '100%' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Cart
+                </Typography>
+                <Badge badgeContent={cart.length} color="primary">
+                  <Iconify icon="solar:cart-large-bold" width={22} />
+                </Badge>
+              </Stack>
+            </Box>
+
+            <Box sx={{ p: 2, minHeight: 200, maxHeight: 340, overflowY: 'auto' }}>
+              {cart.length === 0 ? (
+                <Box textAlign="center" py={5}>
+                  <Iconify icon="solar:cart-plus-bold" width={48} sx={{ color: 'text.disabled', mb: 1.5 }} />
+                  <Typography color="text.secondary" variant="body2">
+                    Click an item to add it here
+                  </Typography>
+                </Box>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ pl: 0, py: 0.5, fontWeight: 700 }}>Item</TableCell>
+                      <TableCell align="center" sx={{ py: 0.5, fontWeight: 700 }}>Qty</TableCell>
+                      <TableCell align="right" sx={{ pr: 0, py: 0.5, fontWeight: 700 }}>Total</TableCell>
+                      <TableCell sx={{ p: 0 }} />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {cart.map((item) => (
+                      <CartRow
+                        key={item.cartId}
+                        item={item}
+                        onQtyChange={changeQty}
+                        onRemove={removeFromCart}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Box>
+
+            <Divider />
+
+            <Box sx={{ p: 2 }}>
+              {/* Total */}
+              <Stack direction="row" justifyContent="space-between" mb={1.5}>
+                <Typography variant="body2" color="text.secondary">Subtotal</Typography>
+                <Typography variant="subtitle1" fontWeight={700}>{fCurrency(cartTotal)}</Typography>
+              </Stack>
+
+              {/* Payment method */}
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel>Payment Method</InputLabel>
+                <Select
+                  value={paymentMethod}
+                  label="Payment Method"
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <MenuItem key={m} value={m} sx={{ textTransform: 'capitalize' }}>
+                      {m.charAt(0).toUpperCase() + m.slice(1)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Checkout button */}
+              <Button
+                fullWidth
+                size="large"
+                variant="contained"
+                color="primary"
+                disabled={!cart.length || submitting}
+                onClick={handleCheckout}
+                startIcon={submitting
+                  ? <CircularProgress size={16} color="inherit" />
+                  : <Iconify icon="solar:card-recive-bold" />
+                }
+                sx={{ fontWeight: 700, py: 1.5, fontSize: '1rem' }}
+              >
+                {submitting ? 'Processing…' : `Complete Sale · ${fCurrency(cartTotal)}`}
+              </Button>
+
+              {cart.length > 0 && (
+                <Button
+                  fullWidth
+                  size="small"
+                  color="inherit"
+                  onClick={() => setCart([])}
+                  sx={{ mt: 1, color: 'text.secondary' }}
+                >
+                  Clear cart
+                </Button>
+              )}
+            </Box>
+          </Card>
+        </Grid>
+
+        {/* ── RIGHT: Recent Sales ── */}
+        <Grid xs={12} md={3}>
+          <Card sx={{ height: '100%' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Recent Sales
+              </Typography>
+            </Box>
+
+            <Box sx={{ maxHeight: 520, overflowY: 'auto' }}>
+              {recentLoading && (
+                <Box display="flex" justifyContent="center" py={4}>
+                  <CircularProgress size={28} />
+                </Box>
+              )}
+              {!recentLoading && recentSales.length === 0 && (
+                <Box textAlign="center" py={5}>
+                  <Iconify icon="solar:clipboard-list-bold" width={40} sx={{ color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary" variant="body2">No sales yet today</Typography>
+                </Box>
+              )}
+              {recentSales.map((sale) => (
+                <Box
+                  key={sale.id}
+                  sx={{
+                    px: 2,
+                    py: 1.25,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 },
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 130 }}>
+                        {sale.invoice_number}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {fDateShort(sale.create_date)} · {fTime(sale.create_date)}
+                      </Typography>
+                    </Box>
+                    <Stack alignItems="flex-end" spacing={0.25}>
+                      <Typography variant="body2" fontWeight={700} color="success.main">
+                        {fCurrency(sale.total_amount)}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={sale.status}
+                        color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
+                        sx={{ height: 18, fontSize: 10 }}
+                      />
+                    </Stack>
+                  </Stack>
+                </Box>
+              ))}
+            </Box>
+          </Card>
+        </Grid>
+
+      </Grid>
+    </DashboardContent>
+  );
+}
