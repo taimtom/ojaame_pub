@@ -171,8 +171,7 @@ const PermissionAwareNavigation = ({ open, onClose, drawerWidth = 280 }) => {
   const [expandedItems, setExpandedItems] = React.useState({});
 
   // Filter navigation items based on permissions
-  const filteredItems = useMemo(() => {
-    return NAVIGATION_ITEMS.filter(item => {
+  const filteredItems = useMemo(() => NAVIGATION_ITEMS.filter(item => {
       if (item.divider) return true;
       
       if (!item.permission) return true;
@@ -191,8 +190,7 @@ const PermissionAwareNavigation = ({ open, onClose, drawerWidth = 280 }) => {
         };
       }
       return item;
-    });
-  }, [hasPermission]);
+    }), [hasPermission]);
 
   const handleItemClick = (item) => {
     if (item.children && item.children.length > 0) {

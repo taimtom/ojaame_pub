@@ -363,7 +363,7 @@ const OnboardingWizard = () => {
       case 4:
         return (
           <Box textAlign="center">
-            <AccountBalance sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
+            <BankIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
             <Typography variant="h6" gutterBottom>
               Connect Your Bank Account (Optional)
             </Typography>
@@ -412,13 +412,13 @@ const OnboardingWizard = () => {
               All Set!
             </Typography>
             <Typography variant="body1" color="text.secondary" paragraph>
-              Your OJAAME account is ready. You'll be redirected to your dashboard shortly.
+              Your OJAAME account is ready. You&apos;ll be redirected to your dashboard shortly.
             </Typography>
 
             <Card variant="outlined" sx={{ mt: 4, maxWidth: 500, mx: 'auto' }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  What's Next?
+                  What&apos;s Next?
                 </Typography>
                 <Stack spacing={1} alignItems="flex-start">
                   <Chip label="✓ Add your products or services" color="success" />

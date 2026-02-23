@@ -68,9 +68,7 @@ export const parseCurrency = (formattedAmount) => {
  * @param {number} exchangeRate - Exchange rate
  * @returns {number} Converted amount
  */
-export const convertCurrency = (amount, exchangeRate) => {
-  return amount * exchangeRate;
-};
+export const convertCurrency = (amount, exchangeRate) => amount * exchangeRate;
 
 /**
  * Get currency symbol

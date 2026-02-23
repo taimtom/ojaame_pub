@@ -280,23 +280,24 @@ export function QuickDashboardView() {
   // ── Search (debounced) ─────────────────────────────────────────
 
   useEffect(() => {
+    let timer;
     if (!query.trim() || !storeId) {
       setSearchResults([]);
-      return;
+    } else {
+      timer = setTimeout(async () => {
+        try {
+          setSearching(true);
+          const res = await axiosInstance.get('/api/quick-dashboard/search', {
+            params: { query: query.trim(), store_id: storeId, limit: 20 },
+          });
+          setSearchResults(res.data?.results || []);
+        } catch {
+          setSearchResults([]);
+        } finally {
+          setSearching(false);
+        }
+      }, 300);
     }
-    const timer = setTimeout(async () => {
-      try {
-        setSearching(true);
-        const res = await axiosInstance.get('/api/quick-dashboard/search', {
-          params: { query: query.trim(), store_id: storeId, limit: 20 },
-        });
-        setSearchResults(res.data?.results || []);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
     return () => clearTimeout(timer);
   }, [query, storeId]);
 
@@ -328,16 +329,16 @@ export function QuickDashboardView() {
   }, []);
 
   const changeQty = useCallback((cartId, delta) => {
-    setCart((prev) => {
-      return prev
+    setCart((prev) =>
+      prev
         .map((c) => {
           if (c.cartId !== cartId) return c;
           const newQty = c.quantity + delta;
           if (newQty < 1) return null;
           return { ...c, quantity: newQty, subtotal: newQty * c.unit_price };
         })
-        .filter(Boolean);
-    });
+        .filter(Boolean)
+    );
   }, []);
 
   const removeFromCart = useCallback((cartId) => {
@@ -494,7 +495,7 @@ export function QuickDashboardView() {
               {searchResults.length === 0 && !searching && query && (
                 <Box textAlign="center" py={4}>
                   <Iconify icon="eva:search-fill" width={40} sx={{ color: 'text.disabled', mb: 1 }} />
-                  <Typography color="text.secondary" variant="body2">No results for "{query}"</Typography>
+                  <Typography color="text.secondary" variant="body2">No results for &quot;{query}&quot;</Typography>
                 </Box>
               )}
               {searchResults.length === 0 && !query && (

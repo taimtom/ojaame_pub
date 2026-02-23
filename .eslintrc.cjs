@@ -38,6 +38,10 @@ module.exports = {
     'no-restricted-exports': 0,
     'no-promise-executor-return': 0,
     'import/prefer-default-export': 0,
+    'import/no-unresolved': 0,
+    'import/no-extraneous-dependencies': 0,
+    'import/extensions': 0,
+    'import/order': 0,
     'prefer-destructuring': [1, { object: true, array: false }],
     // react
     'react/prop-types': 0,

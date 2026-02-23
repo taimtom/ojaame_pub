@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'src/utils/axios';
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -92,7 +92,7 @@ export const CurrencyProvider = ({ children }) => {
     await fetchCurrencies();
   }, [companyId, fetchCurrencies]);
 
-  const value = {
+  const value = useMemo(() => ({
     currentCurrency,
     availableCurrencies,
     baseCurrency,
@@ -103,7 +103,7 @@ export const CurrencyProvider = ({ children }) => {
     formatAmount,
     enableCurrency,
     refreshCurrencies: fetchCurrencies,
-  };
+  }), [currentCurrency, availableCurrencies, baseCurrency, loading, error, switchCurrency, convert, formatAmount, enableCurrency, fetchCurrencies]);
 
   return (
     <CurrencyContext.Provider value={value}>

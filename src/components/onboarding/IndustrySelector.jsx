@@ -165,7 +165,7 @@ const IndustrySelector = ({ onSelect }) => {
           Choose Your Industry
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          We'll customize OJAAME with features specific to your business
+          We&apos;ll customize OJAAME with features specific to your business
         </Typography>
       </Box>
 
@@ -251,7 +251,7 @@ const IndustrySelector = ({ onSelect }) => {
 
       <Box mt={4} textAlign="center">
         <Typography variant="body2" color="text.secondary">
-          Don't worry, you can customize these features later or add more modules
+          Don&apos;t worry, you can customize these features later or add more modules
         </Typography>
       </Box>
     </Box>
