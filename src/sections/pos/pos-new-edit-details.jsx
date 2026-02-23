@@ -314,7 +314,7 @@ export function InvoiceNewEditDetails() {
       setValue(`items[${index}].price`, enteredPrice);
       setValue(`items[${index}].total`, enteredPrice * (values.items[index]?.quantity || 1));
     },
-    [setValue, values.items, itemTypes]
+    [setValue, values.items, itemTypes, currencySymbol]
   );
 
   const renderTotal = (

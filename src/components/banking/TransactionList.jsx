@@ -65,6 +65,7 @@ const TransactionList = ({ accountId = null, storeId = null }) => {
 
   useEffect(() => {
     fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, filters, accountId]);
 
   const fetchTransactions = async () => {
@@ -147,9 +148,7 @@ const TransactionList = ({ accountId = null, storeId = null }) => {
     }
   };
 
-  const getTransactionTypeColor = (isIncome) => {
-    return isIncome ? 'success' : 'error';
-  };
+  const getTransactionTypeColor = (isIncome) => isIncome ? 'success' : 'error';
 
   const getReconciliationStatus = (transaction) => {
     if (transaction.reconciled) {

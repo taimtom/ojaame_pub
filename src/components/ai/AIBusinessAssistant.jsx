@@ -46,6 +46,7 @@ const AIBusinessAssistant = ({ companyId }) => {
 
   useEffect(() => {
     fetchAIData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
   const fetchAIData = async () => {
@@ -76,7 +77,7 @@ const AIBusinessAssistant = ({ companyId }) => {
       setChatLoading(true);
       const response = await axios.post('/api/ai/ask', {
         company_id: companyId,
-        question: question
+        question,
       });
 
       setChatHistory([
@@ -349,7 +350,7 @@ const AIBusinessAssistant = ({ companyId }) => {
 
               <Box mt={1}>
                 <Typography variant="caption" color="text.secondary">
-                  Examples: "Should I restock Product X?" • "What's my profit trend?" • "Which store performs best?"
+                  Examples: &quot;Should I restock Product X?&quot; &bull; &quot;What&apos;s my profit trend?&quot; &bull; &quot;Which store performs best?&quot;
                 </Typography>
               </Box>
             </Box>

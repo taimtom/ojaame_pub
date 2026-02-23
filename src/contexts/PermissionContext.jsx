@@ -4,8 +4,9 @@
  * Manages user permissions and role-based access control throughout the app.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios from '../../utils/axios';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+
+import axios from 'src/utils/axios';
 
 const PermissionContext = createContext(null);
 
@@ -147,7 +148,7 @@ export const PermissionProvider = ({ children }) => {
       .map(perm => perm.action);
   }, [permissions]);
 
-  const value = {
+  const value = useMemo(() => ({
     permissions,
     roles,
     loading,
@@ -158,8 +159,9 @@ export const PermissionProvider = ({ children }) => {
     getAccessibleStores,
     canAccessFeature,
     getFeatureActions,
-    refreshPermissions: fetchPermissions
-  };
+    refreshPermissions: fetchPermissions,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [permissions, roles, loading, error]);
 
   return (
     <PermissionContext.Provider value={value}>
