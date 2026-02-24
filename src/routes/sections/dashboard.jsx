@@ -58,6 +58,7 @@ const PaymentMethodEditPage = lazy(() => import('src/pages/dashboard/payment-met
 const ServiceListPage = lazy(() => import('src/pages/dashboard/service/list'));
 const ServiceCreatePage = lazy(() => import('src/pages/dashboard/service/new'));
 const ServiceEditPage = lazy(() => import('src/pages/dashboard/service/edit'));
+const ServiceDetailsPage = lazy(() => import('src/pages/dashboard/service/details'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
@@ -201,6 +202,7 @@ export const dashboardRoutes = [
             { index: true, element: <ServiceListPage /> },
             { path: 'list', element: <ServiceListPage /> },
             { path: 'new', element: <ServiceCreatePage /> },
+            { path: ':id', element: <ServiceDetailsPage /> },
             { path: ':id/edit', element: <ServiceEditPage /> },
           ],
         },

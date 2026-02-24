@@ -88,14 +88,25 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
         <TableCell>{fCurrency(row.total_amount)}</TableCell>
 
         <TableCell>
-          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-            {fCurrency(row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0)}
-          </Typography>
-          {row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) < row.total_amount && (
-            <Typography variant="caption" sx={{ color: 'error.main', display: 'block' }}>
-              Due: {fCurrency(row.total_amount - (row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0))}
-            </Typography>
-          )}
+          {(() => {
+            const isFullyPaid = row.status === 'paid' || row.status === 'completed';
+            const paymentsSum = row.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+            // For paid/completed sales, treat the full amount as paid regardless of payment records
+            const displayPaid = isFullyPaid ? row.total_amount : paymentsSum;
+            const due = row.total_amount - displayPaid;
+            return (
+              <>
+                <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                  {fCurrency(displayPaid)}
+                </Typography>
+                {!isFullyPaid && due > 0 && (
+                  <Typography variant="caption" sx={{ color: 'error.main', display: 'block' }}>
+                    Due: {fCurrency(due)}
+                  </Typography>
+                )}
+              </>
+            );
+          })()}
         </TableCell>
 
         <TableCell>

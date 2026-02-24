@@ -322,3 +322,25 @@ export function useStoreExpenses(storeId, period = 'month') {
     [data, error, isLoading, isValidating, mutate, period]
   );
 }
+
+export function useStoreFeatured(storeId, limit = 3) {
+  const key = storeId
+    ? [endpoints.dashboard.store.featured(storeId), { params: { limit } }]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    fetcher,
+    { ...swrOptions, keepPreviousData: true }
+  );
+
+  return useMemo(
+    () => ({
+      featuredProducts: Array.isArray(data) ? data : [],
+      featuredLoading: isLoading,
+      featuredError: error,
+      refetchFeatured: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}

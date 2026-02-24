@@ -1,58 +1,68 @@
-import Stack from '@mui/material/Stack';
+import { useEffect } from 'react';
+
+import { useLocation } from 'src/routes/hooks';
 
 import { BackToTop } from 'src/components/animate/back-to-top';
 import { ScrollProgress, useScrollProgress } from 'src/components/animate/scroll-progress';
 
+import { HomeCta } from '../home-cta';
 import { HomeHero } from '../home-hero';
-// import { HomeFAQs } from '../home-faqs';
-// import { HomeZoneUI } from '../home-zone-ui';
-import { HomeMinimal } from '../home-minimal';
-// import { HomePricing } from '../home-pricing';
-// import { HomeForDesigner } from '../home-for-designer';
-// import { HomeTestimonials } from '../home-testimonials';
-// import { HomeIntegrations } from '../home-integrations';
-// import { HomeAdvertisement } from '../home-advertisement';
-// import { HomeHugePackElements } from '../home-hugepack-elements';
-// import { HomeHighlightFeatures } from '../home-highlight-features';
+import { HomeAbout } from '../home-about';
+import { HomeStats } from '../home-stats';
+import { HomePricing } from '../home-pricing';
+import { HomeFeatures } from '../home-features';
+import { HomeHowItWorks } from '../home-how-it-works';
+import { HomeTestimonials } from '../home-testimonials';
 
 // ----------------------------------------------------------------------
 
 export function HomeView() {
   const pageProgress = useScrollProgress();
+  const { hash } = useLocation();
+
+  // Scroll to section when URL hash is present (e.g. from top nav anchor links)
+  useEffect(() => {
+    const id = hash ? hash.replace('#', '') : '';
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [hash]);
 
   return (
     <>
       <ScrollProgress
         variant="linear"
         progress={pageProgress.scrollYProgress}
-        sx={{ position: 'fixed' }}
+        sx={{ position: 'fixed', zIndex: 9999 }}
       />
 
       <BackToTop />
 
+      {/* 1. Hero */}
       <HomeHero />
 
-      <Stack sx={{ position: 'relative', bgcolor: 'background.default' }}>
-        <HomeMinimal />
+      {/* 2. Social proof stats */}
+      <HomeStats />
 
-        {/* <HomeHugePackElements />
+      {/* 3. Features */}
+      <HomeFeatures />
 
-        <HomeForDesigner />
+      {/* 4. How it works */}
+      <HomeHowItWorks />
 
-        <HomeHighlightFeatures />
+      {/* 5. Pricing */}
+      <HomePricing />
 
-        <HomeIntegrations />
+      {/* 6. Testimonials */}
+      <HomeTestimonials />
 
-        <HomePricing />
+      {/* 7. About */}
+      <HomeAbout />
 
-        <HomeTestimonials />
-
-        <HomeFAQs />
-
-        <HomeZoneUI />
-
-        <HomeAdvertisement /> */}
-      </Stack>
+      {/* 8. Final CTA + Contact */}
+      <HomeCta />
     </>
   );
 }

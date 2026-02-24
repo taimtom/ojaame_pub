@@ -229,6 +229,11 @@ export function InvoiceNewEditDetails() {
           );
           setValue(`items[${index}].service_id`, service.id);
           setValue(`items[${index}].item`, service.name);
+          // Auto-fill description with service name if not already set
+          const currentDesc = values.items[index]?.description;
+          if (!currentDesc) {
+            setValue(`items[${index}].description`, service.sub_description || service.description || service.name);
+          }
           // For services, costPrice is not used.
           setValue(`items[${index}].costPrice`, undefined);
           setValue(`items[${index}].originalPrice`, service.price || 0);

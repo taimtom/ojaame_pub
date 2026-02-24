@@ -37,12 +37,12 @@ export const NewInvoiceSchema = zod
     due_date: schemaHelper.date({ message: { required_error: 'Due date is required!' } }),
     items: zod.array(
       zod.object({
-        product_id: zod.number().nullable().optional(),  // Allow null if not used
-        service_id: zod.number().nullable().optional(),  // Allow null if not used
+        product_id: zod.number().nullable().optional(),
+        service_id: zod.number().nullable().optional(),
         quantity: zod.number().min(1, { message: 'Quantity must be at least 1' }),
         price: zod.number().min(0, { message: 'Price must be at least 0' }),
-        costPrice: zod.number().optional(),
-        description: zod.string().optional(),
+        costPrice: zod.number().nullable().optional(),
+        description: zod.string().nullable().optional(),
       })
     ).min(1, { message: 'At least one sale item is required' }),
     taxes: zod.number().min(0).default(0),
@@ -52,13 +52,14 @@ export const NewInvoiceSchema = zod
     payments: zod
     .array(
       zod.object({
-        payment_method_id: zod.number({ required_error: 'Method is required' }),
-        amount:            zod.number().min(0.01, 'Must be > 0'),
+        payment_method_id: zod.union([zod.number(), zod.string()]).nullable().optional(),
+        amount:            zod.number().min(0).default(0),
         reference:         zod.string().optional(),
         notes:             zod.string().optional(),
       })
     )
-    .optional(),
+    .optional()
+    .default([]),
 })
   .refine((data) => !fIsAfter(data.create_date, data.due_date), {
     message: 'Due date cannot be earlier than create date!',
@@ -101,8 +102,8 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
     () => ({
       invoice_number: currentInvoice?.invoice_number || "",
       invoice_to: currentInvoice?.invoice_to || null,
-      create_date:toDateOnly(currentInvoice?.create_date),
-      due_date: toDateOnly(currentInvoice?.create_date),
+      create_date: toDateOnly(currentInvoice?.create_date),
+      due_date: toDateOnly(currentInvoice?.due_date),
       taxes: currentInvoice?.taxes || 0,
       shipping: currentInvoice?.shipping || 0,
       status: currentInvoice?.status || 'draft',
@@ -119,14 +120,9 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
           description: '',
         },
       ],
-      payments: currentInvoice?.payments && currentInvoice.payments.length > 0
-        ? [
-            // Add a default empty payment for new payments in edit mode
-            { payment_method_id: undefined, amount: 0, reference: '', notes: '', isNew: true },
-          ]
-        : [
-            { payment_method_id: undefined, amount: 0, reference: '', notes: '' },
-          ],
+      // Edit mode: start empty (existing payments are displayed read-only in the payments component)
+      // New mode: start with one blank row (payments component initialises the amount)
+      payments: currentInvoice ? [] : [{ payment_method_id: '', amount: 0, reference: '', notes: '' }],
     }),
     [currentInvoice]
   );
@@ -243,11 +239,18 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
     }
   }, [delta, methods, isWalkInCustomer, paidSum, totalAmount, currentInvoice, isModified]);
 
-  const enrichDataWithStore = (data) => ({
-    ...data,
-    store_id: activeStore?.id || 0,
-    invoice_from: activeStore ? `${activeStore.id} - ${activeStore.storeName}` : '',
-  });
+  const enrichDataWithStore = (data) => {
+    // Strip placeholder rows that have no payment method selected
+    const validPayments = (data.payments || []).filter(
+      (p) => p.payment_method_id !== '' && p.payment_method_id != null && Number(p.amount) > 0
+    );
+    return {
+      ...data,
+      payments: validPayments,
+      store_id: activeStore?.id || 0,
+      invoice_from: activeStore ? `${activeStore.id} - ${activeStore.storeName}` : '',
+    };
+  };
 
   // Validate credit sales for walk-in customers
   const validateCreditSale = (data) => {

@@ -148,7 +148,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       sku: currentProduct?.sku || '',
       coverUrl: currentProduct?.coverUrl || '',
       price: currentProduct?.price || 0,
-      quantity: currentProduct?.quantity || 0,
+      quantity: currentProduct ? (currentProduct.quantity ?? 0) : 1,
       costPrice: currentProduct?.costPrice || 0,
       priceSale: currentProduct?.priceSale || 0,
       tags: currentProduct?.tags || [],

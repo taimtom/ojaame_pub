@@ -1,288 +1,196 @@
-import { m } from 'framer-motion';
-
 import Box from '@mui/material/Box';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Container from '@mui/material/Container';
-import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
-
-import { useTabs } from 'src/hooks/use-tabs';
-
-import { CONFIG } from 'src/config-global';
-import { varAlpha } from 'src/theme/styles';
+import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
-import { varFade, varScale, MotionViewport } from 'src/components/animate';
-
-import { SectionTitle } from './components/section-title';
-import { FloatLine, FloatXIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-export function HomePricing({ sx, ...other }) {
+const PLANS = [
+  {
+    title: 'Starter',
+    price: 'Free',
+    period: 'forever',
+    description: 'Perfect for small shops just getting started.',
+    color: 'default',
+    popular: false,
+    features: [
+      '1 store',
+      'Up to 50 products',
+      'Quick Sale dashboard',
+      'Basic invoicing',
+      'Sales reports',
+      'Email support',
+    ],
+    disabled: [],
+  },
+  {
+    title: 'Growth',
+    price: '₦9,900',
+    period: 'per month',
+    description: 'For growing businesses that need more power.',
+    color: 'primary',
+    popular: true,
+    features: [
+      'Up to 3 stores',
+      'Unlimited products & services',
+      'Credit tracking',
+      'Advanced analytics',
+      'Customer management',
+      'Priority support',
+      'Invoice customisation',
+    ],
+    disabled: [],
+  },
+  {
+    title: 'Enterprise',
+    price: 'Custom',
+    period: 'contact us',
+    description: 'For chains and businesses with complex needs.',
+    color: 'default',
+    popular: false,
+    features: [
+      'Unlimited stores',
+      'Unlimited everything',
+      'Dedicated account manager',
+      'Custom integrations',
+      'SLA guarantee',
+      'On-site training',
+      'API access',
+    ],
+    disabled: [],
+  },
+];
+
+// ----------------------------------------------------------------------
+
+export function HomePricing() {
   const theme = useTheme();
 
-  const tabs = useTabs('Standard');
-
-  const renderDescription = (
-    <SectionTitle
-      caption="plans"
-      title="Transparent"
-      txtGradient="pricing"
-      description="Choose from flexible pricing options designed to fit your business needs and budget with no hidden fees."
-      sx={{ mb: 8, textAlign: 'center' }}
-    />
-  );
-
-  const renderContentDesktop = (
-    <Box gridTemplateColumns="repeat(3, 1fr)" sx={{ display: { xs: 'none', md: 'grid' } }}>
-      {PLANS.map((plan) => (
-        <PlanCard
-          key={plan.license}
-          plan={plan}
-          sx={{
-            ...(plan.license === 'Plus' && {
-              [theme.breakpoints.down(1440)]: {
-                borderLeft: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-                borderRight: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-              },
-            }),
-          }}
-        />
-      ))}
-    </Box>
-  );
-
-  const renderContentMobile = (
-    <Stack spacing={5} alignItems="center" sx={{ display: { md: 'none' } }}>
-      <Tabs
-        value={tabs.value}
-        onChange={tabs.onChange}
-        sx={{
-          boxShadow: `0px -2px 0px 0px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)} inset`,
-        }}
-      >
-        {PLANS.map((tab) => (
-          <Tab key={tab.license} value={tab.license} label={tab.license} />
-        ))}
-      </Tabs>
-
-      <Box
-        sx={{
-          width: 1,
-          borderRadius: 2,
-          border: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-        }}
-      >
-        {PLANS.map(
-          (tab) => tab.license === tabs.value && <PlanCard key={tab.license} plan={tab} />
-        )}
-      </Box>
-    </Stack>
-  );
-
   return (
-    <Stack component="section" sx={{ py: 10, position: 'relative', ...sx }} {...other}>
-      <MotionViewport>
-        <FloatLine vertical sx={{ top: 0, left: 80 }} />
-
-        <Container>{renderDescription}</Container>
-
-        <Box
-          sx={{
-            position: 'relative',
-            '&::before, &::after': {
-              width: 64,
-              height: 64,
-              content: "''",
-              [theme.breakpoints.up(1440)]: {
-                display: 'block',
-              },
-            },
-          }}
-        >
-          <Container>{renderContentDesktop}</Container>
-
-          <FloatLine sx={{ top: 64, left: 0 }} />
-          <FloatLine sx={{ bottom: 64, left: 0 }} />
+    <Box
+      id="pricing"
+      sx={{
+        py: { xs: 8, md: 12 },
+        bgcolor: 'background.default',
+        scrollMarginTop: 64,
+      }}
+    >
+      <Container maxWidth="lg">
+        <Box sx={{ textAlign: 'center', mb: { xs: 6, md: 8 } }}>
+          <Typography
+            variant="overline"
+            sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 2, display: 'block', mb: 1.5 }}
+          >
+            Pricing
+          </Typography>
+          <Typography variant="h2" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+            Simple, Transparent Pricing
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 480, mx: 'auto' }}>
+            No hidden fees. No surprises. Start free and upgrade when your business grows.
+          </Typography>
         </Box>
 
-        <Container>{renderContentMobile}</Container>
-      </MotionViewport>
-    </Stack>
-  );
-}
-
-function PlanCard({ plan, sx, ...other }) {
-  const standardLicense = plan.license === 'Standard';
-
-  const plusLicense = plan.license === 'Plus';
-
-  const renderLines = (
-    <>
-      <FloatLine vertical sx={{ top: -64, left: 0, height: 'calc(100% + (64px * 2))' }} />
-      <FloatLine vertical sx={{ top: -64, right: 0, height: 'calc(100% + (64px * 2))' }} />
-      <FloatXIcon sx={{ top: -8, left: -8 }} />
-      <FloatXIcon sx={{ top: -8, right: -8 }} />
-      <FloatXIcon sx={{ bottom: -8, left: -8 }} />
-      <FloatXIcon sx={{ bottom: -8, right: -8 }} />
-    </>
-  );
-
-  return (
-    <Stack
-      spacing={5}
-      component={MotionViewport}
-      sx={{
-        px: 6,
-        py: 8,
-        position: 'relative',
-        ...sx,
-      }}
-      {...other}
-    >
-      {plusLicense && renderLines}
-
-      <Stack direction="row" alignItems="center">
-        <Stack flexGrow={1}>
-          <m.div variants={varFade({ distance: 24 }).inLeft}>
-            <Typography variant="h4" component="h6">
-              {plan.license}
-            </Typography>
-          </m.div>
-
-          <m.div variants={varScale({ distance: 24 }).inX}>
-            <Box
-              sx={{
-                width: 32,
-                height: 6,
-                opacity: 0.24,
-                borderRadius: 1,
-                bgcolor: 'error.main',
-                ...(standardLicense && { bgcolor: 'primary.main' }),
-                ...(plusLicense && { bgcolor: 'secondary.main' }),
-              }}
-            />
-          </m.div>
-        </Stack>
-
-        <m.div variants={varFade({ distance: 24 }).inLeft}>
-          <Box component="span" sx={{ typography: 'h3' }}>
-            ${plan.price}
-          </Box>
-        </m.div>
-      </Stack>
-
-      <Stack direction="row" spacing={2}>
-        {plan.icons.map((icon, index) => (
-          <Box
-            component={m.img}
-            variants={varFade().in}
-            key={icon}
-            alt={icon}
-            src={icon}
-            sx={{
-              width: 24,
-              height: 24,
-              ...(standardLicense && [1, 2].includes(index) && { display: 'none' }),
-            }}
-          />
-        ))}
-        {standardLicense && (
-          <Box component={m.span} variants={varFade().in} sx={{ ml: -1 }}>
-            (only)
-          </Box>
-        )}
-      </Stack>
-
-      <Stack spacing={2.5}>
-        {plan.commons.map((option) => (
-          <Stack
-            key={option}
-            component={m.div}
-            variants={varFade().in}
-            spacing={1.5}
-            direction="row"
-            alignItems="center"
-            sx={{ typography: 'body2' }}
-          >
-            <Iconify width={16} icon="eva:checkmark-fill" />
-            {option}
-          </Stack>
-        ))}
-
-        <m.div variants={varFade({ distance: 24 }).inLeft}>
-          <Divider sx={{ borderStyle: 'dashed' }} />
-        </m.div>
-
-        {plan.options.map((option, index) => {
-          const disabled =
-            (standardLicense && [1, 2, 3].includes(index)) || (plusLicense && [3].includes(index));
-
-          return (
-            <Stack
-              key={option}
-              component={m.div}
-              variants={varFade().in}
-              spacing={1.5}
-              direction="row"
-              alignItems="center"
-              sx={{
-                typography: 'body2',
-                ...(disabled && { color: 'text.disabled', textDecoration: 'line-through' }),
-              }}
-            >
-              <Iconify width={18} icon={disabled ? 'mingcute:close-line' : 'eva:checkmark-fill'} />
-              {option}
-            </Stack>
-          );
-        })}
-      </Stack>
-
-      <m.div variants={varFade({ distance: 24 }).inUp}>
-        <Button
-          fullWidth
-          variant={plusLicense ? 'contained' : 'outlined'}
-          color="inherit"
-          size="large"
-          target="_blank"
-          rel="noopener"
-          href={paths.minimalStore}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={3}
+          alignItems={{ md: 'stretch' }}
         >
-          Get started
-        </Button>
-      </m.div>
-    </Stack>
+          {PLANS.map((plan) => {
+            const isPopular = plan.popular;
+            return (
+              <Box key={plan.title} sx={{ flex: 1, position: 'relative' }}>
+                {isPopular && (
+                  <Box sx={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}>
+                    <Chip
+                      label="Most Popular"
+                      color="primary"
+                      size="small"
+                      sx={{ fontWeight: 700, fontSize: 11, px: 1 }}
+                    />
+                  </Box>
+                )}
+                <Card
+                  sx={{
+                    p: 4,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    border: isPopular
+                      ? `2px solid ${theme.palette.primary.main}`
+                      : `1px solid ${theme.palette.divider}`,
+                    borderRadius: 3,
+                    boxShadow: isPopular ? `0 16px 48px ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+                    position: 'relative',
+                    overflow: 'visible',
+                  }}
+                >
+                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                    {plan.title}
+                  </Typography>
+
+                  <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 1 }}>
+                    <Typography variant="h3" fontWeight={800} lineHeight={1}>
+                      {plan.price}
+                    </Typography>
+                    {plan.period !== 'forever' && plan.price !== 'Custom' && (
+                      <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
+                        /{plan.period}
+                      </Typography>
+                    )}
+                    {(plan.period === 'forever' || plan.price === 'Custom') && (
+                      <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
+                        {plan.period}
+                      </Typography>
+                    )}
+                  </Stack>
+
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    {plan.description}
+                  </Typography>
+
+                  <Divider sx={{ mb: 3 }} />
+
+                  <Stack spacing={1.5} sx={{ mb: 4, flex: 1 }}>
+                    {plan.features.map((feature) => (
+                      <Stack key={feature} direction="row" alignItems="center" spacing={1}>
+                        <Iconify
+                          icon="solar:check-circle-bold"
+                          width={18}
+                          sx={{ color: isPopular ? 'primary.main' : 'success.main', flexShrink: 0 }}
+                        />
+                        <Typography variant="body2">{feature}</Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+
+                  <Button
+                    component={RouterLink}
+                    href={plan.price === 'Custom' ? '/#contact' : paths.auth.jwt.signUp}
+                    fullWidth
+                    size="large"
+                    variant={isPopular ? 'contained' : 'outlined'}
+                    color="primary"
+                    sx={{ borderRadius: 2, fontWeight: 700, py: 1.5 }}
+                  >
+                    {plan.price === 'Custom' ? 'Contact Sales' : plan.price === 'Free' ? 'Get Started Free' : 'Start 14-Day Trial'}
+                  </Button>
+                </Card>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Container>
+    </Box>
   );
 }
-
-// ----------------------------------------------------------------------
-
-const PLANS = [...Array(3)].map((_, index) => ({
-  license: ['Standard', 'Plus', 'Extended'][index],
-  price: [69, 129, 599][index],
-  commons: [
-    'One end products',
-    '12 months updates',
-    '6 months of support',
-    'One-time payments',
-    'Lifetime perpetual license.',
-  ],
-  options: [
-    'JavaScript version',
-    'TypeScript version',
-    'Design resources (Figma)',
-    'Commercial applications',
-  ],
-  icons: [
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-js.svg`,
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-ts.svg`,
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-figma.svg`,
-  ],
-}));

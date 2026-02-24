@@ -164,7 +164,8 @@ export const paths = {
 
     service: {
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service`,
-      new:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}/edit`,
       demo: {
         edit: `${ROOTS.DASHBOARD}/service/${MOCK_ID}/edit`,

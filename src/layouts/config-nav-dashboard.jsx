@@ -203,7 +203,11 @@ export const useNavData = () => {
     subheader: 'Overview',
     items: [
       { title: 'Company Dashboard', path: paths.dashboard.general.analytics, icon: ICONS.analytics },
-      { title: 'Store Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard },
+      {
+        title: 'Store Dashboard',
+        path: storeBasePath || paths.dashboard.store.list,
+        icon: ICONS.dashboard,
+      },
       { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
     ],
   },

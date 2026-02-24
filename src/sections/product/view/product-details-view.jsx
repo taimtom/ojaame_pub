@@ -26,6 +26,7 @@ import { ProductDetailsSummary } from '../product-details-summary';
 import { ProductDetailsToolbar } from '../product-details-toolbar';
 import { ProductDetailsCarousel } from '../product-details-carousel';
 import { ProductDetailsDescription } from '../product-details-description';
+import { ProductPurchaseHistoryTab, ProductSaleHistoryTab } from '../product-history-tab';
 
 // ----------------------------------------------------------------------
 
@@ -149,6 +150,8 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           {[
             { value: 'description', label: 'Description' },
             { value: 'reviews', label: `Reviews (${(product?.reviews ?? []).length})` },
+            { value: 'purchase_history', label: 'Purchase History' },
+            { value: 'sale_history', label: 'Sale History' },
           ].map((tab) => (
             <Tab key={tab.value} value={tab.value} label={tab.label} />
           ))}
@@ -165,6 +168,14 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
             totalRatings={product?.totalRatings ?? 0}
             totalReviews={product?.totalReviews ?? 0}
           />
+        )}
+
+        {tabs.value === 'purchase_history' && (
+          <ProductPurchaseHistoryTab storeId={storeId} productId={product?.id} />
+        )}
+
+        {tabs.value === 'sale_history' && (
+          <ProductSaleHistoryTab storeId={storeId} productId={product?.id} />
         )}
       </Card>
     </DashboardContent>

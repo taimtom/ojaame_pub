@@ -236,6 +236,8 @@ export function QuickDashboardView() {
   // Cart
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [saleStatus, setSaleStatus] = useState('paid');
+  const [creditCustomerName, setCreditCustomerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────
@@ -352,27 +354,29 @@ export function QuickDashboardView() {
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
     if (!storeId) { toast.error('No active store selected.'); return; }
+    if (saleStatus === 'credit' && !creditCustomerName.trim()) {
+      toast.error('Please enter the customer name for a credit sale.');
+      return;
+    }
     try {
       setSubmitting(true);
       const currencyCode = localStorage.getItem('current_currency') || 'NGN';
       await axiosInstance.post('/api/quick-dashboard/sale', {
         store_id: storeId,
         items: cart.map(({ id, type, name, quantity, unit_price, subtotal }) => ({
-          id,
-          type,
-          name,
-          quantity,
-          unit_price,
-          subtotal,
+          id, type, name, quantity, unit_price, subtotal,
         })),
         payment_method: paymentMethod,
+        status: saleStatus,
+        customer_name: saleStatus === 'credit' ? creditCustomerName.trim() : undefined,
         currency_code: currencyCode,
       });
-      toast.success(`Sale of ${fCurrency(cartTotal)} completed! 🎉`);
+      const label = saleStatus === 'credit' ? `Credit sale of ${fCurrency(cartTotal)} recorded!` : `Sale of ${fCurrency(cartTotal)} completed!`;
+      toast.success(label);
       setCart([]);
       setQuery('');
       setSearchResults([]);
-      // Refresh stats and recent sales
+      setCreditCustomerName('');
       await Promise.all([fetchStats(), fetchRecent()]);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
@@ -571,7 +575,7 @@ export function QuickDashboardView() {
               </Stack>
 
               {/* Payment method */}
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
                 <InputLabel>Payment Method</InputLabel>
                 <Select
                   value={paymentMethod}
@@ -586,21 +590,81 @@ export function QuickDashboardView() {
                 </Select>
               </FormControl>
 
+              {/* Sale status */}
+              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={saleStatus}
+                  label="Status"
+                  onChange={(e) => {
+                    setSaleStatus(e.target.value);
+                    if (e.target.value !== 'credit') setCreditCustomerName('');
+                  }}
+                >
+                  <MenuItem value="paid">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:check-circle-bold" width={16} sx={{ color: 'success.main' }} />
+                      <span>Paid</span>
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="credit">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:clock-circle-bold" width={16} sx={{ color: 'warning.main' }} />
+                      <span>Credit</span>
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="draft">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:document-bold" width={16} sx={{ color: 'text.secondary' }} />
+                      <span>Draft</span>
+                    </Stack>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Credit buyer name — shown only when status = credit */}
+              {saleStatus === 'credit' && (
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Customer Name *"
+                  placeholder="Enter buyer's name"
+                  value={creditCustomerName}
+                  onChange={(e) => setCreditCustomerName(e.target.value)}
+                  sx={{ mb: 1.5 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Iconify icon="solar:user-bold" width={16} sx={{ color: 'warning.main' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText="A customer record will be created or matched automatically"
+                />
+              )}
+
               {/* Checkout button */}
               <Button
                 fullWidth
                 size="large"
                 variant="contained"
-                color="primary"
-                disabled={!cart.length || submitting}
+                color={saleStatus === 'credit' ? 'warning' : saleStatus === 'draft' ? 'inherit' : 'primary'}
+                disabled={!cart.length || submitting || (saleStatus === 'credit' && !creditCustomerName.trim())}
                 onClick={handleCheckout}
                 startIcon={submitting
                   ? <CircularProgress size={16} color="inherit" />
-                  : <Iconify icon="solar:card-recive-bold" />
+                  : <Iconify icon={saleStatus === 'credit' ? 'solar:clock-circle-bold' : 'solar:card-recive-bold'} />
                 }
                 sx={{ fontWeight: 700, py: 1.5, fontSize: '1rem' }}
               >
-                {submitting ? 'Processing…' : `Complete Sale · ${fCurrency(cartTotal)}`}
+                {submitting
+                  ? 'Processing…'
+                  : saleStatus === 'credit'
+                    ? `Record Credit · ${fCurrency(cartTotal)}`
+                    : saleStatus === 'draft'
+                      ? `Save Draft · ${fCurrency(cartTotal)}`
+                      : `Complete Sale · ${fCurrency(cartTotal)}`
+                }
               </Button>
 
               {cart.length > 0 && (

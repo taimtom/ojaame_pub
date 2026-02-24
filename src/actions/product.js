@@ -185,6 +185,25 @@ export async function updateProductQuantity(productId, quantityData) {
  * @param {string | number} productId - The ID of the product.
  * @returns {object} - An object containing the product movement list and loading/error states.
  */
+export function useGetProductSalesHistory(storeId, productId) {
+  const key =
+    storeId && productId
+      ? [endpoints.product.salesHistory, { params: { store_id: storeId, product_id: productId } }]
+      : null;
+
+  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      productSalesHistory: Array.isArray(data) ? data : [],
+      productSalesHistoryLoading: isLoading,
+      productSalesHistoryError: error,
+      productSalesHistoryValidating: isValidating,
+    }),
+    [data, error, isLoading, isValidating]
+  );
+}
+
 export function useGetProductMovements(storeId, productId) {
   // Build the SWR key only if both storeId and productId are provided.
   const key =

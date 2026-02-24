@@ -100,6 +100,7 @@ export const endpoints = {
     quantity: '/api/product/quantity',
     history: '/api/product/history',
     movement: '/api/product/movement',
+    salesHistory: '/api/product/sales-history',
   },
   shop: {
     list: '/api/product/list',
@@ -191,6 +192,7 @@ export const endpoints = {
       topProducts: (storeId) => `/api/dashboard/${storeId}/dashboard/top-products`,
       expenses: (storeId) => `/api/dashboard/${storeId}/dashboard/expenses`,
       yearlySales: (storeId) => `/api/dashboard/${storeId}/dashboard/yearly-sales`,
+      featured: (storeId) => `/api/dashboard/${storeId}/dashboard/featured`,
       verify: (storeId) => `/api/dashboard/${storeId}/verify`
     }
   },
@@ -209,8 +211,7 @@ export const endpoints = {
     add: '/api/services/add', // For adding a new service
     edit: '/api/services/edit', // For editing a service (append /{serviceId})
     detail: '/api/services/detail',
-    // The detail endpoint is constructed directly in useGetService:
-    // `/services/detail/${storeId}/${serviceId}/`
+    saleHistory: '/api/services/sale-history',
   },
   customers: {
     list: '/api/customers/list/',
