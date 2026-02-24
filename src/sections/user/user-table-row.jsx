@@ -22,7 +22,7 @@ import { UserQuickEditForm } from './user-quick-edit-form';
 
 // ----------------------------------------------------------------------
 
-export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRow }) {
+export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRow, onResendInvite }) {
   const confirm = useBoolean();
 
   const popover = usePopover();
@@ -123,6 +123,18 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
             <Iconify icon="solar:pen-bold" />
             Edit
           </MenuItem>
+
+          {row.status === 'pending' && (
+            <MenuItem
+              onClick={() => {
+                onResendInvite();
+                popover.onClose();
+              }}
+            >
+              <Iconify icon="solar:letter-bold" />
+              Resend Invitation
+            </MenuItem>
+          )}
         </MenuList>
       </CustomPopover>
 
