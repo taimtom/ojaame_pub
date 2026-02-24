@@ -34,6 +34,14 @@ export const updateUserDetails = async (invitationId, userData) => {
 
 
 // ----------------------------------------------------------------------
+// resendInvitation - Resends the invitation email to a pending user.
+// ----------------------------------------------------------------------
+export const resendInvitation = async (userId) => {
+  const response = await axiosInstance.post(`${endpoints.user.resendInvite}${userId}`);
+  return response.data;
+};
+
+// ----------------------------------------------------------------------
 // editUserDetails - Admin updates user details via a PUT request.
 // ----------------------------------------------------------------------
 export const editUserDetails = async (userId, userData) => {

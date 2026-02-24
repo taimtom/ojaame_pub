@@ -49,6 +49,7 @@ export const endpoints = {
   user: {
     invite: '/api/auth/invite', // POST endpoint to invite a user
     updateInvite: '/api/auth/update/', // POST endpoint to update details; append invitation_id
+    resendInvite: '/api/auth/resend/', // POST endpoint to resend invite; append user_id
     list: '/api/auth/list',
     details: '/api/auth/details',
     edit: '/api/auth/edit',

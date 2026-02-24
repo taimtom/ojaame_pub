@@ -18,7 +18,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import { varAlpha } from 'src/theme/styles';
-import { useGetUsers } from 'src/actions/user';
+import { useGetUsers, resendInvitation } from 'src/actions/user';
 import { useGetRoles } from 'src/actions/role';
 import { USER_STATUS_OPTIONS } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -139,6 +139,17 @@ export function UserListView() {
     },
     [router]
   );
+
+  const handleResendInvite = useCallback(async (id) => {
+    try {
+      await resendInvitation(id);
+      toast.success('Invitation resent successfully!');
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail || error?.message || 'Failed to resend invitation';
+      toast.error(message);
+    }
+  }, []);
 
   const handleFilterStatus = useCallback(
     (event, newValue) => {
@@ -276,6 +287,7 @@ export function UserListView() {
                         onSelectRow={() => table.onSelectRow(row.user_id)}
                         onDeleteRow={() => handleDeleteRow(row.user_id)}
                         onEditRow={() => handleEditRow(row.user_id)}
+                        onResendInvite={() => handleResendInvite(row.user_id)}
                       />
                     ))}
 
