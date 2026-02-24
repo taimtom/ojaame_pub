@@ -17,6 +17,9 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Alert from '@mui/material/Alert';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -60,6 +63,10 @@ export const NewProductSchema = zod
     subDescription: zod.string().optional(),
     taxes: zod.number().optional(),
     publish: zod.string().optional(),
+    // Pack fields
+    is_pack: zod.boolean().optional(),
+    quantity_per_pack: zod.number().optional(),
+    cost_price_per_pack: zod.number().optional(),
     saleLabel: zod
       .object({
         enabled: zod.boolean(),
@@ -74,16 +81,32 @@ export const NewProductSchema = zod
       .optional(),
   })
   .refine((data) => {
-    // If costPrice is provided, it must not be greater than price.
-    // And if a sale price is provided, costPrice must not exceed it either.
+    if (data.is_pack) {
+      if (!data.quantity_per_pack || data.quantity_per_pack < 1) return false;
+    }
+    return true;
+  }, {
+    message: 'Quantity per pack must be at least 1.',
+    path: ['quantity_per_pack'],
+  })
+  .refine((data) => {
+    if (data.is_pack && (data.cost_price_per_pack === undefined || data.cost_price_per_pack === null)) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Cost price per pack is required for pack products.',
+    path: ['cost_price_per_pack'],
+  })
+  .refine((data) => {
     if (data.costPrice !== undefined) {
       if (data.costPrice > data.price) return false;
       if (data.priceSale !== undefined && data.costPrice > data.priceSale) return false;
     }
     return true;
   }, {
-    message: "Cost price must not be greater than regular price or sale price.",
-    path: ["costPrice"],
+    message: 'Cost price must not be greater than regular price or sale price.',
+    path: ['costPrice'],
   });
 
 
@@ -96,10 +119,13 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
 
   const [includeTaxes, setIncludeTaxes] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
-   const [coverUrlInput, setcoverUrlInput] = useState('');
-   const [newImageUrl, setNewImageUrl] = useState('');
+  const [coverUrlInput, setcoverUrlInput] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [productType, setProductType] = useState(
+    currentProduct?.is_pack ? 'pack' : 'single'
+  );
 
-   const [isPublish, setIsPublish] = useState(
+  const [isPublish, setIsPublish] = useState(
     currentProduct?.publish === 'publish'
   );
 
@@ -118,7 +144,6 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       description: currentProduct?.description || '',
       subDescription: currentProduct?.subDescription || '',
       images: currentProduct?.images || [],
-      //
       code: currentProduct?.code || '',
       sku: currentProduct?.sku || '',
       coverUrl: currentProduct?.coverUrl || '',
@@ -135,7 +160,10 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       newLabel: currentProduct?.newLabel || { enabled: false, content: '' },
       saleLabel: currentProduct?.saleLabel || { enabled: false, content: '' },
       publish: currentProduct?.publish || 'draft',
-
+      // Pack fields
+      is_pack: currentProduct?.is_pack || false,
+      quantity_per_pack: currentProduct?.quantity_per_pack || null,
+      cost_price_per_pack: currentProduct?.cost_price_per_pack || null,
     }),
     [currentProduct, defaultCategory]
   );
@@ -159,6 +187,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
     if (currentProduct) {
       reset(defaultValues);
       setIsPublish(currentProduct.publish === 'publish');
+      setProductType(currentProduct.is_pack ? 'pack' : 'single');
     }
   }, [currentProduct, defaultValues, reset]);
 
@@ -171,7 +200,29 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
     }
   }, [currentProduct?.taxes, includeTaxes, setValue]);
 
-   // Updated removal function compares images by URL.
+  const handleProductTypeChange = useCallback(
+    (_, newType) => {
+      if (!newType) return;
+      setProductType(newType);
+      const isPack = newType === 'pack';
+      setValue('is_pack', isPack);
+      if (!isPack) {
+        setValue('quantity_per_pack', null);
+        setValue('cost_price_per_pack', null);
+      }
+    },
+    [setValue]
+  );
+
+  // Auto-calculated cost per item for pack products (display only)
+  const costPricePerPack = values.cost_price_per_pack;
+  const quantityPerPack = values.quantity_per_pack;
+  const calculatedCostPerItem =
+    values.is_pack && costPricePerPack > 0 && quantityPerPack > 0
+      ? (costPricePerPack / quantityPerPack).toFixed(4)
+      : null;
+
+  // Updated removal function compares images by URL.
   const handleRemoveFile = useCallback(
     (inputFile) => {
       const inputUrl =
@@ -212,6 +263,21 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
 
       // Set publish state.
       data.publish = isPublish ? 'publish' : 'draft';
+
+      // For pack products:
+      // - derive costPrice (cost per item) from pack cost / quantity per pack
+      // - expand quantity to total individual units (packs × items per pack)
+      if (data.is_pack && data.quantity_per_pack > 0) {
+        data.quantity *= data.quantity_per_pack;
+        if (data.cost_price_per_pack > 0) {
+          data.costPrice = parseFloat((data.cost_price_per_pack / data.quantity_per_pack).toFixed(4));
+        }
+      }
+      // For single products, clear pack-specific fields
+      if (!data.is_pack) {
+        data.quantity_per_pack = null;
+        data.cost_price_per_pack = null;
+      }
 
       // Call your API to add or edit the product
       let response;
@@ -290,17 +356,51 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       <CardHeader title="Details" subheader="Title, short description, image..." sx={{ mb: 3 }} />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
-        {/* Mark important fields with an asterisk */}
         <Field.Text name="name" label={`${getLabel('product', 'name')} *`} />
+
+        {/* Pack / Single item toggle */}
+        <Stack spacing={1}>
+          <Typography variant="subtitle2">Item Type</Typography>
+          <ToggleButtonGroup
+            exclusive
+            value={productType}
+            onChange={handleProductTypeChange}
+            size="small"
+          >
+            <ToggleButton value="single">Single Item</ToggleButton>
+            <ToggleButton value="pack">Pack</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+
         {isFieldVisible('product', 'quantity') && (
           <Field.Text
             name="quantity"
-            label={`${getLabel('product', 'quantity')} *`}
+            label={values.is_pack ? 'Number of Packs *' : `${getLabel('product', 'quantity')} *`}
             placeholder="0"
             type="number"
             InputLabelProps={{ shrink: true }}
+            helperText={
+              values.is_pack && values.quantity_per_pack > 0
+                ? `Total units in stock: ${(values.quantity || 0) * values.quantity_per_pack}`
+                : undefined
+            }
           />
         )}
+
+        {/* Pack-specific fields */}
+        {values.is_pack && (
+          <Stack spacing={2}>
+            <Field.Text
+              name="quantity_per_pack"
+              label="Quantity per Pack *"
+              placeholder="e.g. 12"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              helperText="How many individual units are in one pack"
+            />
+          </Stack>
+        )}
+
         <Field.Select native name="category_id" label={`${t('category')} *`} InputLabelProps={{ shrink: true }}>
           {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>
@@ -366,26 +466,53 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       <CardHeader title="Pricing" subheader="Price related inputs" sx={{ mb: 3 }} />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
-        <Field.Text
-          name="costPrice"
-          label={`Cost ${t('price')} *`}
-          placeholder="0.00"
-          type="number"
-          InputLabelProps={{ shrink: true }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
-              </InputAdornment>
-            ),
-          }}
-        />
+        {values.is_pack ? (
+          <Stack spacing={2}>
+            <Field.Text
+              name="cost_price_per_pack"
+              label={`Cost ${t('price')} per Pack *`}
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              helperText="Total purchase cost for one full pack"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            {calculatedCostPerItem !== null && (
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                Cost per item: <strong>{currencySymbol} {calculatedCostPerItem}</strong>
+                &nbsp;(auto-calculated from pack cost ÷ quantity per pack)
+              </Alert>
+            )}
+          </Stack>
+        ) : (
+          <Field.Text
+            name="costPrice"
+            label={`Cost ${t('price')} *`}
+            placeholder="0.00"
+            type="number"
+            InputLabelProps={{ shrink: true }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                </InputAdornment>
+              ),
+            }}
+          />
+        )}
          <Field.Text
           name="price"
-          label={`Regular ${t('price')} *`}
+          label={values.is_pack ? `Selling ${t('price')} per Item *` : `Regular ${t('price')} *`}
           placeholder="0.00"
           type="number"
           InputLabelProps={{ shrink: true }}
+          helperText={values.is_pack ? 'The price charged to customers per individual item' : undefined}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">

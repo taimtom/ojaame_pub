@@ -15,7 +15,6 @@ import {
 } from '@mui/x-data-grid';
 
 import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -290,10 +289,9 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
           ]}
           action={
             <Button
-              component={RouterLink}
-              href={paths.dashboard.product.new(storeSlug)}
               variant="contained"
               startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
             >
               New {productTerm}
             </Button>

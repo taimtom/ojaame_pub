@@ -15,7 +15,6 @@ import {
 } from '@mui/x-data-grid';
 
 import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -233,15 +232,14 @@ export function ProductHistoryListView({ storeSlug: propStoreSlug }) {
           heading="List"
           links={[
             { name: 'Dashboard', href: paths.dashboard.root },
-            { name: 'Product', href: paths.dashboard.product.root },
-            { name: 'List' },
+            { name: 'Product', href: paths.dashboard.product.root(storeSlug) },
+            { name: 'History' },
           ]}
           action={
             <Button
-              component={RouterLink}
-              href={paths.dashboard.product.new}
               variant="contained"
               startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
             >
               New product
             </Button>
