@@ -14,8 +14,7 @@ import { fCurrency } from 'src/utils/format-number';
 
 import { Chart, useChart } from 'src/components/chart';
 import { EmptyContent } from 'src/components/empty-content';
-import { useGetProductMovements } from 'src/actions/product';
-import { useGetProductSalesHistory } from 'src/actions/product';
+import { useGetProductMovements, useGetProductSalesHistory } from 'src/actions/product';
 
 // Status colours matching the existing product history table
 const STATUS_COLORS = {

@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-
-import { useLocation } from 'src/routes/hooks';
+import { useLocation } from 'react-router-dom';
 
 import { BackToTop } from 'src/components/animate/back-to-top';
 import { ScrollProgress, useScrollProgress } from 'src/components/animate/scroll-progress';
