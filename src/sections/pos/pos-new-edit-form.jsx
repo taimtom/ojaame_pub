@@ -39,7 +39,8 @@ export const NewInvoiceSchema = zod
       zod.object({
         product_id: zod.number().nullable().optional(),
         service_id: zod.number().nullable().optional(),
-        quantity: zod.number().min(1, { message: 'Quantity must be at least 1' }),
+        // Allow fractional quantities (e.g. 0.5, 1.25)
+        quantity: zod.number().min(0.01, { message: 'Quantity must be at least 0.01' }),
         price: zod.number().min(0, { message: 'Price must be at least 0' }),
         costPrice: zod.number().nullable().optional(),
         description: zod.string().nullable().optional(),

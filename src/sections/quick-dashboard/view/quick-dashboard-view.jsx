@@ -170,7 +170,7 @@ function ItemCard({ item, onAdd }) {
 // Cart row
 // ----------------------------------------------------------------------
 
-function CartRow({ item, onQtyChange, onRemove }) {
+function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove }) {
   const { currencySymbol } = useCurrencyFormat();
   return (
     <TableRow>
@@ -178,18 +178,47 @@ function CartRow({ item, onQtyChange, onRemove }) {
         <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 140 }}>
           {item.name}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {currencySymbol}{item.unit_price.toLocaleString()}
-        </Typography>
+        {item.allow_variable_price ? (
+          <TextField
+            value={item.unit_price}
+            onChange={(e) => onPriceChange?.(item.cartId, e.target.value)}
+            type="number"
+            variant="outlined"
+            size="small"
+            sx={{ mt: 0.25, maxWidth: 120 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                </InputAdornment>
+              ),
+            }}
+            inputProps={{ step: 0.01 }}
+            helperText={
+              item.variable_price_min != null && item.variable_price_max != null
+                ? `Var: ${currencySymbol}${item.variable_price_min}–${currencySymbol}${item.variable_price_max}`
+                : 'Variable price'
+            }
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            {currencySymbol}{item.unit_price.toLocaleString()}
+          </Typography>
+        )}
       </TableCell>
       <TableCell sx={{ py: 1 }} align="center">
         <Stack direction="row" alignItems="center" spacing={0.5}>
           <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
             <Iconify icon="eva:minus-fill" width={14} />
           </IconButton>
-          <Typography variant="body2" sx={{ minWidth: 20, textAlign: 'center' }}>
-            {item.quantity}
-          </Typography>
+          <TextField
+            value={item.quantity}
+            onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
+            type="number"
+            variant="outlined"
+            size="small"
+            inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 56 } }}
+          />
           <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
             <Iconify icon="eva:plus-fill" width={14} />
           </IconButton>
@@ -325,6 +354,9 @@ export function QuickDashboardView() {
           unit_price: item.price,
           quantity: 1,
           subtotal: item.price,
+          allow_variable_price: item.allow_variable_price ?? false,
+          variable_price_min: item.variable_price_min ?? null,
+          variable_price_max: item.variable_price_max ?? null,
         },
       ];
     });
@@ -336,10 +368,41 @@ export function QuickDashboardView() {
         .map((c) => {
           if (c.cartId !== cartId) return c;
           const newQty = c.quantity + delta;
-          if (newQty < 1) return null;
+          if (newQty < 0.01) return null;
           return { ...c, quantity: newQty, subtotal: newQty * c.unit_price };
         })
         .filter(Boolean)
+    );
+  }, []);
+
+  const setQtyExact = useCallback((cartId, rawValue) => {
+    const value = Number(rawValue);
+    if (!value || value < 0.01) return;
+    setCart((prev) =>
+      prev.map((c) =>
+        c.cartId === cartId ? { ...c, quantity: value, subtotal: value * c.unit_price } : c
+      )
+    );
+  }, []);
+
+  const changeUnitPrice = useCallback((cartId, rawValue) => {
+    const input = Number(rawValue);
+    if (Number.isNaN(input) || input < 0) return;
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        let price = input;
+        if (c.allow_variable_price) {
+          const min = c.variable_price_min;
+          const max = c.variable_price_max;
+          if (min != null && price < min) price = min;
+          if (max != null && price > max) price = max;
+        } else {
+          // If variable pricing not enabled, keep original price
+          price = c.unit_price;
+        }
+        return { ...c, unit_price: price, subtotal: price * c.quantity };
+      })
     );
   }, []);
 
@@ -557,6 +620,8 @@ export function QuickDashboardView() {
                         key={item.cartId}
                         item={item}
                         onQtyChange={changeQty}
+                        onQtyInput={setQtyExact}
+                        onPriceChange={changeUnitPrice}
                         onRemove={removeFromCart}
                       />
                     ))}
