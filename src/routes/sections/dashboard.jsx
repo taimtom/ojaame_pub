@@ -151,6 +151,7 @@ const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/website'));
 
 // Reports
+const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/store-general'));
 const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
 const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
 const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
@@ -267,7 +268,8 @@ export const dashboardRoutes = [
         {
           path: 'reports',
           children: [
-            { index: true, element: <StoreSalesTrendsReportPage /> },
+            { index: true, element: <StoreGeneralReportPage /> },
+            { path: 'general', element: <StoreGeneralReportPage /> },
             { path: 'inventory', element: <StoreInventoryReportPage /> },
             { path: 'financial', element: <StoreFinancialReportPage /> },
             { path: 'profit-loss', element: <StoreProfitLossReportPage /> },

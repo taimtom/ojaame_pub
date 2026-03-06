@@ -203,6 +203,7 @@ export const endpoints = {
     inventoryAlerts: '/api/store-dashboard/inventory-alerts',
     salesTrend: '/api/store-dashboard/sales-trend',
     categoryPerformance: '/api/store-dashboard/category-performance',
+    forecast: '/api/store-dashboard/forecast',
   },
   // Company dashboard (query-param style: ?company_id=X)
   companyDashboard: {

@@ -125,6 +125,24 @@ export function useCompanyProfitLoss(companyId, period = '30d') {
   );
 }
 
+export function useStoreForecast(storeId) {
+  const key = storeId
+    ? [endpoints.storeDashboard.forecast, { params: { store_id: storeId } }]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      forecast: data || null,
+      forecastLoading: isLoading,
+      forecastError: error,
+      refetchForecast: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
 export function useCompanyRevenueTrend(companyId, period = '1y', groupBy = 'month') {
   const key = companyId
     ? [

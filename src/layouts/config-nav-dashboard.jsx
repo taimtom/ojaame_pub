@@ -319,6 +319,7 @@ export const useNavData = () => {
         path: callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
         icon: ICONS.analytics,
         children: [
+          { title: 'General Store Reports', path: callIfFunction(paths.dashboard.reports.generalReport, currentStore) },
           { title: 'Inventory Report', path: callIfFunction(paths.dashboard.reports.inventory, currentStore) },
           { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
           { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },

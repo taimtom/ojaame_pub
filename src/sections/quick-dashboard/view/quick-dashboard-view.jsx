@@ -171,8 +171,10 @@ function ItemCard({ item, onAdd }) {
 // Cart row
 // ----------------------------------------------------------------------
 
-function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove }) {
+function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, inputMode, onToggleMode, onAmountInput }) {
   const { currencySymbol } = useCurrencyFormat();
+  const isAmountMode = inputMode === 'amount';
+
   return (
     <TableRow>
       <TableCell sx={{ py: 1, pl: 0 }}>
@@ -207,29 +209,78 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove }) {
           </Typography>
         )}
       </TableCell>
+
       <TableCell sx={{ py: 1 }} align="center">
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
-            <Iconify icon="eva:minus-fill" width={14} />
-          </IconButton>
-          <TextField
-            value={item.quantity}
-            onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
-            type="number"
-            variant="outlined"
-            size="small"
-            inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 56 } }}
-          />
-          <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
-            <Iconify icon="eva:plus-fill" width={14} />
-          </IconButton>
-        </Stack>
+        {isAmountMode ? (
+          /* ── Amount mode: user enters the total they want to pay ── */
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <TextField
+              value={item.subtotal || ''}
+              onChange={(e) => onAmountInput?.(item.cartId, e.target.value)}
+              type="number"
+              variant="outlined"
+              size="small"
+              placeholder="0"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+              inputProps={{ step: 1, min: 0, style: { textAlign: 'center', width: 60 } }}
+            />
+            <Tooltip title="Switch to quantity mode">
+              <IconButton
+                size="small"
+                onClick={() => onToggleMode?.(item.cartId)}
+                sx={{ p: 0.25, color: 'primary.main' }}
+              >
+                <Iconify icon="solar:hashtag-bold" width={14} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ) : (
+          /* ── Qty mode: default +/- stepper ── */
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
+              <Iconify icon="eva:minus-fill" width={14} />
+            </IconButton>
+            <TextField
+              value={item.quantity}
+              onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
+              type="number"
+              variant="outlined"
+              size="small"
+              inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 56 } }}
+            />
+            <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
+              <Iconify icon="eva:plus-fill" width={14} />
+            </IconButton>
+            <Tooltip title="Enter total amount instead of quantity">
+              <IconButton
+                size="small"
+                onClick={() => onToggleMode?.(item.cartId)}
+                sx={{ p: 0.25, color: 'text.secondary' }}
+              >
+                <Iconify icon="solar:dollar-minimalistic-bold" width={14} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
       </TableCell>
+
       <TableCell sx={{ py: 1, pr: 0 }} align="right">
         <Typography variant="body2" fontWeight={600}>
           {fCurrency(item.subtotal)}
         </Typography>
+        {isAmountMode && (
+          <Typography variant="caption" color="text.disabled" display="block">
+            qty: {Number(item.quantity).toFixed(4)}
+          </Typography>
+        )}
       </TableCell>
+
       <TableCell sx={{ py: 1, pr: 0, pl: 0.5 }} align="right">
         <IconButton size="small" color="error" onClick={() => onRemove(item.cartId)} sx={{ p: 0.5 }}>
           <Iconify icon="eva:trash-2-outline" width={16} />
@@ -268,6 +319,7 @@ export function QuickDashboardView() {
 
   // Cart
   const [cart, setCart] = useState([]);
+  const [rowModes, setRowModes] = useState({}); // { [cartId]: 'qty' | 'amount' }
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [saleStatus, setSaleStatus] = useState('paid');
   const [creditCustomerName, setCreditCustomerName] = useState('');
@@ -430,6 +482,33 @@ export function QuickDashboardView() {
 
   const removeFromCart = useCallback((cartId) => {
     setCart((prev) => prev.filter((c) => c.cartId !== cartId));
+    setRowModes((prev) => {
+      const next = { ...prev };
+      delete next[cartId];
+      return next;
+    });
+  }, []);
+
+  const toggleRowMode = useCallback((cartId) => {
+    setRowModes((prev) => ({
+      ...prev,
+      [cartId]: prev[cartId] === 'amount' ? 'qty' : 'amount',
+    }));
+  }, []);
+
+  // When in 'amount' mode the user types a total; qty is back-calculated
+  const setAmountExact = useCallback((cartId, rawValue) => {
+    const amount = Number(rawValue);
+    if (Number.isNaN(amount) || amount < 0) return;
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        if (c.unit_price <= 0) return c;
+        const newQty = amount / c.unit_price;
+        // Store entered amount directly so floating-point doesn't corrupt the display
+        return { ...c, quantity: newQty, subtotal: amount };
+      })
+    );
   }, []);
 
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
@@ -459,6 +538,7 @@ export function QuickDashboardView() {
       const label = saleStatus === 'credit' ? `Credit sale of ${fCurrency(cartTotal)} recorded!` : `Sale of ${fCurrency(cartTotal)} completed!`;
       toast.success(label);
       setCart([]);
+      setRowModes({});
       setQuery('');
       setSearchResults([]);
       setCreditCustomerName('');
@@ -645,6 +725,9 @@ export function QuickDashboardView() {
                         onQtyInput={setQtyExact}
                         onPriceChange={changeUnitPrice}
                         onRemove={removeFromCart}
+                        inputMode={rowModes[item.cartId] || 'qty'}
+                        onToggleMode={toggleRowMode}
+                        onAmountInput={setAmountExact}
                       />
                     ))}
                   </TableBody>
@@ -759,7 +842,7 @@ export function QuickDashboardView() {
                   fullWidth
                   size="small"
                   color="inherit"
-                  onClick={() => setCart([])}
+                  onClick={() => { setCart([]); setRowModes({}); }}
                   sx={{ mt: 1, color: 'text.secondary' }}
                 >
                   Clear cart

@@ -292,6 +292,7 @@ export const paths = {
     reports: {
       // Store-level reports (scoped by storeParam)
       storeRoot: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports`,
+      generalReport: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/general`,
       inventory: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/inventory`,
       financial: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/financial`,
       profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
