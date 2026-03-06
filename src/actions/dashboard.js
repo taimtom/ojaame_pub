@@ -206,16 +206,21 @@ export function useStoreSalesByPaymentMethod(storeId, period = 'month') {
     ? [endpoints.dashboard.store.salesByPaymentMethod(storeId), { params: { period } }]
     : null;
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    key,
+    fetcher,
+    { ...swrOptions, keepPreviousData: true }
+  );
 
   return useMemo(
     () => ({
       salesByPaymentMethod: data || [],
       salesByPaymentMethodLoading: isLoading,
+      salesByPaymentMethodValidating: isValidating,
       salesByPaymentMethodError: error,
       refetchSalesByPaymentMethod: mutate,
     }),
-    [data, error, isLoading, mutate]
+    [data, error, isLoading, isValidating, mutate]
   );
 }
 

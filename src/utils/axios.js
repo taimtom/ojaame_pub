@@ -197,6 +197,24 @@ export const endpoints = {
     }
   },
 
+  // Store-level dashboard / report endpoints (query-param style: ?store_id=X)
+  storeDashboard: {
+    stats: '/api/store-dashboard/stats',
+    inventoryAlerts: '/api/store-dashboard/inventory-alerts',
+    salesTrend: '/api/store-dashboard/sales-trend',
+    categoryPerformance: '/api/store-dashboard/category-performance',
+  },
+  // Company dashboard (query-param style: ?company_id=X)
+  companyDashboard: {
+    revenueTrend: '/api/company-dashboard/revenue-trend',
+  },
+  // Financial / company-level reports (query-param style: ?company_id=X)
+  reports: {
+    profitLoss: '/api/reports/profit-loss',
+    cashFlow: '/api/reports/cash-flow',
+    tax: '/api/reports/tax',
+  },
+
   paymentMethod:{
     add: '/api/payment/add',
     list:'/api/payment/list',

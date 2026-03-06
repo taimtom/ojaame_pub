@@ -150,6 +150,13 @@ const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 // Store website settings
 const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/website'));
 
+// Reports
+const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
+const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
+const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
+const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
+const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
+
 // ----------------------------------------------------------------------
 
 const layoutContent = (
@@ -255,6 +262,16 @@ export const dashboardRoutes = [
             { path: 'list', element: <PaymentMethodListPage /> },
             { path: 'new', element: <PaymentMethodCreatePage /> },
             { path: ':id/edit', element: <PaymentMethodEditPage /> },
+          ],
+        },
+        {
+          path: 'reports',
+          children: [
+            { index: true, element: <StoreSalesTrendsReportPage /> },
+            { path: 'inventory', element: <StoreInventoryReportPage /> },
+            { path: 'financial', element: <StoreFinancialReportPage /> },
+            { path: 'profit-loss', element: <StoreProfitLossReportPage /> },
+            { path: 'sales-trends', element: <StoreSalesTrendsReportPage /> },
           ],
         },
       ],
@@ -391,6 +408,7 @@ export const dashboardRoutes = [
               { path: ':id/edit', element: <TourEditPage /> },
             ],
           },
+          { path: 'company-reports', element: <CompanyReportsPage /> },
           { path: 'file-manager', element: <FileManagerPage /> },
           { path: 'mail', element: <MailPage /> },
           { path: 'chat', element: <ChatPage /> },

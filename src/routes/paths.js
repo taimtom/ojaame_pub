@@ -289,6 +289,17 @@ export const paths = {
         edit: `${ROOTS.DASHBOARD}/job/${MOCK_ID}/edit`,
       },
     },
+    reports: {
+      // Store-level reports (scoped by storeParam)
+      storeRoot: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports`,
+      inventory: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/inventory`,
+      financial: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/financial`,
+      profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
+      salesTrends: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/sales-trends`,
+
+      // Company-level reports (not scoped to a single store)
+      companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
+    },
     order: {
       root: `${ROOTS.DASHBOARD}/order`,
       details: (id) => `${ROOTS.DASHBOARD}/order/${id}`,

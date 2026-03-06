@@ -25,6 +25,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Grid from '@mui/material/Unstable_Grid2';
 import Tooltip from '@mui/material/Tooltip';
+import Collapse from '@mui/material/Collapse';
 
 import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -256,6 +257,9 @@ export function QuickDashboardView() {
   // Recent sales
   const [recentSales, setRecentSales] = useState([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [expandedSaleId, setExpandedSaleId] = useState(null);
+  const [saleItemsCache, setSaleItemsCache] = useState({});
+  const [loadingSaleId, setLoadingSaleId] = useState(null);
 
   // Search
   const [query, setQuery] = useState('');
@@ -300,6 +304,24 @@ export function QuickDashboardView() {
       setRecentLoading(false);
     }
   }, [storeId]);
+
+  const handleSaleClick = useCallback(async (saleId) => {
+    if (expandedSaleId === saleId) {
+      setExpandedSaleId(null);
+      return;
+    }
+    setExpandedSaleId(saleId);
+    if (saleItemsCache[saleId]) return;
+    try {
+      setLoadingSaleId(saleId);
+      const res = await axiosInstance.get(`/api/quick-dashboard/sale/${saleId}/items`);
+      setSaleItemsCache((prev) => ({ ...prev, [saleId]: res.data?.items || [] }));
+    } catch {
+      setSaleItemsCache((prev) => ({ ...prev, [saleId]: [] }));
+    } finally {
+      setLoadingSaleId(null);
+    }
+  }, [expandedSaleId, saleItemsCache]);
 
   useEffect(() => {
     fetchStats();
@@ -768,40 +790,98 @@ export function QuickDashboardView() {
                   <Typography color="text.secondary" variant="body2">No sales yet today</Typography>
                 </Box>
               )}
-              {recentSales.map((sale) => (
-                <Box
-                  key={sale.id}
-                  sx={{
-                    px: 2,
-                    py: 1.25,
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                    '&:last-child': { borderBottom: 0 },
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 130 }}>
-                        {sale.invoice_number}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {fDateShort(sale.create_date)} · {fTime(sale.create_date)}
-                      </Typography>
-                    </Box>
-                    <Stack alignItems="flex-end" spacing={0.25}>
-                      <Typography variant="body2" fontWeight={700} color="success.main">
-                        {fCurrency(sale.total_amount)}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={sale.status}
-                        color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
-                        sx={{ height: 18, fontSize: 10 }}
-                      />
+              {recentSales.map((sale) => {
+                const isExpanded = expandedSaleId === sale.id;
+                const items = saleItemsCache[sale.id] || [];
+                const isLoadingItems = loadingSaleId === sale.id;
+                return (
+                  <Box
+                    key={sale.id}
+                    sx={{
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': { borderBottom: 0 },
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      onClick={() => handleSaleClick(sale.id)}
+                      sx={{
+                        px: 2,
+                        py: 1.25,
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': { bgcolor: 'action.hover' },
+                        transition: 'background-color 0.15s',
+                      }}
+                    >
+                      <Stack direction="row" alignItems="flex-start" spacing={0.75}>
+                        <Iconify
+                          icon={isExpanded ? 'eva:chevron-down-fill' : 'eva:chevron-right-fill'}
+                          width={16}
+                          sx={{ mt: 0.25, color: 'text.secondary', flexShrink: 0 }}
+                        />
+                        <Box>
+                          <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
+                            {sale.invoice_number}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {fDateShort(sale.create_date)} · {fTime(sale.create_date)}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Stack alignItems="flex-end" spacing={0.25}>
+                        <Typography variant="body2" fontWeight={700} color="success.main">
+                          {fCurrency(sale.total_amount)}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={sale.status}
+                          color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
+                          sx={{ height: 18, fontSize: 10 }}
+                        />
+                      </Stack>
                     </Stack>
-                  </Stack>
-                </Box>
-              ))}
+
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <Box sx={{ px: 2, pb: 1.5, bgcolor: 'background.neutral' }}>
+                        {isLoadingItems ? (
+                          <Box display="flex" justifyContent="center" py={1.5}>
+                            <CircularProgress size={18} />
+                          </Box>
+                        ) : items.length === 0 ? (
+                          <Typography variant="caption" color="text.disabled" sx={{ pl: 2.5 }}>
+                            No items found
+                          </Typography>
+                        ) : (
+                          <Stack spacing={0.5} pt={0.75}>
+                            {items.map((item) => (
+                              <Stack
+                                key={item.id}
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                              >
+                                <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                                  {item.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ mx: 1, flexShrink: 0 }}>
+                                  ×{item.quantity}
+                                </Typography>
+                                <Typography variant="caption" fontWeight={600} sx={{ flexShrink: 0 }}>
+                                  {fCurrency(item.total)}
+                                </Typography>
+                              </Stack>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
+                    </Collapse>
+                  </Box>
+                );
+              })}
             </Box>
           </Card>
         </Grid>
