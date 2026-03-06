@@ -438,7 +438,7 @@ export default function StoreGeneralReportPage() {
           <Grid item xs={12} md={6}>
             <TableCard
               title="Top Products by Revenue"
-              subtitle={`Best-performing products in the selected period`}
+              subtitle="Best-performing products in the selected period"
             >
               <Table size="small">
                 <TableHead>
