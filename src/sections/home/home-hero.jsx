@@ -1,328 +1,324 @@
-import { useRef, useState } from 'react';
-import { m, useScroll, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
-
 import Box from '@mui/material/Box';
-// import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
-import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
-import AvatarGroup from '@mui/material/AvatarGroup';
-import Avatar, { avatarClasses } from '@mui/material/Avatar';
+import { alpha, useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { useResponsive } from 'src/hooks/use-responsive';
-
-import { _mock } from 'src/_mock';
-import { CONFIG } from 'src/config-global';
-import { textGradient } from 'src/theme/styles';
-
 import { Iconify } from 'src/components/iconify';
-// import { SvgColor } from 'src/components/svg-color';
-import { varFade, MotionContainer } from 'src/components/animate';
-
-import { HeroBackground } from './components/hero-background';
 
 // ----------------------------------------------------------------------
 
-const smKey = 'sm';
-const mdKey = 'md';
-const lgKey = 'lg';
-
-export function HomeHero({ sx, ...other }) {
+export function HomeHero() {
   const theme = useTheme();
 
-  const scroll = useScrollPercent();
-
-  const mdUp = useResponsive('up', mdKey);
-
-  const distance = mdUp ? scroll.percent : 0;
-
-  const y1 = useTransformY(scroll.scrollY, distance * -7);
-  const y2 = useTransformY(scroll.scrollY, distance * -6);
-  const y3 = useTransformY(scroll.scrollY, distance * -5);
-  const y4 = useTransformY(scroll.scrollY, distance * -4);
-  const y5 = useTransformY(scroll.scrollY, distance * -3);
-
-  const opacity = useTransform(
-    scroll.scrollY,
-    [0, 1],
-    [1, mdUp ? Number((1 - scroll.percent / 100).toFixed(1)) : 1]
-  );
-
-  const renderHeading = (
-    <MInview>
+  return (
+    <Box
+      id="home"
+      sx={{
+        minHeight: { xs: '100vh', md: '90vh' },
+        display: 'flex',
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        background: `linear-gradient(135deg, ${theme.palette.grey[900]} 0%, #0f172a 50%, ${alpha(
+          theme.palette.primary.dark,
+          0.9
+        )} 100%)`,
+        pt: { xs: 12, md: 8 },
+        pb: { xs: 8, md: 0 },
+      }}
+    >
+      {/* Background blobs */}
       <Box
-        component="h1"
-        display="flex"
-        flexWrap="wrap"
-        justifyContent="center"
         sx={{
-          ...theme.typography.h2,
-          my: 0,
-          mx: 'auto',
-          maxWidth: 680,
-          fontFamily: theme.typography.fontSecondaryFamily,
-          [theme.breakpoints.up(lgKey)]: { fontSize: 72, lineHeight: '90px' },
+          position: 'absolute',
+          top: '10%',
+          right: '5%',
+          width: { xs: 200, md: 420 },
+          height: { xs: 200, md: 420 },
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.25)} 0%, transparent 70%)`,
+          filter: 'blur(40px)',
+          pointerEvents: 'none',
         }}
-      >
-        <Box component="span" sx={{ width: 1, opacity: 0.24 }}>
-          Boost your building
-        </Box>
-        process with
-        <Box
-          component={m.span}
-          animate={{ backgroundPosition: '200% center' }}
-          transition={{
-            duration: 20,
-            ease: 'linear',
-            repeat: Infinity,
-            repeatType: 'reverse',
-          }}
-          sx={{
-            ...textGradient(
-              `300deg, ${theme.vars.palette.primary.main} 0%, ${theme.vars.palette.warning.main} 25%, ${theme.vars.palette.primary.main} 50%, ${theme.vars.palette.warning.main} 75%, ${theme.vars.palette.primary.main} 100%`
-            ),
-            backgroundSize: '400%',
-            ml: { xs: 0.75, md: 1, xl: 1.5 },
-          }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: '5%',
+          left: '0%',
+          width: { xs: 160, md: 300 },
+          height: { xs: 160, md: 300 },
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${alpha(theme.palette.success.main, 0.2)} 0%, transparent 70%)`,
+          filter: 'blur(40px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <Container maxWidth="lg">
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          alignItems="center"
+          spacing={{ xs: 6, md: 8 }}
         >
-          Ojaa me
-        </Box>
-      </Box>
-    </MInview>
-  );
-
-  const renderText = (
-    <MInview>
-      <Typography
-        variant="body2"
-        sx={{
-          mx: 'auto',
-          [theme.breakpoints.up(smKey)]: { whiteSpace: 'pre' },
-          [theme.breakpoints.up(lgKey)]: { fontSize: 20, lineHeight: '36px' },
-        }}
-      >
-        {`The starting point for your next project is based on MUI. \nEasy customization helps you build apps faster and better.`}
-      </Typography>
-    </MInview>
-  );
-
-  const renderRatings = (
-    <MInview>
-      <Box
-        gap={1.5}
-        display="flex"
-        flexWrap="wrap"
-        alignItems="center"
-        justifyContent="center"
-        sx={{ typography: 'subtitle2' }}
-      >
-        <AvatarGroup sx={{ [`& .${avatarClasses.root}`]: { width: 32, height: 32 } }}>
-          {[...Array(3)].map((_, index) => (
-            <Avatar
-              key={_mock.fullName(index + 1)}
-              alt={_mock.fullName(index + 1)}
-              src={_mock.image.avatar(index + 1)}
-            />
-          ))}
-        </AvatarGroup>
-        160+ Happy customers
-      </Box>
-    </MInview>
-  );
-
-  const renderButtons = (
-    <Box display="flex" flexWrap="wrap" justifyContent="center" gap={{ xs: 1.5, sm: 2 }}>
-      <MInview>
-        <Stack alignItems="center" spacing={2.5}>
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.root}
-            color="inherit"
-            size="large"
-            variant="contained"
-            startIcon={<Iconify width={24} icon="iconoir:flash" />}
-          >
-            <span>
-              Get Started
+          {/* Left: Text */}
+          <Box sx={{ flex: 1, textAlign: { xs: 'center', md: 'left' } }}>
+            {/* Badge */}
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              justifyContent={{ xs: 'center', md: 'flex-start' }}
+              sx={{ mb: 3 }}
+            >
               <Box
-                component="small"
                 sx={{
-                  mt: '-3px',
-                  opacity: 0.64,
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 10,
+                  border: `1px solid ${alpha(theme.palette.primary.light, 0.4)}`,
+                  bgcolor: alpha(theme.palette.primary.main, 0.12),
                   display: 'flex',
-                  fontSize: theme.typography.pxToRem(10),
-                  fontWeight: theme.typography.fontWeightMedium,
+                  alignItems: 'center',
+                  gap: 0.75,
                 }}
               >
-                v{CONFIG.site.version}
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: 'success.light',
+                    boxShadow: `0 0 8px ${theme.palette.success.light}`,
+                  }}
+                />
+                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 600 }}>
+                  Trusted by 500+ Businesses
+                </Typography>
               </Box>
-            </span>
-          </Button>
+            </Stack>
 
-          {/* <Link
-            color="inherit"
-            variant="body2"
-            target="_blank"
-            rel="noopener"
-            href={paths.freeUI}
-            underline="always"
-            sx={{ gap: 0.5, alignItems: 'center', display: 'inline-flex' }}
-          >
-            Get started
-            <Iconify width={16} icon="eva:external-link-fill" />
-          </Link> */}
-        </Stack>
-      </MInview>
-
-    </Box>
-  );
-
-  const renderIcons = (
-    <Stack spacing={3} sx={{ textAlign: 'center' }}>
-      <MInview>
-        <Typography variant="overline" sx={{ opacity: 0.4 }}>
-          Available For
-        </Typography>
-      </MInview>
-
-      {/* <Stack spacing={2.5} direction="row">
-        {['js', 'ts', 'nextjs', 'vite', 'figma'].map((platform) => (
-          <MInview key={platform}>
-            {platform === 'nextjs' ? (
-              <SvgColor
-                src={`${CONFIG.site.basePath}/assets/icons/platforms/ic-${platform}.svg`}
-                sx={{ width: 24, height: 24 }}
-              />
-            ) : (
+            <Typography
+              variant="h1"
+              sx={{
+                color: 'common.white',
+                fontWeight: 800,
+                lineHeight: 1.15,
+                fontSize: { xs: '2.2rem', sm: '2.8rem', md: '3.5rem', lg: '4rem' },
+                mb: 2.5,
+              }}
+            >
+              The{' '}
               <Box
-                component="img"
-                alt={platform}
-                src={`${CONFIG.site.basePath}/assets/icons/platforms/ic-${platform}.svg`}
-                sx={{ width: 24, height: 24 }}
-              />
-            )}
-          </MInview>
-        ))}
-      </Stack> */}
-    </Stack>
-  );
+                component="span"
+                sx={{
+                  background: `linear-gradient(90deg, ${theme.palette.primary.light}, ${theme.palette.success.light})`,
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                Smartest POS
+              </Box>
+              <br />
+              for Your Business
+            </Typography>
 
-  return (
-    <Stack
-      ref={scroll.elementRef}
-      component="section"
-      sx={{
-        overflow: 'hidden',
-        position: 'relative',
-        [theme.breakpoints.up(mdKey)]: {
-          minHeight: 760,
-          height: '100vh',
-          maxHeight: 1440,
-          display: 'block',
-          willChange: 'opacity',
-          mt: 'calc(var(--layout-header-desktop-height) * -1)',
-        },
-        ...sx,
-      }}
-      {...other}
-    >
-      <Box
-        component={m.div}
-        style={{ opacity }}
-        sx={{
-          width: 1,
-          display: 'flex',
-          position: 'relative',
-          flexDirection: 'column',
-          transition: theme.transitions.create(['opacity']),
-          [theme.breakpoints.up(mdKey)]: {
-            height: 1,
-            position: 'fixed',
-            maxHeight: 'inherit',
-          },
-        }}
-      >
-        <Container
-          component={MotionContainer}
-          sx={{
-            py: 3,
-            gap: 5,
-            zIndex: 9,
-            display: 'flex',
-            alignItems: 'center',
-            flexDirection: 'column',
-            [theme.breakpoints.up(mdKey)]: {
-              flex: '1 1 auto',
+            <Typography
+              variant="h6"
+              sx={{
+                color: alpha('#fff', 0.7),
+                fontWeight: 400,
+                lineHeight: 1.7,
+                mb: 4,
+                maxWidth: 500,
+                mx: { xs: 'auto', md: 0 },
+              }}
+            >
+              Manage sales, inventory, invoices, credit customers and analytics — all from one
+              powerful dashboard. Process a sale in under 30 seconds.
+            </Typography>
+
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              justifyContent={{ xs: 'center', md: 'flex-start' }}
+              sx={{ mb: 5 }}
+            >
+              <Button
+                component={RouterLink}
+                href={paths.auth.jwt.signUp}
+                size="large"
+                variant="contained"
+                color="primary"
+                endIcon={<Iconify icon="eva:arrow-forward-fill" />}
+                sx={{
+                  px: 4,
+                  py: 1.75,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.5)}`,
+                }}
+              >
+                Start Free Today
+              </Button>
+              <Button
+                component={RouterLink}
+                href={paths.auth.jwt.signIn}
+                size="large"
+                variant="outlined"
+                sx={{
+                  px: 4,
+                  py: 1.75,
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  borderColor: alpha('#fff', 0.3),
+                  color: 'common.white',
+                  '&:hover': {
+                    borderColor: 'common.white',
+                    bgcolor: alpha('#fff', 0.07),
+                  },
+                }}
+              >
+                Sign In
+              </Button>
+            </Stack>
+
+            {/* Trust row */}
+            <Stack
+              direction="row"
+              spacing={3}
+              justifyContent={{ xs: 'center', md: 'flex-start' }}
+              flexWrap="wrap"
+              useFlexGap
+            >
+              {[
+                { icon: 'solar:shield-check-bold', label: 'No credit card needed' },
+                { icon: 'solar:clock-circle-bold', label: 'Setup in 2 minutes' },
+                { icon: 'solar:star-bold', label: 'Free forever plan' },
+              ].map((item) => (
+                <Stack key={item.label} direction="row" alignItems="center" spacing={0.75}>
+                  <Iconify icon={item.icon} width={16} sx={{ color: 'success.light' }} />
+                  <Typography variant="caption" sx={{ color: alpha('#fff', 0.6) }}>
+                    {item.label}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+
+          {/* Right: Dashboard mockup */}
+          <Box
+            sx={{
+              flex: 1,
+              display: { xs: 'none', md: 'flex' },
               justifyContent: 'center',
-              py: 'var(--layout-header-desktop-height)',
-            },
-          }}
-        >
-          <Stack spacing={3} sx={{ textAlign: 'center' }}>
-            <m.div style={{ y: y1 }}>{renderHeading}</m.div>
-            <m.div style={{ y: y2 }}>{renderText}</m.div>
-          </Stack>
-          <m.div style={{ y: y3 }}>{renderRatings}</m.div>
-          <m.div style={{ y: y4 }}>{renderButtons}</m.div>
-          <m.div style={{ y: y5 }}>{renderIcons}</m.div>
-        </Container>
+              position: 'relative',
+            }}
+          >
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: 520,
+                borderRadius: 3,
+                overflow: 'hidden',
+                border: `1px solid ${alpha('#fff', 0.12)}`,
+                boxShadow: `0 32px 80px ${alpha('#000', 0.5)}`,
+                bgcolor: alpha(theme.palette.grey[900], 0.8),
+                backdropFilter: 'blur(12px)',
+                p: 3,
+              }}
+            >
+              {/* Mock top bar */}
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
+                {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
+                  <Box key={c} sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c }} />
+                ))}
+                <Box sx={{ flex: 1 }} />
+                <Typography variant="caption" sx={{ color: alpha('#fff', 0.4) }}>
+                  ⚡ Quick Dashboard
+                </Typography>
+              </Stack>
 
-        <HeroBackground />
-      </Box>
-    </Stack>
-  );
-}
+              {/* Mock stats row */}
+              <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+                {[
+                  { label: "Today's Revenue", value: '₦48,500', color: 'success.main' },
+                  { label: 'Transactions', value: '23', color: 'info.main' },
+                  { label: 'Top Item', value: 'Phone Case', color: 'warning.main' },
+                ].map((s) => (
+                  <Box
+                    key={s.label}
+                    sx={{
+                      flex: 1,
+                      borderRadius: 1.5,
+                      p: 1.5,
+                      bgcolor: alpha('#fff', 0.05),
+                      border: `1px solid ${alpha('#fff', 0.07)}`,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: alpha('#fff', 0.45), display: 'block' }}>
+                      {s.label}
+                    </Typography>
+                    <Typography variant="subtitle2" sx={{ color: s.color, fontWeight: 700 }}>
+                      {s.value}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
 
-// ----------------------------------------------------------------------
+              {/* Mock cart */}
+              <Box
+                sx={{
+                  borderRadius: 1.5,
+                  p: 2,
+                  bgcolor: alpha('#fff', 0.04),
+                  border: `1px solid ${alpha('#fff', 0.07)}`,
+                  mb: 2,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), mb: 1, display: 'block' }}>
+                  Cart · 3 items
+                </Typography>
+                {[
+                  { name: 'Coca-Cola 50cl', qty: 2, price: '₦600' },
+                  { name: 'Phone Charging', qty: 1, price: '₦200' },
+                ].map((item) => (
+                  <Stack key={item.name} direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: alpha('#fff', 0.7) }}>
+                      {item.name} ×{item.qty}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'success.light', fontWeight: 600 }}>
+                      {item.price}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Box>
 
-function MInview({ children, component = m.div }) {
-  return (
-    <Box component={component} variants={varFade({ distance: 24 }).inUp}>
-      {children}
+              {/* Mock complete button */}
+              <Box
+                sx={{
+                  borderRadius: 1.5,
+                  py: 1.5,
+                  textAlign: 'center',
+                  bgcolor: theme.palette.primary.main,
+                  cursor: 'default',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ color: 'common.white', fontWeight: 700 }}>
+                  💳 Complete Sale · ₦800
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Stack>
+      </Container>
     </Box>
   );
-}
-
-// ----------------------------------------------------------------------
-
-function useTransformY(value, distance) {
-  const physics = {
-    mass: 0.1,
-    damping: 20,
-    stiffness: 300,
-    restDelta: 0.001,
-  };
-
-  return useSpring(useTransform(value, [0, 1], [0, distance]), physics);
-}
-
-function useScrollPercent() {
-  const elementRef = useRef(null);
-
-  const { scrollY } = useScroll();
-
-  const [percent, setPercent] = useState(0);
-
-  useMotionValueEvent(scrollY, 'change', (scrollHeight) => {
-    let heroHeight = 0;
-
-    if (elementRef.current) {
-      heroHeight = elementRef.current.offsetHeight;
-    }
-
-    const scrollPercent = Math.floor((scrollHeight / heroHeight) * 100);
-
-    if (scrollPercent >= 100) {
-      setPercent(100);
-    } else {
-      setPercent(Math.floor(scrollPercent));
-    }
-  });
-
-  return { elementRef, percent, scrollY };
 }

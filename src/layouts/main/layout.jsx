@@ -1,6 +1,8 @@
-import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 import { usePathname } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -33,9 +35,6 @@ export function MainLayout({ sx, data, children }) {
       <NavMobile data={navData} open={mobileNavOpen.value} onClose={mobileNavOpen.onFalse} />
 
       <LayoutSection
-        /** **************************************
-         * Header
-         *************************************** */
         headerSection={
           <HeaderBase
             layoutQuery={layoutQuery}
@@ -48,13 +47,10 @@ export function MainLayout({ sx, data, children }) {
               workspaces: false,
               localization: false,
               notifications: false,
+              settings: false,
+              purchase: false,
             }}
             slots={{
-              topArea: (
-                <Alert severity="info" sx={{ display: 'none', borderRadius: 0 }}>
-                  This is an info Alert.
-                </Alert>
-              ),
               rightAreaStart: (
                 <NavDesktop
                   data={navData}
@@ -67,16 +63,26 @@ export function MainLayout({ sx, data, children }) {
                   }}
                 />
               ),
+              rightAreaEnd: (
+                <Button
+                  component={RouterLink}
+                  href={paths.auth.jwt.signUp}
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  sx={{
+                    display: 'none',
+                    ml: 2,
+                    [theme.breakpoints.up(layoutQuery)]: { display: 'inline-flex' },
+                  }}
+                >
+                  Get Started
+                </Button>
+              ),
             }}
           />
         }
-        /** **************************************
-         * Footer
-         *************************************** */
         footerSection={homePage ? <HomeFooter /> : <Footer layoutQuery={layoutQuery} />}
-        /** **************************************
-         * Style
-         *************************************** */
         sx={sx}
       >
         <Main>{children}</Main>

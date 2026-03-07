@@ -79,9 +79,9 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
     return `${method.method_type.replace('_', ' ').toUpperCase()}${method.issuer ? ` — ${method.issuer}` : ''}`;
   };
 
-  // Initialize new payment with remaining amount for new invoices
+  // For new invoices keep the first payment row's amount in sync with the total
   useEffect(() => {
-    if (!currentInvoice && fields.length === 1) {
+    if (!currentInvoice && fields.length === 1 && totalAmount > 0) {
       setValue(`payments.0.amount`, totalAmount);
     }
   }, [currentInvoice, fields.length, totalAmount, setValue]);

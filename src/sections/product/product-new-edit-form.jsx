@@ -65,8 +65,13 @@ export const NewProductSchema = zod
     publish: zod.string().optional(),
     // Pack fields
     is_pack: zod.boolean().optional(),
-    quantity_per_pack: zod.number().optional(),
-    cost_price_per_pack: zod.number().optional(),
+    // Allow null so single items (non‑pack) can submit with these cleared
+    quantity_per_pack: zod.number().nullable().optional(),
+    cost_price_per_pack: zod.number().nullable().optional(),
+    // Variable pricing fields
+    allow_variable_price: zod.boolean().optional(),
+    variable_price_min: zod.number().nullable().optional(),
+    variable_price_max: zod.number().nullable().optional(),
     saleLabel: zod
       .object({
         enabled: zod.boolean(),
@@ -88,6 +93,18 @@ export const NewProductSchema = zod
   }, {
     message: 'Quantity per pack must be at least 1.',
     path: ['quantity_per_pack'],
+  })
+  .refine((data) => {
+    if (data.allow_variable_price) {
+      const { variable_price_min: min, variable_price_max: max } = data;
+      if (min == null || max == null) return false;
+      if (min < 0 || max < 0) return false;
+      if (min > max) return false;
+    }
+    return true;
+  }, {
+    message: 'When variable pricing is enabled, both min and max must be set and min must not exceed max.',
+    path: ['variable_price_max'],
   })
   .refine((data) => {
     if (data.is_pack && (data.cost_price_per_pack === undefined || data.cost_price_per_pack === null)) {
@@ -148,7 +165,13 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       sku: currentProduct?.sku || '',
       coverUrl: currentProduct?.coverUrl || '',
       price: currentProduct?.price || 0,
-      quantity: currentProduct?.quantity || 0,
+      // For pack products the DB stores total units; display as number of packs
+      quantity:
+        currentProduct
+          ? currentProduct.is_pack && currentProduct.quantity_per_pack > 0
+            ? Math.round(currentProduct.quantity / currentProduct.quantity_per_pack)
+            : currentProduct.quantity ?? 0
+          : 1,
       costPrice: currentProduct?.costPrice || 0,
       priceSale: currentProduct?.priceSale || 0,
       tags: currentProduct?.tags || [],
@@ -164,6 +187,10 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       is_pack: currentProduct?.is_pack || false,
       quantity_per_pack: currentProduct?.quantity_per_pack || null,
       cost_price_per_pack: currentProduct?.cost_price_per_pack || null,
+      // Variable pricing fields
+      allow_variable_price: currentProduct?.allow_variable_price || false,
+      variable_price_min: currentProduct?.variable_price_min ?? null,
+      variable_price_max: currentProduct?.variable_price_max ?? null,
     }),
     [currentProduct, defaultCategory]
   );
@@ -221,6 +248,8 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
     values.is_pack && costPricePerPack > 0 && quantityPerPack > 0
       ? (costPricePerPack / quantityPerPack).toFixed(4)
       : null;
+  
+  console.log('values', values);
 
   // Updated removal function compares images by URL.
   const handleRemoveFile = useCallback(
@@ -264,16 +293,9 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       // Set publish state.
       data.publish = isPublish ? 'publish' : 'draft';
 
-      // For pack products:
-      // - derive costPrice (cost per item) from pack cost / quantity per pack
-      // - expand quantity to total individual units (packs × items per pack)
-      if (data.is_pack && data.quantity_per_pack > 0) {
-        data.quantity *= data.quantity_per_pack;
-        if (data.cost_price_per_pack > 0) {
-          data.costPrice = parseFloat((data.cost_price_per_pack / data.quantity_per_pack).toFixed(4));
-        }
-      }
-      // For single products, clear pack-specific fields
+      // For single products, clear pack-specific fields.
+      // Pack expansion (quantity × quantity_per_pack, costPrice calculation) is
+      // handled exclusively by the backend to avoid double-multiplication.
       if (!data.is_pack) {
         data.quantity_per_pack = null;
         data.cost_price_per_pack = null;
@@ -535,6 +557,55 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
             ),
           }}
         />
+        {/* Variable pricing controls */}
+        <FormControlLabel
+          control={
+            <Switch
+              checked={values.allow_variable_price || false}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setValue('allow_variable_price', enabled);
+                if (!enabled) {
+                  setValue('variable_price_min', null);
+                  setValue('variable_price_max', null);
+                }
+              }}
+            />
+          }
+          label="Allow variable pricing"
+        />
+        {values.allow_variable_price && (
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <Field.Text
+              name="variable_price_min"
+              label="Min variable price"
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Field.Text
+              name="variable_price_max"
+              label="Max variable price"
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
+        )}
         <FormControlLabel
           control={
             <Switch

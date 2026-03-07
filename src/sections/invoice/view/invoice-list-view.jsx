@@ -25,7 +25,7 @@ import { sumBy } from 'src/utils/helper';
 import { paramCase } from 'src/utils/change-case';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
-import { useGetSales } from 'src/actions/sale';
+import { useGetSales, markSaleAsPaid } from 'src/actions/sale';
 // import { paramCase } from 'src/utils/change-case';
 
 import { varAlpha } from 'src/theme/styles';
@@ -236,6 +236,21 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
       router.push(paths.dashboard.invoice.historylist(storeSlug, id));
     },
     [router, storeSlug]
+  );
+
+  const handleMarkAsPaid = useCallback(
+    async (id) => {
+      try {
+        await markSaleAsPaid(id);
+        setTableData((prev) =>
+          prev.map((row) => (row.id === id ? { ...row, status: 'paid' } : row))
+        );
+        toast.success('Sale marked as paid!');
+      } catch (error) {
+        toast.error(error?.response?.data?.detail || 'Failed to mark sale as paid.');
+      }
+    },
+    []
   );
 
   const handleFilterStatus = useCallback(
@@ -453,6 +468,7 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
                         onEditRow={() => handleEditRow(row.id)}
                         onHistoryRow={() => handleHistoryRow(row.id)}
                         onDeleteRow={() => handleDeleteRow(row.id)}
+                        onMarkAsPaid={() => handleMarkAsPaid(row.id)}
                       />
                     ))}
 

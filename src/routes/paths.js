@@ -164,7 +164,8 @@ export const paths = {
 
     service: {
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service`,
-      new:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}/edit`,
       demo: {
         edit: `${ROOTS.DASHBOARD}/service/${MOCK_ID}/edit`,
@@ -287,6 +288,18 @@ export const paths = {
         details: `${ROOTS.DASHBOARD}/job/${MOCK_ID}`,
         edit: `${ROOTS.DASHBOARD}/job/${MOCK_ID}/edit`,
       },
+    },
+    reports: {
+      // Store-level reports (scoped by storeParam)
+      storeRoot: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports`,
+      generalReport: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/general`,
+      inventory: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/inventory`,
+      financial: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/financial`,
+      profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
+      salesTrends: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/sales-trends`,
+
+      // Company-level reports (not scoped to a single store)
+      companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
     },
     order: {
       root: `${ROOTS.DASHBOARD}/order`,

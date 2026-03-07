@@ -4,7 +4,7 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
-import { iconButtonClasses } from '@mui/material/IconButton';
+import IconButton, { iconButtonClasses } from '@mui/material/IconButton';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -112,25 +112,48 @@ export function DashboardLayout({ sx, children, data }) {
                 </Alert>
               ),
               rightAreaStart: (
-                <Tooltip title="Quick Sale ⚡">
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="primary"
-                    onClick={() => router.push(paths.dashboard.quickDashboard)}
-                    startIcon={<Iconify icon="solar:bolt-bold" width={16} />}
-                    sx={{
-                      mr: 0.5,
-                      px: 1.5,
-                      minWidth: 0,
-                      height: 34,
-                      fontWeight: 700,
-                      display: { xs: 'none', sm: 'inline-flex' },
-                    }}
-                  >
-                    Quick Sale
-                  </Button>
-                </Tooltip>
+                <>
+                  {/* Full button on sm+ screens */}
+                  <Tooltip title="Quick Sale ⚡">
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      onClick={() => router.push(paths.dashboard.quickDashboard)}
+                      startIcon={<Iconify icon="solar:bolt-bold" width={16} />}
+                      sx={{
+                        mr: 0.5,
+                        px: 1.5,
+                        minWidth: 0,
+                        height: 34,
+                        fontWeight: 700,
+                        display: { xs: 'none', sm: 'inline-flex' },
+                      }}
+                    >
+                      Quick Sale
+                    </Button>
+                  </Tooltip>
+
+                  {/* Icon-only button on mobile */}
+                  <Tooltip title="Quick Sale ⚡">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => router.push(paths.dashboard.quickDashboard)}
+                      sx={{
+                        mr: 0.5,
+                        display: { xs: 'inline-flex', sm: 'none' },
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        width: 34,
+                        height: 34,
+                        '&:hover': { bgcolor: 'primary.dark' },
+                      }}
+                    >
+                      <Iconify icon="solar:bolt-bold" width={18} />
+                    </IconButton>
+                  </Tooltip>
+                </>
               ),
               bottomArea: isNavHorizontal ? (
                 <NavHorizontal

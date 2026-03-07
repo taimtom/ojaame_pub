@@ -134,12 +134,12 @@ export function ServiceListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
-  // const handleViewRow = useCallback(
-  //   (id) => {
-  //     router.push(paths.dashboard.service.details(storeSlug, id));
-  //   },
-  //   [router, storeSlug]
-  // );
+  const handleViewRow = useCallback(
+    (id) => {
+      router.push(paths.dashboard.service.details(storeSlug, id));
+    },
+    [router, storeSlug]
+  );
 
   const CustomToolbarCallback = useCallback(
     () => (
@@ -202,7 +202,12 @@ export function ServiceListView({ storeSlug: propStoreSlug }) {
       filterable: false,
       disableColumnMenu: true,
       getActions: (params) => [
-
+        <GridActionsCellItem
+          showInMenu
+          icon={<Iconify icon="solar:eye-bold" />}
+          label="View"
+          onClick={() => handleViewRow(params.row.id)}
+        />,
         <GridActionsCellItem
           showInMenu
           icon={<Iconify icon="solar:pen-bold" />}
