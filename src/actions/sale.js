@@ -255,6 +255,23 @@ export async function removeSalePayment(saleId, paymentId) {
 }
 
 /**
+ * markSaleAsPaid - Marks a credit sale as fully paid.
+ *
+ * @param {string|number} saleId - The ID of the credit sale to mark as paid.
+ * @returns {Promise<object>} - The updated sale data.
+ */
+export async function markSaleAsPaid(saleId) {
+  try {
+    const url = `/api/sales/${saleId}/mark-paid`;
+    const response = await axiosInstance.post(url);
+    return response.data;
+  } catch (error) {
+    console.error('Error marking sale as paid:', error);
+    throw error;
+  }
+}
+
+/**
  * deleteSale - Deletes/voids a sale.
  *
  * @param {string|number} saleId - The ID of the sale to delete.

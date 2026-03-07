@@ -24,8 +24,9 @@ import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
-export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditRow, onHistoryRow, onDeleteRow }) {
+export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditRow, onHistoryRow, onDeleteRow, onMarkAsPaid }) {
   const confirm = useBoolean();
+  const confirmPaid = useBoolean();
 
   const popover = usePopover();
   const customerName = row.customer_name || 'N/A';
@@ -183,6 +184,19 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
             SalesHistory
           </MenuItem>
 
+          {row.status === 'credit' && (
+            <MenuItem
+              onClick={() => {
+                confirmPaid.onTrue();
+                popover.onClose();
+              }}
+              sx={{ color: 'success.main' }}
+            >
+              <Iconify icon="solar:check-circle-bold" />
+              Mark as Paid
+            </MenuItem>
+          )}
+
           <Divider sx={{ borderStyle: 'dashed' }} />
 
           <MenuItem
@@ -206,6 +220,22 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
         action={
           <Button variant="contained" color="error" onClick={onDeleteRow}>
             Delete
+          </Button>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmPaid.value}
+        onClose={confirmPaid.onFalse}
+        title="Mark as Paid"
+        content={
+          <>
+            Mark <strong>{row.customer_name || 'this sale'}</strong> ({row.invoice_number}) as fully paid?
+          </>
+        }
+        action={
+          <Button variant="contained" color="success" onClick={() => { onMarkAsPaid(); confirmPaid.onFalse(); }}>
+            Confirm
           </Button>
         }
       />

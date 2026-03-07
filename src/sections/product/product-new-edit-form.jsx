@@ -165,7 +165,13 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       sku: currentProduct?.sku || '',
       coverUrl: currentProduct?.coverUrl || '',
       price: currentProduct?.price || 0,
-      quantity: currentProduct ? (currentProduct.quantity ?? 0) : 1,
+      // For pack products the DB stores total units; display as number of packs
+      quantity:
+        currentProduct
+          ? currentProduct.is_pack && currentProduct.quantity_per_pack > 0
+            ? Math.round(currentProduct.quantity / currentProduct.quantity_per_pack)
+            : currentProduct.quantity ?? 0
+          : 1,
       costPrice: currentProduct?.costPrice || 0,
       priceSale: currentProduct?.priceSale || 0,
       tags: currentProduct?.tags || [],
@@ -287,20 +293,12 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       // Set publish state.
       data.publish = isPublish ? 'publish' : 'draft';
 
-      // For pack products:
-      // - derive costPrice (cost per item) from pack cost / quantity per pack
-      // - expand quantity to total individual units (packs × items per pack)
-      if (data.is_pack && data.quantity_per_pack > 0) {
-        data.quantity *= data.quantity_per_pack;
-        if (data.cost_price_per_pack > 0) {
-          data.costPrice = parseFloat((data.cost_price_per_pack / data.quantity_per_pack).toFixed(4));
-        }
-      }
-      // For single products, clear pack-specific fields
+      // For single products, clear pack-specific fields.
+      // Pack expansion (quantity × quantity_per_pack, costPrice calculation) is
+      // handled exclusively by the backend to avoid double-multiplication.
       if (!data.is_pack) {
         data.quantity_per_pack = null;
         data.cost_price_per_pack = null;
-        console.log('data', data);
       }
 
       // Call your API to add or edit the product
