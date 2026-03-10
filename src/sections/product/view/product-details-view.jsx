@@ -300,7 +300,7 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
             label="Stock Value"
             value={fCurrency(stockValue)}
             color="warning"
-            sub={`at cost price`}
+          sub="at cost price"
           />
         )}
       </Stack>
@@ -359,8 +359,8 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           onChange={tabs.onChange}
           sx={{
             px: 3,
-            boxShadow: (theme) =>
-              `inset 0 -2px 0 0 ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
+            boxShadow: (t) =>
+              `inset 0 -2px 0 0 ${varAlpha(t.vars.palette.grey['500Channel'], 0.08)}`,
           }}
         >
           {[
