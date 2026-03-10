@@ -98,8 +98,10 @@ export const endpoints = {
     edit: '/api/product/edit',
     add: '/api/product/add',
     quantity: '/api/product/quantity',
+    adjust: '/api/product/adjust',
     history: '/api/product/history',
     movement: '/api/product/movement',
+    salesHistory: '/api/product/sales-history',
   },
   shop: {
     list: '/api/product/list',
@@ -191,8 +193,28 @@ export const endpoints = {
       topProducts: (storeId) => `/api/dashboard/${storeId}/dashboard/top-products`,
       expenses: (storeId) => `/api/dashboard/${storeId}/dashboard/expenses`,
       yearlySales: (storeId) => `/api/dashboard/${storeId}/dashboard/yearly-sales`,
+      featured: (storeId) => `/api/dashboard/${storeId}/dashboard/featured`,
       verify: (storeId) => `/api/dashboard/${storeId}/verify`
     }
+  },
+
+  // Store-level dashboard / report endpoints (query-param style: ?store_id=X)
+  storeDashboard: {
+    stats: '/api/store-dashboard/stats',
+    inventoryAlerts: '/api/store-dashboard/inventory-alerts',
+    salesTrend: '/api/store-dashboard/sales-trend',
+    categoryPerformance: '/api/store-dashboard/category-performance',
+    forecast: '/api/store-dashboard/forecast',
+  },
+  // Company dashboard (query-param style: ?company_id=X)
+  companyDashboard: {
+    revenueTrend: '/api/company-dashboard/revenue-trend',
+  },
+  // Financial / company-level reports (query-param style: ?company_id=X)
+  reports: {
+    profitLoss: '/api/reports/profit-loss',
+    cashFlow: '/api/reports/cash-flow',
+    tax: '/api/reports/tax',
   },
 
   paymentMethod:{
@@ -209,8 +231,7 @@ export const endpoints = {
     add: '/api/services/add', // For adding a new service
     edit: '/api/services/edit', // For editing a service (append /{serviceId})
     detail: '/api/services/detail',
-    // The detail endpoint is constructed directly in useGetService:
-    // `/services/detail/${storeId}/${serviceId}/`
+    saleHistory: '/api/services/sale-history',
   },
   customers: {
     list: '/api/customers/list/',
@@ -228,5 +249,14 @@ export const endpoints = {
     edit: '/api/sales/edit',
     history: '/api/sales/history/',
     saleslist: '/api/sales/historylist/',
+  },
+
+  notifications: {
+    list: '/api/notifications/list',
+    summary: '/api/notifications/summary',
+    markAllRead: '/api/notifications/mark-all-read',
+    markRead: (id) => `/api/notifications/${id}/read`,
+    archive: (id) => `/api/notifications/${id}/archive`,
+    generate: '/api/notifications/generate',
   },
 };

@@ -71,8 +71,13 @@ export const useNavData = () => {
   const { getNavLabel, t } = useBusinessType();
   const { userPermissions } = usePermissions();
 
-  // 1. Hydrate currentStore from URL or localStorage
-  let currentStore = storeParam;
+  // 1. Hydrate currentStore from URL or localStorage.
+  // A valid storeParam must end with a numeric ID (e.g. "my-store-42").
+  // Reject strings like "null", "undefined", or plain page-names that can
+  // land in :storeParam when a route is accidentally visited.
+  const isValidStoreParam = (p) => Boolean(p && /^.+-\d+$/.test(p));
+
+  let currentStore = isValidStoreParam(storeParam) ? storeParam : null;
   if (!currentStore) {
     try {
       const raw = localStorage.getItem('activeWorkspace');
@@ -89,12 +94,18 @@ export const useNavData = () => {
 
   // 2. Redirect away from any store-scoped page if no currentStore
   React.useEffect(() => {
-    const isStoreMgmt = location.pathname.startsWith(paths.dashboard.store.list);
-    const isAnalytics = location.pathname === paths.dashboard.general.analytics;
-    const isRoleList = location.pathname === paths.dashboard.role.root;
-    const isRoleNew = location.pathname === paths.dashboard.role.new;
+    // Pages that are legitimately NOT store-scoped — never redirect from these.
+    const isExempt = (
+      location.pathname.startsWith(paths.dashboard.store.list) ||
+      location.pathname === paths.dashboard.general.analytics ||
+      location.pathname === paths.dashboard.role.root ||
+      location.pathname === paths.dashboard.role.new ||
+      location.pathname === paths.dashboard.reports.companyRoot ||
+      location.pathname.startsWith(paths.dashboard.user.root) ||
+      location.pathname.startsWith(paths.dashboard.integration.root)
+    );
 
-    // List of store-scoped roots we guard
+    // List of store-scoped roots we guard (only meaningful when currentStore is truthy)
     const guardedRoots = [
       callIfFunction(paths.dashboard.pos.root, currentStore),
       callIfFunction(paths.dashboard.category.root, currentStore),
@@ -104,13 +115,14 @@ export const useNavData = () => {
       callIfFunction(paths.dashboard.customer.root, currentStore),
       callIfFunction(paths.dashboard.paymentMethod.root, currentStore),
       callIfFunction(paths.dashboard.expense.root, currentStore),
+      callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
     ];
 
     const onGuardedPage = guardedRoots.some((root) =>
       location.pathname.startsWith(root || '')
     );
 
-    if (!currentStore && onGuardedPage && !isStoreMgmt && !isAnalytics && !isRoleList && !isRoleNew) {
+    if (!currentStore && onGuardedPage && !isExempt) {
       navigate(paths.dashboard.store.list, { replace: true });
     }
   }, [currentStore, location.pathname, navigate]);
@@ -203,7 +215,11 @@ export const useNavData = () => {
     subheader: 'Overview',
     items: [
       { title: 'Company Dashboard', path: paths.dashboard.general.analytics, icon: ICONS.analytics },
-      { title: 'Store Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard },
+      {
+        title: 'Store Dashboard',
+        path: storeBasePath || paths.dashboard.store.list,
+        icon: ICONS.dashboard,
+      },
       { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
     ],
   },
@@ -288,6 +304,34 @@ export const useNavData = () => {
         children: [
           { title: 'Add Expense', path: callIfFunction(paths.dashboard.expense.new, currentStore  ) },
           { title: 'Expenses List', path: callIfFunction(paths.dashboard.expense.root, currentStore  ) },
+        ],
+      },
+    ],
+  },
+  /**
+   * Reports
+   */
+  {
+    subheader: 'Reports',
+    items: [
+      {
+        title: 'Store Reports',
+        path: callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
+        icon: ICONS.analytics,
+        children: [
+          { title: 'General Store Reports', path: callIfFunction(paths.dashboard.reports.generalReport, currentStore) },
+          { title: 'Inventory Report', path: callIfFunction(paths.dashboard.reports.inventory, currentStore) },
+          { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
+          { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
+          { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
+        ],
+      },
+      {
+        title: 'Company Reports',
+        path: paths.dashboard.reports.companyRoot,
+        icon: ICONS.banking,
+        children: [
+          { title: 'All Company Reports', path: paths.dashboard.reports.companyRoot },
         ],
       },
     ],

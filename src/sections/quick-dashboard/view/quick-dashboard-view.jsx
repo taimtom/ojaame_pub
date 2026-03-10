@@ -25,6 +25,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import Grid from '@mui/material/Unstable_Grid2';
 import Tooltip from '@mui/material/Tooltip';
+import Collapse from '@mui/material/Collapse';
 
 import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -170,36 +171,116 @@ function ItemCard({ item, onAdd }) {
 // Cart row
 // ----------------------------------------------------------------------
 
-function CartRow({ item, onQtyChange, onRemove }) {
+function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, inputMode, onToggleMode, onAmountInput }) {
   const { currencySymbol } = useCurrencyFormat();
+  const isAmountMode = inputMode === 'amount';
+
   return (
     <TableRow>
       <TableCell sx={{ py: 1, pl: 0 }}>
         <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 140 }}>
           {item.name}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {currencySymbol}{item.unit_price.toLocaleString()}
-        </Typography>
-      </TableCell>
-      <TableCell sx={{ py: 1 }} align="center">
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
-            <Iconify icon="eva:minus-fill" width={14} />
-          </IconButton>
-          <Typography variant="body2" sx={{ minWidth: 20, textAlign: 'center' }}>
-            {item.quantity}
+        {item.allow_variable_price ? (
+          <TextField
+            value={item.unit_price}
+            onChange={(e) => onPriceChange?.(item.cartId, e.target.value)}
+            type="number"
+            variant="outlined"
+            size="small"
+            sx={{ mt: 0.25, maxWidth: 120 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                </InputAdornment>
+              ),
+            }}
+            inputProps={{ step: 0.01 }}
+            helperText={
+              item.variable_price_min != null && item.variable_price_max != null
+                ? `Var: ${currencySymbol}${item.variable_price_min}–${currencySymbol}${item.variable_price_max}`
+                : 'Variable price'
+            }
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            {currencySymbol}{item.unit_price.toLocaleString()}
           </Typography>
-          <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
-            <Iconify icon="eva:plus-fill" width={14} />
-          </IconButton>
-        </Stack>
+        )}
       </TableCell>
+
+      <TableCell sx={{ py: 1 }} align="center">
+        {isAmountMode ? (
+          /* ── Amount mode: user enters the total they want to pay ── */
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <TextField
+              value={item.subtotal || ''}
+              onChange={(e) => onAmountInput?.(item.cartId, e.target.value)}
+              type="number"
+              variant="outlined"
+              size="small"
+              placeholder="0"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+              inputProps={{ step: 1, min: 0, style: { textAlign: 'center', width: 60 } }}
+            />
+            <Tooltip title="Switch to quantity mode">
+              <IconButton
+                size="small"
+                onClick={() => onToggleMode?.(item.cartId)}
+                sx={{ p: 0.25, color: 'primary.main' }}
+              >
+                <Iconify icon="solar:hashtag-bold" width={14} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ) : (
+          /* ── Qty mode: default +/- stepper ── */
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
+              <Iconify icon="eva:minus-fill" width={14} />
+            </IconButton>
+            <TextField
+              value={item.quantity}
+              onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
+              type="number"
+              variant="outlined"
+              size="small"
+              inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 56 } }}
+            />
+            <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
+              <Iconify icon="eva:plus-fill" width={14} />
+            </IconButton>
+            <Tooltip title="Enter total amount instead of quantity">
+              <IconButton
+                size="small"
+                onClick={() => onToggleMode?.(item.cartId)}
+                sx={{ p: 0.25, color: 'text.secondary' }}
+              >
+                <Iconify icon="solar:dollar-minimalistic-bold" width={14} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
+      </TableCell>
+
       <TableCell sx={{ py: 1, pr: 0 }} align="right">
         <Typography variant="body2" fontWeight={600}>
           {fCurrency(item.subtotal)}
         </Typography>
+        {isAmountMode && (
+          <Typography variant="caption" color="text.disabled" display="block">
+            qty: {Number(item.quantity).toFixed(4)}
+          </Typography>
+        )}
       </TableCell>
+
       <TableCell sx={{ py: 1, pr: 0, pl: 0.5 }} align="right">
         <IconButton size="small" color="error" onClick={() => onRemove(item.cartId)} sx={{ p: 0.5 }}>
           <Iconify icon="eva:trash-2-outline" width={16} />
@@ -227,6 +308,9 @@ export function QuickDashboardView() {
   // Recent sales
   const [recentSales, setRecentSales] = useState([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [expandedSaleId, setExpandedSaleId] = useState(null);
+  const [saleItemsCache, setSaleItemsCache] = useState({});
+  const [loadingSaleId, setLoadingSaleId] = useState(null);
 
   // Search
   const [query, setQuery] = useState('');
@@ -235,7 +319,10 @@ export function QuickDashboardView() {
 
   // Cart
   const [cart, setCart] = useState([]);
+  const [rowModes, setRowModes] = useState({}); // { [cartId]: 'qty' | 'amount' }
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [saleStatus, setSaleStatus] = useState('paid');
+  const [creditCustomerName, setCreditCustomerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────
@@ -269,6 +356,24 @@ export function QuickDashboardView() {
       setRecentLoading(false);
     }
   }, [storeId]);
+
+  const handleSaleClick = useCallback(async (saleId) => {
+    if (expandedSaleId === saleId) {
+      setExpandedSaleId(null);
+      return;
+    }
+    setExpandedSaleId(saleId);
+    if (saleItemsCache[saleId]) return;
+    try {
+      setLoadingSaleId(saleId);
+      const res = await axiosInstance.get(`/api/quick-dashboard/sale/${saleId}/items`);
+      setSaleItemsCache((prev) => ({ ...prev, [saleId]: res.data?.items || [] }));
+    } catch {
+      setSaleItemsCache((prev) => ({ ...prev, [saleId]: [] }));
+    } finally {
+      setLoadingSaleId(null);
+    }
+  }, [expandedSaleId, saleItemsCache]);
 
   useEffect(() => {
     fetchStats();
@@ -307,9 +412,12 @@ export function QuickDashboardView() {
     setCart((prev) => {
       const existing = prev.find((c) => c.cartId === `${item.type}-${item.id}`);
       if (existing) {
+        const maxQty = existing.stock != null ? existing.stock : Infinity;
+        if (existing.quantity >= maxQty) return prev;
+        const newQty = Math.min(existing.quantity + 1, maxQty);
         return prev.map((c) =>
           c.cartId === existing.cartId
-            ? { ...c, quantity: c.quantity + 1, subtotal: (c.quantity + 1) * c.unit_price }
+            ? { ...c, quantity: newQty, subtotal: newQty * c.unit_price }
             : c
         );
       }
@@ -323,6 +431,10 @@ export function QuickDashboardView() {
           unit_price: item.price,
           quantity: 1,
           subtotal: item.price,
+          stock: item.stock ?? null,
+          allow_variable_price: item.allow_variable_price ?? false,
+          variable_price_min: item.variable_price_min ?? null,
+          variable_price_max: item.variable_price_max ?? null,
         },
       ];
     });
@@ -334,15 +446,81 @@ export function QuickDashboardView() {
         .map((c) => {
           if (c.cartId !== cartId) return c;
           const newQty = c.quantity + delta;
-          if (newQty < 1) return null;
-          return { ...c, quantity: newQty, subtotal: newQty * c.unit_price };
+          if (newQty < 0.01) return null;
+          const maxQty = c.stock != null ? c.stock : Infinity;
+          const clampedQty = Math.min(newQty, maxQty);
+          return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
         })
         .filter(Boolean)
     );
   }, []);
 
+  const setQtyExact = useCallback((cartId, rawValue) => {
+    const value = Number(rawValue);
+    if (!value || value < 0.01) return;
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        const maxQty = c.stock != null ? c.stock : Infinity;
+        const clampedQty = Math.min(value, maxQty);
+        return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
+      })
+    );
+  }, []);
+
+  const changeUnitPrice = useCallback((cartId, rawValue) => {
+    const input = Number(rawValue);
+    if (Number.isNaN(input) || input < 0) return;
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        let price = input;
+        if (c.allow_variable_price) {
+          const min = c.variable_price_min;
+          const max = c.variable_price_max;
+          if (min != null && price < min) price = min;
+          if (max != null && price > max) price = max;
+        } else {
+          // If variable pricing not enabled, keep original price
+          price = c.unit_price;
+        }
+        return { ...c, unit_price: price, subtotal: price * c.quantity };
+      })
+    );
+  }, []);
+
   const removeFromCart = useCallback((cartId) => {
     setCart((prev) => prev.filter((c) => c.cartId !== cartId));
+    setRowModes((prev) => {
+      const next = { ...prev };
+      delete next[cartId];
+      return next;
+    });
+  }, []);
+
+  const toggleRowMode = useCallback((cartId) => {
+    setRowModes((prev) => ({
+      ...prev,
+      [cartId]: prev[cartId] === 'amount' ? 'qty' : 'amount',
+    }));
+  }, []);
+
+  // When in 'amount' mode the user types a total; qty is back-calculated
+  const setAmountExact = useCallback((cartId, rawValue) => {
+    const amount = Number(rawValue);
+    if (Number.isNaN(amount) || amount < 0) return;
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        if (c.unit_price <= 0) return c;
+        const newQty = amount / c.unit_price;
+        const maxQty = c.stock != null ? c.stock : Infinity;
+        const clampedQty = Math.min(newQty, maxQty);
+        const clampedAmount = clampedQty * c.unit_price;
+        // Store entered amount directly so floating-point doesn't corrupt the display
+        return { ...c, quantity: clampedQty, subtotal: clampedAmount };
+      })
+    );
   }, []);
 
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
@@ -352,27 +530,30 @@ export function QuickDashboardView() {
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
     if (!storeId) { toast.error('No active store selected.'); return; }
+    if (saleStatus === 'credit' && !creditCustomerName.trim()) {
+      toast.error('Please enter the customer name for a credit sale.');
+      return;
+    }
     try {
       setSubmitting(true);
       const currencyCode = localStorage.getItem('current_currency') || 'NGN';
       await axiosInstance.post('/api/quick-dashboard/sale', {
         store_id: storeId,
         items: cart.map(({ id, type, name, quantity, unit_price, subtotal }) => ({
-          id,
-          type,
-          name,
-          quantity,
-          unit_price,
-          subtotal,
+          id, type, name, quantity, unit_price, subtotal,
         })),
         payment_method: paymentMethod,
+        status: saleStatus,
+        customer_name: saleStatus === 'credit' ? creditCustomerName.trim() : undefined,
         currency_code: currencyCode,
       });
-      toast.success(`Sale of ${fCurrency(cartTotal)} completed! 🎉`);
+      const label = saleStatus === 'credit' ? `Credit sale of ${fCurrency(cartTotal)} recorded!` : `Sale of ${fCurrency(cartTotal)} completed!`;
+      toast.success(label);
       setCart([]);
+      setRowModes({});
       setQuery('');
       setSearchResults([]);
-      // Refresh stats and recent sales
+      setCreditCustomerName('');
       await Promise.all([fetchStats(), fetchRecent()]);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
@@ -553,7 +734,12 @@ export function QuickDashboardView() {
                         key={item.cartId}
                         item={item}
                         onQtyChange={changeQty}
+                        onQtyInput={setQtyExact}
+                        onPriceChange={changeUnitPrice}
                         onRemove={removeFromCart}
+                        inputMode={rowModes[item.cartId] || 'qty'}
+                        onToggleMode={toggleRowMode}
+                        onAmountInput={setAmountExact}
                       />
                     ))}
                   </TableBody>
@@ -571,7 +757,7 @@ export function QuickDashboardView() {
               </Stack>
 
               {/* Payment method */}
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
                 <InputLabel>Payment Method</InputLabel>
                 <Select
                   value={paymentMethod}
@@ -586,21 +772,81 @@ export function QuickDashboardView() {
                 </Select>
               </FormControl>
 
+              {/* Sale status */}
+              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={saleStatus}
+                  label="Status"
+                  onChange={(e) => {
+                    setSaleStatus(e.target.value);
+                    if (e.target.value !== 'credit') setCreditCustomerName('');
+                  }}
+                >
+                  <MenuItem value="paid">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:check-circle-bold" width={16} sx={{ color: 'success.main' }} />
+                      <span>Paid</span>
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="credit">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:clock-circle-bold" width={16} sx={{ color: 'warning.main' }} />
+                      <span>Credit</span>
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="draft">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="solar:document-bold" width={16} sx={{ color: 'text.secondary' }} />
+                      <span>Draft</span>
+                    </Stack>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Credit buyer name — shown only when status = credit */}
+              {saleStatus === 'credit' && (
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Customer Name *"
+                  placeholder="Enter buyer's name"
+                  value={creditCustomerName}
+                  onChange={(e) => setCreditCustomerName(e.target.value)}
+                  sx={{ mb: 1.5 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Iconify icon="solar:user-bold" width={16} sx={{ color: 'warning.main' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText="A customer record will be created or matched automatically"
+                />
+              )}
+
               {/* Checkout button */}
               <Button
                 fullWidth
                 size="large"
                 variant="contained"
-                color="primary"
-                disabled={!cart.length || submitting}
+                color={saleStatus === 'credit' ? 'warning' : saleStatus === 'draft' ? 'inherit' : 'primary'}
+                disabled={!cart.length || submitting || (saleStatus === 'credit' && !creditCustomerName.trim())}
                 onClick={handleCheckout}
                 startIcon={submitting
                   ? <CircularProgress size={16} color="inherit" />
-                  : <Iconify icon="solar:card-recive-bold" />
+                  : <Iconify icon={saleStatus === 'credit' ? 'solar:clock-circle-bold' : 'solar:card-recive-bold'} />
                 }
                 sx={{ fontWeight: 700, py: 1.5, fontSize: '1rem' }}
               >
-                {submitting ? 'Processing…' : `Complete Sale · ${fCurrency(cartTotal)}`}
+                {submitting
+                  ? 'Processing…'
+                  : saleStatus === 'credit'
+                    ? `Record Credit · ${fCurrency(cartTotal)}`
+                    : saleStatus === 'draft'
+                      ? `Save Draft · ${fCurrency(cartTotal)}`
+                      : `Complete Sale · ${fCurrency(cartTotal)}`
+                }
               </Button>
 
               {cart.length > 0 && (
@@ -608,7 +854,7 @@ export function QuickDashboardView() {
                   fullWidth
                   size="small"
                   color="inherit"
-                  onClick={() => setCart([])}
+                  onClick={() => { setCart([]); setRowModes({}); }}
                   sx={{ mt: 1, color: 'text.secondary' }}
                 >
                   Clear cart
@@ -639,40 +885,98 @@ export function QuickDashboardView() {
                   <Typography color="text.secondary" variant="body2">No sales yet today</Typography>
                 </Box>
               )}
-              {recentSales.map((sale) => (
-                <Box
-                  key={sale.id}
-                  sx={{
-                    px: 2,
-                    py: 1.25,
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                    '&:last-child': { borderBottom: 0 },
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 130 }}>
-                        {sale.invoice_number}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {fDateShort(sale.create_date)} · {fTime(sale.create_date)}
-                      </Typography>
-                    </Box>
-                    <Stack alignItems="flex-end" spacing={0.25}>
-                      <Typography variant="body2" fontWeight={700} color="success.main">
-                        {fCurrency(sale.total_amount)}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={sale.status}
-                        color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
-                        sx={{ height: 18, fontSize: 10 }}
-                      />
+              {recentSales.map((sale) => {
+                const isExpanded = expandedSaleId === sale.id;
+                const items = saleItemsCache[sale.id] || [];
+                const isLoadingItems = loadingSaleId === sale.id;
+                return (
+                  <Box
+                    key={sale.id}
+                    sx={{
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': { borderBottom: 0 },
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      onClick={() => handleSaleClick(sale.id)}
+                      sx={{
+                        px: 2,
+                        py: 1.25,
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': { bgcolor: 'action.hover' },
+                        transition: 'background-color 0.15s',
+                      }}
+                    >
+                      <Stack direction="row" alignItems="flex-start" spacing={0.75}>
+                        <Iconify
+                          icon={isExpanded ? 'eva:chevron-down-fill' : 'eva:chevron-right-fill'}
+                          width={16}
+                          sx={{ mt: 0.25, color: 'text.secondary', flexShrink: 0 }}
+                        />
+                        <Box>
+                          <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
+                            {sale.invoice_number}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {fDateShort(sale.create_date)} · {fTime(sale.create_date)}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Stack alignItems="flex-end" spacing={0.25}>
+                        <Typography variant="body2" fontWeight={700} color="success.main">
+                          {fCurrency(sale.total_amount)}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={sale.status}
+                          color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
+                          sx={{ height: 18, fontSize: 10 }}
+                        />
+                      </Stack>
                     </Stack>
-                  </Stack>
-                </Box>
-              ))}
+
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <Box sx={{ px: 2, pb: 1.5, bgcolor: 'background.neutral' }}>
+                        {isLoadingItems ? (
+                          <Box display="flex" justifyContent="center" py={1.5}>
+                            <CircularProgress size={18} />
+                          </Box>
+                        ) : items.length === 0 ? (
+                          <Typography variant="caption" color="text.disabled" sx={{ pl: 2.5 }}>
+                            No items found
+                          </Typography>
+                        ) : (
+                          <Stack spacing={0.5} pt={0.75}>
+                            {items.map((item) => (
+                              <Stack
+                                key={item.id}
+                                direction="row"
+                                justifyContent="space-between"
+                                alignItems="center"
+                              >
+                                <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                                  {item.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ mx: 1, flexShrink: 0 }}>
+                                  ×{item.quantity}
+                                </Typography>
+                                <Typography variant="caption" fontWeight={600} sx={{ flexShrink: 0 }}>
+                                  {fCurrency(item.total)}
+                                </Typography>
+                              </Stack>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
+                    </Collapse>
+                  </Box>
+                );
+              })}
             </Box>
           </Card>
         </Grid>

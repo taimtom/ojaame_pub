@@ -25,7 +25,7 @@ import { sumBy } from 'src/utils/helper';
 import { paramCase } from 'src/utils/change-case';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
-import { useGetSales } from 'src/actions/sale';
+import { useGetSales, markSaleAsPaid, deleteSale } from 'src/actions/sale';
 // import { paramCase } from 'src/utils/change-case';
 
 import { varAlpha } from 'src/theme/styles';
@@ -103,7 +103,7 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
 
   const { sales, salesLoading, salesError, salesEmpty } = useGetSales(numericStoreId);
 
-  const table = useTable({ defaultOrderBy: 'create_date' });
+  const table = useTable({ defaultOrderBy: 'create_date', defaultOrder: 'desc' });
 
   const confirm = useBoolean();
 
@@ -192,29 +192,33 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
   ];
 
   const handleDeleteRow = useCallback(
-    (id) => {
-      const deleteRow = tableData.filter((row) => row.id !== id);
-
-      toast.success('Delete success!');
-
-      setTableData(deleteRow);
-
-      table.onUpdatePageDeleteRow(dataInPage.length);
+    async (id) => {
+      try {
+        await deleteSale(id);
+        const deleteRow = tableData.filter((row) => row.id !== id);
+        toast.success('Delete success!');
+        setTableData(deleteRow);
+        table.onUpdatePageDeleteRow(dataInPage.length);
+      } catch (error) {
+        toast.error(error?.response?.data?.detail || 'Failed to delete receipt.');
+      }
     },
     [dataInPage.length, table, tableData]
   );
 
-  const handleDeleteRows = useCallback(() => {
-    const deleteRows = tableData.filter((row) => !table.selected.includes(row.id));
-
-    toast.success('Delete success!');
-
-    setTableData(deleteRows);
-
-    table.onUpdatePageDeleteRows({
-      totalRowsInPage: dataInPage.length,
-      totalRowsFiltered: dataFiltered.length,
-    });
+  const handleDeleteRows = useCallback(async () => {
+    try {
+      await Promise.all(table.selected.map((id) => deleteSale(id)));
+      const deleteRows = tableData.filter((row) => !table.selected.includes(row.id));
+      toast.success('Delete success!');
+      setTableData(deleteRows);
+      table.onUpdatePageDeleteRows({
+        totalRowsInPage: dataInPage.length,
+        totalRowsFiltered: dataFiltered.length,
+      });
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Failed to delete receipts.');
+    }
   }, [dataFiltered.length, dataInPage.length, table, tableData]);
 
   const handleEditRow = useCallback(
@@ -236,6 +240,21 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
       router.push(paths.dashboard.invoice.historylist(storeSlug, id));
     },
     [router, storeSlug]
+  );
+
+  const handleMarkAsPaid = useCallback(
+    async (id) => {
+      try {
+        await markSaleAsPaid(id);
+        setTableData((prev) =>
+          prev.map((row) => (row.id === id ? { ...row, status: 'paid' } : row))
+        );
+        toast.success('Sale marked as paid!');
+      } catch (error) {
+        toast.error(error?.response?.data?.detail || 'Failed to mark sale as paid.');
+      }
+    },
+    []
   );
 
   const handleFilterStatus = useCallback(
@@ -453,6 +472,7 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
                         onEditRow={() => handleEditRow(row.id)}
                         onHistoryRow={() => handleHistoryRow(row.id)}
                         onDeleteRow={() => handleDeleteRow(row.id)}
+                        onMarkAsPaid={() => handleMarkAsPaid(row.id)}
                       />
                     ))}
 

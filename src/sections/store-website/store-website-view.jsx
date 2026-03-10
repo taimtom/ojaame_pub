@@ -3,6 +3,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 
 import { HeroSection } from './hero-section';
+import { AboutSection } from './about-section';
 import { ProductGridSection } from './product-grid-section';
 import { ContactSection } from './contact-section';
 import { FooterSection } from './footer-section';
@@ -35,7 +36,21 @@ export function StoreWebsiteView({ website, template }) {
               />
             );
           case 'productGrid':
-            return <ProductGridSection key={key} content={sectionContent} />;
+            return (
+              <ProductGridSection
+                key={key}
+                content={sectionContent}
+                theme={themeConfig}
+              />
+            );
+          case 'about':
+            return (
+              <AboutSection
+                key={key}
+                content={sectionContent}
+                theme={themeConfig}
+              />
+            );
           case 'contact':
             return <ContactSection key={key} content={sectionContent} />;
           case 'footer':
@@ -47,4 +62,3 @@ export function StoreWebsiteView({ website, template }) {
     </Box>
   );
 }
-

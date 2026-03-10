@@ -179,12 +179,50 @@ export async function updateProductQuantity(productId, quantityData) {
 
 
 /**
+ * adjustProductStock - Records a stock loss/waste adjustment (damaged, wasted, expired, stolen, lost).
+ *
+ * @param {number|string} productId - The ID of the product.
+ * @param {Object} adjustmentData - { product_id, store_id, quantity, reason, description? }
+ * @returns {Promise<Object>}
+ */
+export async function adjustProductStock(productId, adjustmentData) {
+  try {
+    const url = `${endpoints.product.adjust}/${productId}`;
+    const response = await axiosInstance.patch(url, adjustmentData);
+    return response.data;
+  } catch (error) {
+    console.error('Error adjusting product stock:', error);
+    throw error;
+  }
+}
+
+
+/**
  * useGetProductMovements - Fetches the product movement history for a specific product in a store.
  *
  * @param {string | number} storeId - The ID of the store.
  * @param {string | number} productId - The ID of the product.
  * @returns {object} - An object containing the product movement list and loading/error states.
  */
+export function useGetProductSalesHistory(storeId, productId) {
+  const key =
+    storeId && productId
+      ? [endpoints.product.salesHistory, { params: { store_id: storeId, product_id: productId } }]
+      : null;
+
+  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      productSalesHistory: Array.isArray(data) ? data : [],
+      productSalesHistoryLoading: isLoading,
+      productSalesHistoryError: error,
+      productSalesHistoryValidating: isValidating,
+    }),
+    [data, error, isLoading, isValidating]
+  );
+}
+
 export function useGetProductMovements(storeId, productId) {
   // Build the SWR key only if both storeId and productId are provided.
   const key =

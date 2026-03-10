@@ -1,273 +1,168 @@
-import { m } from 'framer-motion';
-
 import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Rating from '@mui/material/Rating';
-import Divider from '@mui/material/Divider';
 import Container from '@mui/material/Container';
-import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+import Grid from '@mui/material/Unstable_Grid2';
+import { alpha, useTheme } from '@mui/material/styles';
 
-import { fToNow } from 'src/utils/format-time';
-
-import { _mock } from 'src/_mock';
-import { maxLine, varAlpha, textGradient } from 'src/theme/styles';
-
-import { varFade, MotionViewport, AnimateCountUp } from 'src/components/animate';
-import {
-  Carousel,
-  useCarousel,
-  CarouselDotButtons,
-  carouselBreakpoints,
-  CarouselArrowBasicButtons,
-} from 'src/components/carousel';
-
-import { SectionTitle } from './components/section-title';
-import { FloatLine, FloatTriangleDownIcon } from './components/svg-elements';
+import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
-
-export function HomeTestimonials({ sx, ...other }) {
-  const theme = useTheme();
-
-  const renderLines = (
-    <>
-      <Stack
-        spacing={8}
-        alignItems="center"
-        sx={{ top: 64, left: 80, position: 'absolute', transform: 'translateX(-15px)' }}
-      >
-        <FloatTriangleDownIcon sx={{ position: 'static', opacity: 0.12 }} />
-        <FloatTriangleDownIcon sx={{ width: 30, height: 15, opacity: 0.24, position: 'static' }} />
-      </Stack>
-      <FloatLine vertical sx={{ top: 0, left: 80 }} />
-    </>
-  );
-
-  const carousel = useCarousel({
-    align: 'start',
-    slidesToShow: { xs: 1, sm: 2, md: 3, lg: 4 },
-    breakpoints: {
-      [carouselBreakpoints.sm]: { slideSpacing: '24px' },
-      [carouselBreakpoints.md]: { slideSpacing: '40px' },
-      [carouselBreakpoints.lg]: { slideSpacing: '64px' },
-    },
-  });
-
-  const renderDescription = (
-    <SectionTitle
-      caption="testimonials"
-      title="Rumors are flying"
-      txtGradient="that..."
-      sx={{ mb: { xs: 5, md: 8 }, textAlign: 'center' }}
-    />
-  );
-
-  const horizontalDivider = (position) => (
-    <Divider
-      component="div"
-      sx={{
-        width: 1,
-        opacity: 0.16,
-        height: '1px',
-        border: 'none',
-        position: 'absolute',
-        background: `linear-gradient(to right, ${varAlpha(theme.vars.palette.grey['500Channel'], 0)} 0%, ${theme.vars.palette.grey[500]} 50%, ${varAlpha(theme.vars.palette.grey['500Channel'], 0)} 100%)`,
-        ...(position === 'top' && { top: 0 }),
-        ...(position === 'bottom' && { bottom: 0 }),
-      }}
-    />
-  );
-
-  const verticalDivider = (
-    <Divider
-      component="div"
-      orientation="vertical"
-      flexItem
-      sx={{
-        opacity: 0.16,
-        border: 'none',
-        width: '1px',
-        background: `linear-gradient(to bottom, ${varAlpha(theme.vars.palette.grey['500Channel'], 0)} 0%, ${theme.vars.palette.grey[500]} 50%, ${varAlpha(theme.vars.palette.grey['500Channel'], 0)} 100%)`,
-        display: { xs: 'none', md: 'block' },
-      }}
-    />
-  );
-
-  const renderContent = (
-    <Stack sx={{ position: 'relative', py: { xs: 5, md: 8 } }}>
-      {horizontalDivider('top')}
-
-      <Carousel carousel={carousel}>
-        {TESTIMONIALS.map((item) => (
-          <Stack key={item.id} component={m.div} variants={varFade().in}>
-            <Stack spacing={1} sx={{ typography: 'subtitle2' }}>
-              <Rating size="small" name="read-only" value={item.rating} precision={0.5} readOnly />
-              {item.category}
-            </Stack>
-
-            <Typography
-              sx={{ ...maxLine({ line: 4, persistent: theme.typography.body1 }), mt: 2, mb: 3 }}
-            >
-              {item.content}
-            </Typography>
-
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar alt={item.name} src={item.avatar} sx={{ width: 48, height: 48 }} />
-              <Stack sx={{ typography: 'subtitle1' }}>
-                <Box component="span">{item.name}</Box>
-                <Box component="span" sx={{ typography: 'body2', color: 'text.disabled' }}>
-                  {fToNow(new Date(item.postedAt))}
-                </Box>
-              </Stack>
-            </Stack>
-          </Stack>
-        ))}
-      </Carousel>
-
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mt: { xs: 5, md: 8 } }}
-      >
-        <CarouselDotButtons
-          fallback
-          variant="rounded"
-          scrollSnaps={carousel.dots.scrollSnaps}
-          selectedIndex={carousel.dots.selectedIndex}
-          onClickDot={carousel.dots.onClickDot}
-        />
-
-        <CarouselArrowBasicButtons {...carousel.arrows} options={carousel.options} />
-      </Stack>
-    </Stack>
-  );
-
-  const renderNumber = (
-    <Stack sx={{ py: { xs: 5, md: 8 }, position: 'relative' }}>
-      {horizontalDivider('top')}
-
-      <Stack spacing={5} direction={{ xs: 'column', md: 'row' }} divider={verticalDivider}>
-        {[
-          { label: 'Purchased order', value: 12.121 },
-          { label: 'Happy customers', value: 160 },
-          { label: 'Review rate', value: 4.9 },
-        ].map((item) => (
-          <Stack key={item.label} spacing={2} sx={{ textAlign: 'center', width: 1 }}>
-            <m.div variants={varFade({ distance: 24 }).inUp}>
-              <AnimateCountUp
-                to={item.value}
-                unit={item.label === 'Purchased order' ? 'k+' : '+'}
-                toFixed={item.label === 'Happy customers' ? 0 : 1}
-                sx={{
-                  fontWeight: 'fontWeightBold',
-                  fontSize: { xs: 40, md: 64 },
-                  lineHeight: { xs: 50 / 40, md: 80 / 64 },
-                  fontFamily: theme.typography.fontSecondaryFamily,
-                }}
-              />
-            </m.div>
-
-            <m.div variants={varFade({ distance: 24 }).inUp}>
-              <Box
-                component="span"
-                sx={{
-                  ...textGradient(
-                    `90deg, ${theme.vars.palette.text.primary}, ${varAlpha(theme.vars.palette.text.primaryChannel, 0.2)}`
-                  ),
-                  opacity: 0.4,
-                  typography: 'h6',
-                }}
-              >
-                {item.label}
-              </Box>
-            </m.div>
-          </Stack>
-        ))}
-      </Stack>
-
-      {horizontalDivider('bottom')}
-    </Stack>
-  );
-
-  return (
-    <Stack component="section" sx={{ py: 10, position: 'relative', ...sx }} {...other}>
-      <MotionViewport>
-        {renderLines}
-
-        <Container>
-          {renderDescription}
-
-          {renderContent}
-
-          {renderNumber}
-        </Container>
-      </MotionViewport>
-    </Stack>
-  );
-}
-
-// ----------------------------------------------------------------------
-
-const base = (index) => ({
-  id: _mock.id(index),
-  name: _mock.fullName(index),
-  avatar: _mock.image.avatar(index),
-  rating: 5,
-});
 
 const TESTIMONIALS = [
   {
-    ...base(1),
-    category: 'Design Quality',
-    content: `The quality of this template is very good, the TypeScript files are neat and the communication with the team behind this template is very good! I would recommend this template for any kind of project, as they implement new features every now and then and enhance their design. I will definitely be using more templates from this team and re-purchasing this template for other projects.`,
-    postedAt: 'April 20, 2024 23:15:30',
+    name: 'Tunde Adeyemi',
+    role: 'Owner, Adeyemi Electronics',
+    location: 'Lagos, Nigeria',
+    avatar: 'T',
+    avatarColor: '#2196f3',
+    rating: 5,
+    review:
+      "Ojaame transformed how I run my shop. I used to spend hours doing accounts at night — now it takes me 10 minutes. The quick sale feature is incredible. My staff loves it too.",
   },
   {
-    ...base(2),
-    category: 'Design Quality',
-    content: `Amazing. I've never purchased complete front ends before, but I'll definitely be doing this again!`,
-    postedAt: 'March 19, 2024 23:15:30',
+    name: 'Amaka Okafor',
+    role: 'Manager, Glow Beauty Salon',
+    location: 'Abuja, Nigeria',
+    avatar: 'A',
+    avatarColor: '#e91e63',
+    rating: 5,
+    review:
+      "Managing our services and tracking credit customers was a nightmare before Ojaame. Now I know exactly who owes us, how much, and we've cut bad debts by 60% in 3 months.",
   },
   {
-    ...base(3),
-    category: 'Code Quality',
-    content: `Clean & Complete (Design & Code). Thansk Minimal team :)`,
-    postedAt: 'April 19, 2023 23:15:30',
+    name: 'Chidi Nwosu',
+    role: 'Owner, Nwosu Supermarket',
+    location: 'Enugu, Nigeria',
+    avatar: 'C',
+    avatarColor: '#4caf50',
+    rating: 5,
+    review:
+      "I have 2 stores and managing inventory across both was chaos. Ojaame gives me a clear view of stock levels, top sellers and daily revenue for each store. Highly recommend.",
   },
   {
-    ...base(4),
-    category: 'Customer Support',
-    content: `Thanks to Minimal for customer support with email. I solved the problem. And the code quality is good, too.`,
-    postedAt: 'May 19, 2023 23:15:30',
+    name: 'Fatima Yusuf',
+    role: 'Co-founder, Yusuf Pharmacy',
+    location: 'Kano, Nigeria',
+    avatar: 'F',
+    avatarColor: '#ff9800',
+    rating: 5,
+    review:
+      "The invoice management and the ability to track overdue payments is exactly what a pharmacy needs. Ojaame is intuitive — even our older staff members picked it up in a day.",
   },
   {
-    ...base(5),
-    category: 'Customer Support',
-    content:
-      'Great UI kit, really beautiful as well. Also the customer support is very warm-hearted. However, I hope the components and themes can be provided as a separated project (package).',
-    postedAt: 'June 19, 2023 23:15:30',
+    name: 'Segun Balogun',
+    role: 'CEO, Balogun Distributors',
+    location: 'Ibadan, Nigeria',
+    avatar: 'S',
+    avatarColor: '#9c27b0',
+    rating: 5,
+    review:
+      "We process over 200 transactions a day and Ojaame handles it all without breaking a sweat. The analytics dashboard helps us make better buying decisions every week.",
   },
   {
-    ...base(6),
-    category: 'Design Quality',
-    content: 'I would never have been able to create all these beautifull components myself!',
-    postedAt: 'July 19, 2023 23:15:30',
-  },
-  {
-    ...base(7),
-    category: 'Code Quality',
-    content:
-      'The quality of this template is excellent. However, as an individual, the cost of obtaining the TypeScript Source version is beyond my means. Despite my strong desire to acquire it, my limited personal budget does not allow me to do so.',
-    postedAt: 'August 19, 2023 23:15:30',
-  },
-  {
-    ...base(8),
-    category: 'Customizability',
-    content:
-      'The design and code quality are impressive. Regular updates and excellent customer support are major advantages.',
-    postedAt: 'September 19, 2023 23:15:30',
+    name: 'Ngozi Eze',
+    role: 'Owner, Ngozi Fashion House',
+    location: 'Port Harcourt, Nigeria',
+    avatar: 'N',
+    avatarColor: '#00bcd4',
+    rating: 5,
+    review:
+      "From inventory to customer management and sales reports — Ojaame covers everything. The mobile-friendly design means I can check my business from anywhere.",
   },
 ];
+
+// ----------------------------------------------------------------------
+
+export function HomeTestimonials() {
+  const theme = useTheme();
+
+  return (
+    <Box
+      id="testimonials"
+      sx={{
+        py: { xs: 8, md: 12 },
+        bgcolor: alpha(theme.palette.primary.main, 0.03),
+        borderTop: `1px solid ${theme.palette.divider}`,
+        scrollMarginTop: 64,
+      }}
+    >
+      <Container maxWidth="lg">
+        <Box sx={{ textAlign: 'center', mb: { xs: 6, md: 8 } }}>
+          <Typography
+            variant="overline"
+            sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 2, display: 'block', mb: 1.5 }}
+          >
+            Customer Stories
+          </Typography>
+          <Typography variant="h2" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+            Loved by Business Owners
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, mx: 'auto' }}>
+            Join hundreds of businesses across Nigeria and Africa who trust Ojaame to run their operations.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={3}>
+          {TESTIMONIALS.map((t) => (
+            <Grid key={t.name} xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  p: 3.5,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: `1px solid ${theme.vars.palette.divider}`,
+                  borderRadius: 2.5,
+                  transition: 'box-shadow 0.2s',
+                  '&:hover': {
+                    boxShadow: theme.shadows[8],
+                  },
+                }}
+              >
+                {/* Quote icon */}
+                <Iconify
+                  icon="solar:quote-up-bold-duotone"
+                  width={32}
+                  sx={{ color: 'primary.light', opacity: 0.5, mb: 2 }}
+                />
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  lineHeight={1.8}
+                  sx={{ flex: 1, mb: 3, fontStyle: 'italic' }}
+                >
+                  &ldquo;{t.review}&rdquo;
+                </Typography>
+
+                <Box>
+                  <Rating value={t.rating} readOnly size="small" sx={{ mb: 2 }} />
+                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Avatar sx={{ bgcolor: t.avatarColor, width: 42, height: 42, fontWeight: 700 }}>
+                      {t.avatar}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {t.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t.role}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
+                        {t.location}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Box>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+    </Box>
+  );
+}

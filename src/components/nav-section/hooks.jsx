@@ -20,9 +20,12 @@ export function useNavItem({
 
   const subDeepItem = Number(depth) > 2;
 
+  const isHashLink = typeof path === 'string' && (path.startsWith('#') || path.startsWith('/#'));
   const linkProps = externalLink
     ? { href: path, target: '_blank', rel: 'noopener' }
-    : { component: RouterLink, href: path };
+    : isHashLink
+      ? { component: 'a', href: path.startsWith('#') ? path : path }
+      : { component: RouterLink, href: path };
 
   const baseProps = hasChild && !enabledRootRedirect ? { component: 'div' } : linkProps;
 

@@ -107,6 +107,24 @@ export async function addService(serviceData) {
 // ----------------------------------------------------------------------
 // editService - Updates an existing service.
 // ----------------------------------------------------------------------
+export function useGetServiceSaleHistory(storeId, serviceId) {
+  const key =
+    storeId && serviceId
+      ? [endpoints.service.saleHistory, { params: { store_id: storeId, service_id: serviceId } }]
+      : null;
+
+  const { data, isLoading, error } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      serviceSaleHistory: Array.isArray(data) ? data : [],
+      serviceSaleHistoryLoading: isLoading,
+      serviceSaleHistoryError: error,
+    }),
+    [data, error, isLoading]
+  );
+}
+
 export async function editService(serviceId, serviceData) {
   try {
     // Construct the URL by appending the serviceId.

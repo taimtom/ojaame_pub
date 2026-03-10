@@ -8,6 +8,8 @@ import LoadingButton from '@mui/lab/LoadingButton';
 
 import { Form } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
+import { toast } from 'src/components/snackbar';
+import axiosInstance from 'src/utils/axios';
 
 import { useCheckoutContext } from './context';
 import { CheckoutSummary } from './checkout-summary';
@@ -70,11 +72,41 @@ export function CheckoutPayment() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      const { storeSlug, items, billing, discount, shipping } = checkout;
+
+      if (storeSlug && items && items.length > 0) {
+        const orderPayload = {
+          customer: {
+            name: billing?.receiver || billing?.name || 'Online Customer',
+            phone: billing?.phoneNumber || billing?.phone || '',
+            address: billing?.fullAddress || billing?.address || '',
+            city: billing?.city || '',
+            state: billing?.state || '',
+            zip_code: billing?.zipCode || billing?.zip_code || '',
+            country: billing?.country || '',
+          },
+          items: items.map((item) => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          discount: discount || 0,
+          shipping: shipping || 0,
+        };
+
+        const res = await axiosInstance.post(
+          `/api/store-website/${storeSlug}/orders`,
+          orderPayload
+        );
+        checkout.onSetOrderResult?.(res.data);
+      }
+
       checkout.onNextStep();
       checkout.onReset();
-      console.info('DATA', data);
     } catch (error) {
-      console.error(error);
+      console.error('Order submission error:', error);
+      const detail = error?.response?.data?.detail || error?.message;
+      toast.error(detail || 'Failed to place order. Please try again.');
     }
   });
 
