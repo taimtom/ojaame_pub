@@ -184,6 +184,7 @@ export const paths = {
       movement: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/movement`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/edit`,
       addqty: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/addqty`,
+      adjust: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/adjust`,
       history: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/history`,
       demo: {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,
@@ -301,6 +302,8 @@ export const paths = {
       // Company-level reports (not scoped to a single store)
       companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
     },
+    notifications: `${ROOTS.DASHBOARD}/notifications`,
+
     order: {
       root: `${ROOTS.DASHBOARD}/order`,
       details: (id) => `${ROOTS.DASHBOARD}/order/${id}`,

@@ -146,6 +146,13 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
+  const handleAdjustRow = useCallback(
+    (id) => {
+      router.push(paths.dashboard.product.adjust(storeSlug, id));
+    },
+    [router, storeSlug]
+  );
+
   const handleViewRow = useCallback(
     (id) => {
       router.push(paths.dashboard.product.details(storeSlug, id));
@@ -153,12 +160,6 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
-  const handleDetailRow = useCallback(
-    (id) => {
-      router.push(paths.dashboard.product.movement(storeSlug, id));
-    },
-    [router, storeSlug]
-  );
 
 
   const CustomToolbarCallback = useCallback(
@@ -255,9 +256,10 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
         />,
         <GridActionsCellItem
           showInMenu
-          icon={<Iconify icon="solar:eye-bold" />}
-          label="Stock Movement"
-          onClick={() => handleDetailRow(params.row.id)}
+          icon={<Iconify icon="solar:danger-triangle-bold" />}
+          label="Record Loss"
+          onClick={() => handleAdjustRow(params.row.id)}
+          sx={{ color: 'error.main' }}
         />,
         <GridActionsCellItem
           showInMenu

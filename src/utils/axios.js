@@ -98,6 +98,7 @@ export const endpoints = {
     edit: '/api/product/edit',
     add: '/api/product/add',
     quantity: '/api/product/quantity',
+    adjust: '/api/product/adjust',
     history: '/api/product/history',
     movement: '/api/product/movement',
     salesHistory: '/api/product/sales-history',
@@ -248,5 +249,14 @@ export const endpoints = {
     edit: '/api/sales/edit',
     history: '/api/sales/history/',
     saleslist: '/api/sales/historylist/',
+  },
+
+  notifications: {
+    list: '/api/notifications/list',
+    summary: '/api/notifications/summary',
+    markAllRead: '/api/notifications/mark-all-read',
+    markRead: (id) => `/api/notifications/${id}/read`,
+    archive: (id) => `/api/notifications/${id}/archive`,
+    generate: '/api/notifications/generate',
   },
 };

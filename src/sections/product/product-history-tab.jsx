@@ -27,6 +27,12 @@ const STATUS_COLORS = {
   partially_paid: 'warning',
   draft: 'default',
   cancelled: 'error',
+  // Stock loss / waste statuses
+  damaged: 'error',
+  wasted: 'warning',
+  expired: 'warning',
+  stolen: 'error',
+  lost: 'default',
 };
 
 // Which movement statuses count as "purchase" (stock additions)

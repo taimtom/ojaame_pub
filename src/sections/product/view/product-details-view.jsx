@@ -1,69 +1,205 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
-import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
+import Tabs from '@mui/material/Tabs';
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useTabs } from 'src/hooks/use-tabs';
 
+import { fCurrency } from 'src/utils/format-number';
+
 import { varAlpha } from 'src/theme/styles';
 import { PRODUCT_PUBLISH_OPTIONS } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 
+import { Chart, useChart } from 'src/components/chart';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
+import { useGetProductMovements, useGetProductSalesHistory } from 'src/actions/product';
+
 import { ProductDetailsSkeleton } from '../product-skeleton';
-import { ProductDetailsReview } from '../product-details-review';
-import { ProductDetailsSummary } from '../product-details-summary';
 import { ProductDetailsToolbar } from '../product-details-toolbar';
 import { ProductDetailsCarousel } from '../product-details-carousel';
 import { ProductDetailsDescription } from '../product-details-description';
+import { ProductDashboardSummary } from '../product-dashboard-summary';
 import { ProductPurchaseHistoryTab, ProductSaleHistoryTab } from '../product-history-tab';
 
 // ----------------------------------------------------------------------
 
-const SUMMARY = [
-  {
-    title: '100% original',
-    description: 'Chocolate bar candy canes ice cream toffee cookie halvah.',
-    icon: 'solar:verified-check-bold',
-  },
-  {
-    title: '10 days replacement',
-    description: 'Marshmallow biscuit donut dragée fruitcake wafer.',
-    icon: 'solar:clock-circle-bold',
-  },
-  {
-    title: 'Year warranty',
-    description: 'Cotton candy gingerbread cake I love sugar sweet.',
-    icon: 'solar:shield-check-bold',
-  },
-];
+function groupByDate(rows, dateKey, valueKey) {
+  const map = {};
+  rows.forEach((row) => {
+    const raw = row[dateKey];
+    if (!raw) return;
+    const day = new Date(raw).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    map[day] = (map[day] || 0) + (Number(row[valueKey]) || 0);
+  });
+  const sorted = Object.entries(map).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  return { categories: sorted.map(([d]) => d), series: sorted.map(([, v]) => v) };
+}
 
-// ----------------------------------------------------------------------
+// ─── Stat Card ───────────────────────────────────────────────────────────────
+
+function StockStatCard({ icon, label, value, color = 'primary', sub }) {
+  return (
+    <Card sx={{ p: 3, flex: 1 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+            {label}
+          </Typography>
+          <Typography variant="h4" sx={{ color: `${color}.main` }}>
+            {value}
+          </Typography>
+          {sub && (
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+              {sub}
+            </Typography>
+          )}
+        </Stack>
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: (theme) => varAlpha(theme.vars.palette[color].mainChannel, 0.12),
+          }}
+        >
+          <Iconify icon={icon} width={24} sx={{ color: `${color}.main` }} />
+        </Box>
+      </Stack>
+    </Card>
+  );
+}
+
+// ─── Combined stock chart ─────────────────────────────────────────────────────
+
+function StockOverviewChart({ purchaseRows, saleRows }) {
+  const theme = useTheme();
+
+  const { categories: purchaseDates, series: purchaseQtys } = useMemo(
+    () => groupByDate(purchaseRows, 'created_at', 'quantity'),
+    [purchaseRows]
+  );
+  const { categories: saleDates, series: saleQtys } = useMemo(
+    () => groupByDate(saleRows, 'sale_date', 'quantity'),
+    [saleRows]
+  );
+
+  // Merge date categories from both datasets
+  const allDates = useMemo(() => {
+    const set = new Set([...purchaseDates, ...saleDates]);
+    return [...set].sort((a, b) => new Date(a) - new Date(b));
+  }, [purchaseDates, saleDates]);
+
+  const purchaseSeries = allDates.map((d) => {
+    const idx = purchaseDates.indexOf(d);
+    return idx >= 0 ? purchaseQtys[idx] : 0;
+  });
+  const saleSeries = allDates.map((d) => {
+    const idx = saleDates.indexOf(d);
+    return idx >= 0 ? saleQtys[idx] : 0;
+  });
+
+  const chartOptions = useChart({
+    colors: [theme.palette.success.main, theme.palette.error.main],
+    xaxis: { categories: allDates },
+    yaxis: { title: { text: 'Quantity' } },
+    tooltip: { y: { formatter: (v) => `${v} units` } },
+    stroke: { curve: 'smooth', width: 3 },
+    markers: { size: 4 },
+    fill: {
+      type: 'gradient',
+      gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05 },
+    },
+    legend: { position: 'top', horizontalAlign: 'right' },
+  });
+
+  if (!allDates.length) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+        <EmptyContent title="No stock activity yet" />
+      </Box>
+    );
+  }
+
+  return (
+    <Chart
+      type="area"
+      series={[
+        { name: 'Stock In', data: purchaseSeries },
+        { name: 'Units Sold', data: saleSeries },
+      ]}
+      options={chartOptions}
+      height={320}
+    />
+  );
+}
+
+// ─── Main view ───────────────────────────────────────────────────────────────
 
 export function ProductDetailsView({ product, error, loading, storeSlug, storeNameSlug, storeId }) {
   const tabs = useTabs('description');
+  const theme = useTheme();
 
   const [publish, setPublish] = useState('');
 
   useEffect(() => {
-    if (product) {
-      setPublish(product?.publish);
-    }
+    if (product) setPublish(product?.publish);
   }, [product]);
 
   const handleChangePublish = useCallback((newValue) => {
     setPublish(newValue);
   }, []);
+
+  const PURCHASE_STATUSES = ['received', 'adjust', 'stock edited'];
+
+  const { productMovements } = useGetProductMovements(storeId, product?.id);
+  const { productSalesHistory } = useGetProductSalesHistory(storeId, product?.id);
+
+  const purchaseRows = useMemo(
+    () => productMovements.filter((r) => PURCHASE_STATUSES.includes(r.status)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [productMovements]
+  );
+
+  const totalUnitsSold = useMemo(
+    () => productSalesHistory.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
+    [productSalesHistory]
+  );
+
+  const totalRevenue = useMemo(
+    () => productSalesHistory.reduce((sum, r) => sum + (Number(r.total) || 0), 0),
+    [productSalesHistory]
+  );
+
+  const totalReceived = useMemo(
+    () => purchaseRows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
+    [purchaseRows]
+  );
+
+  const stockValue = useMemo(() => {
+    const qty = product?.available ?? product?.quantity ?? 0;
+    const cost = product?.costPrice ?? product?.price ?? 0;
+    return qty * cost;
+  }, [product]);
 
   if (loading) {
     return (
@@ -100,44 +236,124 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
       <ProductDetailsToolbar
         backLink={paths.dashboard.product.root(storeSlug)}
         editLink={paths.dashboard.product.edit(storeSlug, product?.id)}
-        // liveLink={paths.product.details(`${product?.id}`)}
+        addQtyLink={paths.dashboard.product.addqty(storeSlug, product?.id)}
+        adjustLink={paths.dashboard.product.adjust(storeSlug, product?.id)}
         publish={publish}
         onChangePublish={handleChangePublish}
         publishOptions={PRODUCT_PUBLISH_OPTIONS}
       />
 
-      <Grid container spacing={{ xs: 3, md: 5, lg: 8 }}>
-        <Grid xs={12} md={6} lg={7}>
+      {/* Product overview: image + stock info panel */}
+      <Grid container spacing={{ xs: 3, md: 5, lg: 6 }}>
+        <Grid xs={12} md={6} lg={5}>
           <ProductDetailsCarousel images={product?.images ?? []} />
         </Grid>
 
-        <Grid xs={12} md={6} lg={5}>
-          {product && <ProductDetailsSummary disableActions product={product} />}
+        <Grid xs={12} md={6} lg={7}>
+          {product && <ProductDashboardSummary product={product} />}
         </Grid>
       </Grid>
 
-      <Box
-        gap={5}
-        display="grid"
-        gridTemplateColumns={{ xs: 'repeat(1, 1fr)', md: 'repeat(3, 1fr)' }}
-        sx={{ my: 10 }}
+      {/* Inventory stat cards */}
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mt: 4 }}
       >
-        {SUMMARY.map((item) => (
-          <Box key={item.title} sx={{ textAlign: 'center', px: 5 }}>
-            <Iconify icon={item.icon} width={32} sx={{ color: 'primary.main' }} />
+        <StockStatCard
+          icon="solar:box-bold"
+          label="Current Stock"
+          value={product?.available ?? product?.quantity ?? 0}
+          color={
+            (product?.inventoryType === 'out of stock' && 'error') ||
+            (product?.inventoryType === 'low stock' && 'warning') ||
+            'info'
+          }
+          sub={product?.inventoryType}
+        />
+        <StockStatCard
+          icon="solar:arrow-down-bold"
+          label="Total Stock Received"
+          value={totalReceived}
+          color="success"
+          sub="all time"
+        />
+        <StockStatCard
+          icon="solar:cart-bold"
+          label="Units Sold"
+          value={totalUnitsSold}
+          color="error"
+          sub="all time"
+        />
+        <StockStatCard
+          icon="solar:wallet-money-bold"
+          label="Total Revenue"
+          value={fCurrency(totalRevenue)}
+          color="primary"
+          sub="from sales"
+        />
+        {product?.costPrice != null && (
+          <StockStatCard
+            icon="solar:safe-square-bold"
+            label="Stock Value"
+            value={fCurrency(stockValue)}
+            color="warning"
+            sub={`at cost price`}
+          />
+        )}
+      </Stack>
 
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2 }}>
-              {item.title}
-            </Typography>
-
+      {/* Combined stock overview chart */}
+      <Card sx={{ mt: 4 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ px: 3, pt: 3, pb: 1 }}
+        >
+          <Stack>
+            <Typography variant="h6">Stock Overview</Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {item.description}
+              Stock received vs units sold over time
             </Typography>
-          </Box>
-        ))}
-      </Box>
+          </Stack>
+          <Stack direction="row" spacing={2}>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  bgcolor: theme.palette.success.main,
+                }}
+              />
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Stock In
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  bgcolor: theme.palette.error.main,
+                }}
+              />
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Units Sold
+              </Typography>
+            </Stack>
+          </Stack>
+        </Stack>
 
-      <Card>
+        <StockOverviewChart purchaseRows={purchaseRows} saleRows={productSalesHistory} />
+      </Card>
+
+      {/* Detail tabs */}
+      <Card sx={{ mt: 4 }}>
         <Tabs
           value={tabs.value}
           onChange={tabs.onChange}
@@ -149,7 +365,6 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         >
           {[
             { value: 'description', label: 'Description' },
-            { value: 'reviews', label: `Reviews (${(product?.reviews ?? []).length})` },
             { value: 'purchase_history', label: 'Purchase History' },
             { value: 'sale_history', label: 'Sale History' },
           ].map((tab) => (
@@ -159,15 +374,6 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
 
         {tabs.value === 'description' && (
           <ProductDetailsDescription description={product?.description ?? ''} />
-        )}
-
-        {tabs.value === 'reviews' && (
-          <ProductDetailsReview
-            ratings={product?.ratings ?? []}
-            reviews={product?.reviews ?? []}
-            totalRatings={product?.totalRatings ?? 0}
-            totalReviews={product?.totalReviews ?? 0}
-          />
         )}
 
         {tabs.value === 'purchase_history' && (

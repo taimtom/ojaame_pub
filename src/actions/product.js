@@ -179,6 +179,25 @@ export async function updateProductQuantity(productId, quantityData) {
 
 
 /**
+ * adjustProductStock - Records a stock loss/waste adjustment (damaged, wasted, expired, stolen, lost).
+ *
+ * @param {number|string} productId - The ID of the product.
+ * @param {Object} adjustmentData - { product_id, store_id, quantity, reason, description? }
+ * @returns {Promise<Object>}
+ */
+export async function adjustProductStock(productId, adjustmentData) {
+  try {
+    const url = `${endpoints.product.adjust}/${productId}`;
+    const response = await axiosInstance.patch(url, adjustmentData);
+    return response.data;
+  } catch (error) {
+    console.error('Error adjusting product stock:', error);
+    throw error;
+  }
+}
+
+
+/**
  * useGetProductMovements - Fetches the product movement history for a specific product in a store.
  *
  * @param {string | number} storeId - The ID of the store.

@@ -34,6 +34,7 @@ const ProductListPage = lazy(() => import('src/pages/dashboard/product/list'));
 const ProductCreatePage = lazy(() => import('src/pages/dashboard/product/new'));
 const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const ProductAddQuantityPage = lazy(() => import('src/pages/dashboard/product/addqty'));
+const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/adjust'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
 
@@ -150,6 +151,9 @@ const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 // Store website settings
 const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/website'));
 
+// Notifications
+const NotificationsPage = lazy(() => import('src/pages/dashboard/notifications'));
+
 // Reports
 const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/store-general'));
 const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
@@ -175,6 +179,7 @@ export const dashboardRoutes = [
     children: [
       { path: 'analytics', element: <OverviewAnalyticsPage /> },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
 
       { index: true, element: <DashboardRootRedirect /> },
       {
@@ -194,6 +199,7 @@ export const dashboardRoutes = [
             { path: 'new', element: <ProductCreatePage /> },
             { path: ':id/edit', element: <ProductEditPage /> },
             { path: ':id/addqty', element: <ProductAddQuantityPage /> },
+            { path: ':id/adjust', element: <ProductAdjustStockPage /> },
           ],
         },
         {

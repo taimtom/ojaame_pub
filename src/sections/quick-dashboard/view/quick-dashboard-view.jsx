@@ -412,9 +412,12 @@ export function QuickDashboardView() {
     setCart((prev) => {
       const existing = prev.find((c) => c.cartId === `${item.type}-${item.id}`);
       if (existing) {
+        const maxQty = existing.stock != null ? existing.stock : Infinity;
+        if (existing.quantity >= maxQty) return prev;
+        const newQty = Math.min(existing.quantity + 1, maxQty);
         return prev.map((c) =>
           c.cartId === existing.cartId
-            ? { ...c, quantity: c.quantity + 1, subtotal: (c.quantity + 1) * c.unit_price }
+            ? { ...c, quantity: newQty, subtotal: newQty * c.unit_price }
             : c
         );
       }
@@ -428,6 +431,7 @@ export function QuickDashboardView() {
           unit_price: item.price,
           quantity: 1,
           subtotal: item.price,
+          stock: item.stock ?? null,
           allow_variable_price: item.allow_variable_price ?? false,
           variable_price_min: item.variable_price_min ?? null,
           variable_price_max: item.variable_price_max ?? null,
@@ -443,7 +447,9 @@ export function QuickDashboardView() {
           if (c.cartId !== cartId) return c;
           const newQty = c.quantity + delta;
           if (newQty < 0.01) return null;
-          return { ...c, quantity: newQty, subtotal: newQty * c.unit_price };
+          const maxQty = c.stock != null ? c.stock : Infinity;
+          const clampedQty = Math.min(newQty, maxQty);
+          return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
         })
         .filter(Boolean)
     );
@@ -453,9 +459,12 @@ export function QuickDashboardView() {
     const value = Number(rawValue);
     if (!value || value < 0.01) return;
     setCart((prev) =>
-      prev.map((c) =>
-        c.cartId === cartId ? { ...c, quantity: value, subtotal: value * c.unit_price } : c
-      )
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        const maxQty = c.stock != null ? c.stock : Infinity;
+        const clampedQty = Math.min(value, maxQty);
+        return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
+      })
     );
   }, []);
 
@@ -505,8 +514,11 @@ export function QuickDashboardView() {
         if (c.cartId !== cartId) return c;
         if (c.unit_price <= 0) return c;
         const newQty = amount / c.unit_price;
+        const maxQty = c.stock != null ? c.stock : Infinity;
+        const clampedQty = Math.min(newQty, maxQty);
+        const clampedAmount = clampedQty * c.unit_price;
         // Store entered amount directly so floating-point doesn't corrupt the display
-        return { ...c, quantity: newQty, subtotal: amount };
+        return { ...c, quantity: clampedQty, subtotal: clampedAmount };
       })
     );
   }, []);
