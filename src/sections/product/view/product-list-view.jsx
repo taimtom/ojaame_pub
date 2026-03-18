@@ -153,6 +153,13 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
+  const handleChangePriceRow = useCallback(
+    (id) => {
+      router.push(paths.dashboard.product.changePrice(storeSlug, id));
+    },
+    [router, storeSlug]
+  );
+
   const handleViewRow = useCallback(
     (id) => {
       router.push(paths.dashboard.product.details(storeSlug, id));
@@ -260,6 +267,12 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
           label="Record Loss"
           onClick={() => handleAdjustRow(params.row.id)}
           sx={{ color: 'error.main' }}
+        />,
+        <GridActionsCellItem
+          showInMenu
+          icon={<Iconify icon="solar:tag-price-bold" />}
+          label="Change Price"
+          onClick={() => handleChangePriceRow(params.row.id)}
         />,
         <GridActionsCellItem
           showInMenu

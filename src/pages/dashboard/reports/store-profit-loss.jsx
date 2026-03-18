@@ -8,10 +8,6 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Divider from '@mui/material/Divider';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 import Table from '@mui/material/Table';
@@ -24,6 +20,7 @@ import { paramCase } from 'src/utils/change-case';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
+import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { useStoreProfitLoss } from 'src/actions/reports';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -40,12 +37,6 @@ function getStoreId(storeParam) {
   return null;
 }
 
-const PERIODS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: '1y', label: 'Last year' },
-];
 
 function PLRow({ label, value, indent = false, bold = false, color }) {
   return (
@@ -77,11 +68,12 @@ export default function StoreProfitLossReportPage() {
   const storeId = getStoreId(storeParam);
   const { user } = useAuthContext();
   const companyId = user?.company_id;
-  const [period, setPeriod] = useState('30d');
+  const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
+  const { period, month, year, date } = periodState;
   const [plMode, setPlMode] = useState('list');
   const [breakdownMode, setBreakdownMode] = useState('list');
 
-  const { profitLoss, profitLossLoading, profitLossError } = useStoreProfitLoss(companyId, storeId, period);
+  const { profitLoss, profitLossLoading, profitLossError } = useStoreProfitLoss(companyId, storeId, period, month, year, date);
 
   const isProfit = (profitLoss?.net_profit ?? 0) >= 0;
 
@@ -151,12 +143,7 @@ export default function StoreProfitLossReportPage() {
               {profitLoss ? `${profitLoss.start_date?.slice(0, 10)} → ${profitLoss.end_date?.slice(0, 10)}` : 'Income statement for selected period'}
             </Typography>
           </Box>
-          <FormControl size="small" sx={{ width: 160 }}>
-            <InputLabel>Period</InputLabel>
-            <Select value={period} label="Period" onChange={(e) => setPeriod(e.target.value)}>
-              {PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ReportPeriodSelector period={period} onChange={setPeriodState} />
         </Stack>
 
         {profitLossError && (

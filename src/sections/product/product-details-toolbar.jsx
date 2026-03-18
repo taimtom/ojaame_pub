@@ -20,6 +20,7 @@ export function ProductDetailsToolbar({
   editLink,
   addQtyLink,
   adjustLink,
+  changePriceLink,
   liveLink,
   publishOptions,
   onChangePublish,
@@ -69,6 +70,18 @@ export function ProductDetailsToolbar({
             startIcon={<Iconify icon="solar:danger-triangle-bold" width={18} />}
           >
             Record Loss
+          </Button>
+        )}
+
+        {changePriceLink && (
+          <Button
+            component={RouterLink}
+            href={changePriceLink}
+            variant="outlined"
+            color="warning"
+            startIcon={<Iconify icon="solar:tag-price-bold" width={18} />}
+          >
+            Change Price
           </Button>
         )}
 

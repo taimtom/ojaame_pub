@@ -185,6 +185,7 @@ export const paths = {
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/edit`,
       addqty: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/addqty`,
       adjust: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/adjust`,
+      changePrice: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/change-price`,
       history: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/history`,
       demo: {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,

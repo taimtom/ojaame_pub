@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
@@ -15,12 +16,14 @@ import { allLangs } from 'src/locales';
 import { useGetStores } from 'src/actions/store';
 import { _contacts } from 'src/_mock';
 import { varAlpha, stylesMode } from 'src/theme/styles';
+import { fDate } from 'src/utils/format-time';
 
 import { bulletColor } from 'src/components/nav-section';
 import { useSettingsContext } from 'src/components/settings';
 import { Iconify } from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useGetSubscriptionStatus } from 'src/actions/billing';
 
 import { Main } from './main';
 import { NavMobile } from './nav-mobile';
@@ -63,6 +66,8 @@ export function DashboardLayout({ sx, children, data }) {
   const { stores, storesLoading } = useGetStores();
   const { user } = useAuthContext();
 
+  const { status, paystackStatus, gracePeriodEnd, isOwner } = useGetSubscriptionStatus();
+
   // Dynamically update the Profile link in the _account array
   const accountNav = useMemo(
     () =>
@@ -73,8 +78,37 @@ export function DashboardLayout({ sx, children, data }) {
       ),
     [user]
   );
+  const showBillingBanner = isOwner && (status === 'unpaid' || status === 'deactivated');
+
   return (
     <>
+      {showBillingBanner && (
+        <Alert
+          severity={status === 'deactivated' ? 'error' : 'warning'}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() =>
+                router.push(`${paths.dashboard.user.account}?tab=billing`)
+              }
+            >
+              {status === 'deactivated' ? 'Go to Billing' : 'Update Payment'}
+            </Button>
+          }
+          sx={{ borderRadius: 0, position: 'sticky', top: 0, zIndex: 1300 }}
+        >
+          <AlertTitle>
+            {status === 'deactivated' ? 'Account Restricted' : 'Payment Failed'}
+          </AlertTitle>
+          {status === 'deactivated'
+            ? 'Your subscription is deactivated. Update your payment method to restore full access.'
+            : paystackStatus === 'attention'
+              ? `Paystack will automatically retry your payment on your next billing date.${gracePeriodEnd ? ` Your account will be restricted on ${fDate(gracePeriodEnd)} if not resolved.` : ''}`
+              : 'Your subscription payment is pending. Please update your payment method.'}
+        </Alert>
+      )}
+
       <NavMobile
         data={navData}
         open={mobileNavOpen.value}

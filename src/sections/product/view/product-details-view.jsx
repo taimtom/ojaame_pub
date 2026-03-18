@@ -238,6 +238,7 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         editLink={paths.dashboard.product.edit(storeSlug, product?.id)}
         addQtyLink={paths.dashboard.product.addqty(storeSlug, product?.id)}
         adjustLink={paths.dashboard.product.adjust(storeSlug, product?.id)}
+        changePriceLink={paths.dashboard.product.changePrice(storeSlug, product?.id)}
         publish={publish}
         onChangePublish={handleChangePublish}
         publishOptions={PRODUCT_PUBLISH_OPTIONS}

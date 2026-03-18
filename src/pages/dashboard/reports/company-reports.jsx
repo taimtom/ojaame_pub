@@ -25,6 +25,7 @@ import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
+import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { useAuthContext } from 'src/auth/hooks';
 import { useCompanySummary, useCompanyStoreComparison } from 'src/actions/dashboard';
 import { useCompanyProfitLoss, useCompanyRevenueTrend } from 'src/actions/reports';
@@ -51,11 +52,6 @@ function KpiCard({ icon, label, value, color = 'primary.main', loading }) {
   );
 }
 
-const PERIODS = [
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: '1y', label: 'Last year' },
-];
 
 const METRICS = [
   { value: 'revenue', label: 'Revenue' },
@@ -75,15 +71,16 @@ const metricLabel = (m, v) => {
 export default function CompanyReportsPage() {
   const { user } = useAuthContext();
   const companyId = user?.company_id;
-  const [period, setPeriod] = useState('30d');
+  const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
+  const { period, month, year, date } = periodState;
   const [metric, setMetric] = useState('revenue');
   const [storesMode, setStoresMode] = useState('list');
   const [plMode, setPlMode] = useState('list');
 
   const { companySummary, companySummaryLoading } = useCompanySummary(companyId);
   const { storeComparison, storeComparisonLoading } = useCompanyStoreComparison(companyId);
-  const { profitLoss, profitLossLoading } = useCompanyProfitLoss(companyId, period);
-  const { revenueTrend, revenueTrendLoading } = useCompanyRevenueTrend(companyId, '1y', 'month');
+  const { profitLoss, profitLossLoading } = useCompanyProfitLoss(companyId, period, month, year, date);
+  const { revenueTrend, revenueTrendLoading } = useCompanyRevenueTrend(companyId, 'this_year', 'month');
 
   // Sort stores by selected metric (client-side)
   const rawStores = storeComparison?.stores || [];
@@ -174,12 +171,7 @@ export default function CompanyReportsPage() {
             <Typography variant="h4" fontWeight={700}>Company Reports</Typography>
             <Typography variant="body2" color="text.secondary">Cross-store performance summary</Typography>
           </Box>
-          <FormControl size="small" sx={{ width: 160 }}>
-            <InputLabel>Period</InputLabel>
-            <Select value={period} label="Period" onChange={(e) => setPeriod(e.target.value)}>
-              {PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ReportPeriodSelector period={period} onChange={setPeriodState} />
         </Stack>
 
         {/* KPI row */}
@@ -269,7 +261,7 @@ export default function CompanyReportsPage() {
             <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box>
                 <Typography variant="subtitle1" fontWeight={700}>Company P&amp;L Summary</Typography>
-                <Typography variant="caption" color="text.secondary">{PERIODS.find((p) => p.value === period)?.label}</Typography>
+                <Typography variant="caption" color="text.secondary">{period.replace(/_/g, ' ')}</Typography>
               </Box>
               {profitLoss && <ReportViewToggle value={plMode} onChange={setPlMode} />}
             </Box>

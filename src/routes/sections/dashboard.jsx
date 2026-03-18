@@ -7,6 +7,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AuthGuard } from 'src/auth/guard';
+import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 
 
 // ----------------------------------------------------------------------
@@ -35,6 +36,7 @@ const ProductCreatePage = lazy(() => import('src/pages/dashboard/product/new'));
 const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const ProductAddQuantityPage = lazy(() => import('src/pages/dashboard/product/addqty'));
 const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/adjust'));
+const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/change-price'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
 
@@ -166,9 +168,11 @@ const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/compan
 
 const layoutContent = (
   <DashboardLayout>
-    <Suspense fallback={<LoadingScreen />}>
-      <Outlet />
-    </Suspense>
+    <SubscriptionGuard>
+      <Suspense fallback={<LoadingScreen />}>
+        <Outlet />
+      </Suspense>
+    </SubscriptionGuard>
   </DashboardLayout>
 );
 
@@ -200,6 +204,7 @@ export const dashboardRoutes = [
             { path: ':id/edit', element: <ProductEditPage /> },
             { path: ':id/addqty', element: <ProductAddQuantityPage /> },
             { path: ':id/adjust', element: <ProductAdjustStockPage /> },
+            { path: ':id/change-price', element: <ProductChangePricePage /> },
           ],
         },
         {

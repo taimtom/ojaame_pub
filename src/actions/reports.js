@@ -10,11 +10,23 @@ const swrOptions = {
   keepPreviousData: true,
 };
 
+// Build params object, only including month/year/date when they are meaningful
+function periodParams(base, period, month, year, date) {
+  const p = { ...base, period };
+  if (month) p.month = month;
+  if (year) p.year = year;
+  if (date) p.date = date;
+  return p;
+}
+
 // ─── Store-dashboard helpers ──────────────────────────────────────────────────
 
-export function useStoreDashboardStats(storeId, period = '30d') {
+export function useStoreDashboardStats(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = storeId
-    ? [endpoints.storeDashboard.stats, { params: { store_id: storeId, period } }]
+    ? [
+        endpoints.storeDashboard.stats,
+        { params: periodParams({ store_id: storeId }, period, month, year, date) },
+      ]
     : null;
 
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
@@ -48,9 +60,12 @@ export function useStoreInventoryAlerts(storeId) {
   );
 }
 
-export function useStoreSalesTrend(storeId, period = '30d') {
+export function useStoreSalesTrend(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = storeId
-    ? [endpoints.storeDashboard.salesTrend, { params: { store_id: storeId, period } }]
+    ? [
+        endpoints.storeDashboard.salesTrend,
+        { params: periodParams({ store_id: storeId }, period, month, year, date) },
+      ]
     : null;
 
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
@@ -66,9 +81,12 @@ export function useStoreSalesTrend(storeId, period = '30d') {
   );
 }
 
-export function useStoreCategoryPerformance(storeId, period = '30d') {
+export function useStoreCategoryPerformance(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = storeId
-    ? [endpoints.storeDashboard.categoryPerformance, { params: { store_id: storeId, period } }]
+    ? [
+        endpoints.storeDashboard.categoryPerformance,
+        { params: periodParams({ store_id: storeId }, period, month, year, date) },
+      ]
     : null;
 
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
@@ -86,11 +104,19 @@ export function useStoreCategoryPerformance(storeId, period = '30d') {
 
 // ─── Reports API (company-scoped) ─────────────────────────────────────────────
 
-export function useStoreProfitLoss(companyId, storeId, period = '30d') {
+export function useStoreProfitLoss(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = companyId
     ? [
         endpoints.reports.profitLoss,
-        { params: { company_id: companyId, store_id: storeId || undefined, period } },
+        {
+          params: periodParams(
+            { company_id: companyId, store_id: storeId || undefined },
+            period,
+            month,
+            year,
+            date
+          ),
+        },
       ]
     : null;
 
@@ -107,9 +133,12 @@ export function useStoreProfitLoss(companyId, storeId, period = '30d') {
   );
 }
 
-export function useCompanyProfitLoss(companyId, period = '30d') {
+export function useCompanyProfitLoss(companyId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = companyId
-    ? [endpoints.reports.profitLoss, { params: { company_id: companyId, period } }]
+    ? [
+        endpoints.reports.profitLoss,
+        { params: periodParams({ company_id: companyId }, period, month, year, date) },
+      ]
     : null;
 
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
@@ -143,11 +172,19 @@ export function useStoreForecast(storeId) {
   );
 }
 
-export function useCompanyRevenueTrend(companyId, period = '1y', groupBy = 'month') {
+export function useCompanyRevenueTrend(companyId, period = 'this_year', groupBy = 'month', month = undefined, year = undefined, date = undefined) {
   const key = companyId
     ? [
         endpoints.companyDashboard.revenueTrend,
-        { params: { company_id: companyId, period, group_by: groupBy } },
+        {
+          params: periodParams(
+            { company_id: companyId, group_by: groupBy },
+            period,
+            month,
+            year,
+            date
+          ),
+        },
       ]
     : null;
 

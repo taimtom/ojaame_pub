@@ -175,6 +175,27 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, input
   const { currencySymbol } = useCurrencyFormat();
   const isAmountMode = inputMode === 'amount';
 
+  // Keep a raw string for the amount field while the user is actively typing.
+  // This prevents React from replacing the input with float-precision noise
+  // (e.g. "30.000000000000004") on every keystroke.
+  const [amountDraft, setAmountDraft] = useState('');
+  const [amountFocused, setAmountFocused] = useState(false);
+
+  const handleAmountFocus = () => {
+    const clean = item.subtotal != null ? parseFloat(item.subtotal.toFixed(2)) : 0;
+    setAmountDraft(clean === 0 ? '' : String(clean));
+    setAmountFocused(true);
+  };
+
+  const handleAmountChange = (e) => {
+    setAmountDraft(e.target.value);
+    onAmountInput?.(item.cartId, e.target.value);
+  };
+
+  const handleAmountBlur = () => {
+    setAmountFocused(false);
+  };
+
   return (
     <TableRow>
       <TableCell sx={{ py: 1, pl: 0 }}>
@@ -215,8 +236,10 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, input
           /* ── Amount mode: user enters the total they want to pay ── */
           <Stack direction="row" alignItems="center" spacing={0.5}>
             <TextField
-              value={item.subtotal || ''}
-              onChange={(e) => onAmountInput?.(item.cartId, e.target.value)}
+              value={amountFocused ? amountDraft : (item.subtotal ? parseFloat(item.subtotal.toFixed(2)) : '')}
+              onFocus={handleAmountFocus}
+              onBlur={handleAmountBlur}
+              onChange={handleAmountChange}
               type="number"
               variant="outlined"
               size="small"
@@ -516,9 +539,10 @@ export function QuickDashboardView() {
         const newQty = amount / c.unit_price;
         const maxQty = c.stock != null ? c.stock : Infinity;
         const clampedQty = Math.min(newQty, maxQty);
-        const clampedAmount = clampedQty * c.unit_price;
-        // Store entered amount directly so floating-point doesn't corrupt the display
-        return { ...c, quantity: clampedQty, subtotal: clampedAmount };
+        // Round to 2 decimal places to prevent IEEE-754 noise (e.g. 30.000000000000004)
+        const clampedAmount = parseFloat((clampedQty * c.unit_price).toFixed(2));
+        const roundedQty = parseFloat(clampedQty.toFixed(6));
+        return { ...c, quantity: roundedQty, subtotal: clampedAmount };
       })
     );
   }, []);

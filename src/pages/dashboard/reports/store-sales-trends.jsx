@@ -8,14 +8,10 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -26,6 +22,7 @@ import { paramCase } from 'src/utils/change-case';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
+import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import {
   useStoreDailySales,
   useStoreWeeklySales,
@@ -77,18 +74,6 @@ function KpiCard({ icon, label, value, trend, color = 'primary.main', loading })
   );
 }
 
-const TREND_PERIODS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-];
-
-const STAT_PERIODS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: '1y', label: 'Last year' },
-];
 
 const CHART_COLORS = ['#00A76F', '#003768'];
 
@@ -97,16 +82,16 @@ const CHART_COLORS = ['#00A76F', '#003768'];
 export default function StoreSalesTrendsReportPage() {
   const { storeParam } = useParams();
   const storeId = getStoreId(storeParam);
-  const [trendPeriod, setTrendPeriod] = useState('30d');
-  const [statPeriod, setStatPeriod] = useState('30d');
+  const [trendPeriodState, setTrendPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
+  const [statPeriodState, setStatPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
   const [trendMode, setTrendMode] = useState('list');
   const [sellersMode, setSellersMode] = useState('list');
 
   const { dailySales, dailySalesLoading } = useStoreDailySales(storeId);
   const { weeklySales, weeklySalesLoading } = useStoreWeeklySales(storeId);
   const { monthlySales, monthlySalesLoading } = useStoreMonthlySales(storeId);
-  const { trend, trendLoading } = useStoreSalesTrend(storeId, trendPeriod);
-  const { stats, statsLoading } = useStoreDashboardStats(storeId, statPeriod);
+  const { trend, trendLoading } = useStoreSalesTrend(storeId, trendPeriodState.period, trendPeriodState.month, trendPeriodState.year, trendPeriodState.date);
+  const { stats, statsLoading } = useStoreDashboardStats(storeId, statPeriodState.period, statPeriodState.month, statPeriodState.year, statPeriodState.date);
 
   const totalTrendRevenue = trend.reduce((s, t) => s + (t.revenue || 0), 0);
   const totalTrendTxn = trend.reduce((s, t) => s + (t.transactions || 0), 0);
@@ -206,12 +191,7 @@ export default function StoreSalesTrendsReportPage() {
                 </Typography>
               </Box>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <FormControl size="small" sx={{ width: 140 }}>
-                  <InputLabel>Period</InputLabel>
-                  <Select value={trendPeriod} label="Period" onChange={(e) => setTrendPeriod(e.target.value)}>
-                    {TREND_PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-                  </Select>
-                </FormControl>
+                <ReportPeriodSelector period={trendPeriodState.period} onChange={setTrendPeriodState} />
                 <ReportViewToggle value={trendMode} onChange={setTrendMode} />
               </Stack>
             </Box>
@@ -256,12 +236,7 @@ export default function StoreSalesTrendsReportPage() {
             <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle1" fontWeight={700}>Top Sellers</Typography>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <FormControl size="small" sx={{ width: 130 }}>
-                  <InputLabel>Period</InputLabel>
-                  <Select value={statPeriod} label="Period" onChange={(e) => setStatPeriod(e.target.value)}>
-                    {STAT_PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-                  </Select>
-                </FormControl>
+                <ReportPeriodSelector period={statPeriodState.period} onChange={setStatPeriodState} />
                 <ReportViewToggle value={sellersMode} onChange={setSellersMode} />
               </Stack>
             </Box>

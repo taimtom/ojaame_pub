@@ -109,24 +109,28 @@ export function UserListView() {
 
   const handleDeleteRow = useCallback(
     (id) => {
+      const targetRow = tableData.find((row) => row.user_id === id);
+      if (targetRow?.role === 'merchant') {
+        toast.error('The owner account cannot be deleted.');
+        return;
+      }
+
       const deleteRow = tableData.filter((row) => row.user_id !== id);
-
       toast.success('Delete success!');
-
       setTableData(deleteRow);
-
       table.onUpdatePageDeleteRow(dataInPage.length);
     },
     [dataInPage.length, table, tableData]
   );
 
   const handleDeleteRows = useCallback(() => {
-    const deleteRows = tableData.filter((row) => !table.selected.includes(row.user_id));
+    // Exclude the owner from bulk deletion
+    const deleteRows = tableData.filter(
+      (row) => !table.selected.includes(row.user_id) || row.role === 'merchant'
+    );
 
     toast.success('Delete success!');
-
     setTableData(deleteRows);
-
     table.onUpdatePageDeleteRows({
       totalRowsInPage: dataInPage.length,
       totalRowsFiltered: dataFiltered.length,

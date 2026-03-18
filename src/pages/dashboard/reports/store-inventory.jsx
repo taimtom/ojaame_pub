@@ -8,14 +8,10 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -26,6 +22,7 @@ import { paramCase } from 'src/utils/change-case';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
+import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import {
   useStoreDashboardStats,
   useStoreInventoryAlerts,
@@ -69,12 +66,6 @@ function StatCard({ icon, label, value, color = 'primary.main', loading }) {
   );
 }
 
-const PERIODS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: '1y', label: 'Last year' },
-];
 
 const DONUT_COLORS = ['#00A76F', '#003768', '#FFAB00', '#FF5630', '#00B8D9', '#8E33FF', '#22C55E', '#FF3030'];
 
@@ -83,13 +74,14 @@ const DONUT_COLORS = ['#00A76F', '#003768', '#FFAB00', '#FF5630', '#00B8D9', '#8
 export default function StoreInventoryReportPage() {
   const { storeParam } = useParams();
   const storeId = getStoreId(storeParam);
-  const [period, setPeriod] = useState('30d');
+  const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
+  const { period, month, year, date } = periodState;
   const [topMode, setTopMode] = useState('list');
   const [alertsMode, setAlertsMode] = useState('list');
 
-  const { stats, statsLoading } = useStoreDashboardStats(storeId, period);
+  const { stats, statsLoading } = useStoreDashboardStats(storeId, period, month, year, date);
   const { alerts, alertsLoading } = useStoreInventoryAlerts(storeId);
-  const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period);
+  const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period, month, year, date);
 
   const topByVolume = stats?.best_by_volume || [];
   const outOfStock = alerts.filter((a) => a.status === 'out_of_stock');
@@ -153,12 +145,7 @@ export default function StoreInventoryReportPage() {
               Stock levels, top-selling items &amp; alerts
             </Typography>
           </Box>
-          <FormControl size="small" sx={{ width: 160 }}>
-            <InputLabel>Period</InputLabel>
-            <Select value={period} label="Period" onChange={(e) => setPeriod(e.target.value)}>
-              {PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <ReportPeriodSelector period={period} onChange={setPeriodState} />
         </Stack>
 
         {/* KPI cards */}

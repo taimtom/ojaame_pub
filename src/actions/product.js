@@ -147,12 +147,22 @@ export async function addProduct(productData) {
  */
 export async function editProduct(productId, productData) {
   try {
-    // Append the productId to the edit endpoint URL.
     const url = `${endpoints.product.edit}/${productId}`;
     const response = await axiosInstance.put(url, productData);
     return response.data;
   } catch (error) {
     console.error('Error editing product:', error);
+    throw error;
+  }
+}
+
+export async function changeProductPrice(productId, priceData) {
+  try {
+    const url = `${endpoints.product.changePrice}/${productId}`;
+    const response = await axiosInstance.patch(url, priceData);
+    return response.data;
+  } catch (error) {
+    console.error('Error changing product price:', error);
     throw error;
   }
 }

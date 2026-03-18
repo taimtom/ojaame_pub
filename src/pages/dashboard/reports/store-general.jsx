@@ -16,15 +16,14 @@ import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
-import ToggleButton from '@mui/material/ToggleButton';
 import CircularProgress from '@mui/material/CircularProgress';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency, fPercent } from 'src/utils/format-number';
 import { paramCase } from 'src/utils/change-case';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
+import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { useAuthContext } from 'src/auth/hooks';
 import {
   useStoreDailySales,
@@ -57,15 +56,12 @@ function getStoreId(storeParam) {
 
 const CHART_COLORS = ['#00A76F', '#003768', '#FFAB00', '#FF5630', '#00B8D9', '#8E33FF', '#FF3030', '#22C55E'];
 
-const PERIODS = [
-  { value: '7d', label: '7 Days' },
-  { value: '30d', label: '30 Days' },
-  { value: '90d', label: '90 Days' },
-  { value: '1y', label: '1 Year' },
-];
-
-const EXPENSE_PERIOD_MAP = { '7d': 'day', '30d': 'month', '90d': 'month', '1y': 'year' };
-const TREND_PERIOD_MAP = { '7d': '7d', '30d': '30d', '90d': '90d', '1y': '30d' };
+const EXPENSE_PERIOD_MAP = {
+  today: 'day', this_week: 'month', this_month: 'month',
+  this_quarter: 'month', this_year: 'year',
+  custom_month: 'month', custom_year: 'year', custom_day: 'day',
+  '7d': 'day', '30d': 'month', '90d': 'month', '1y': 'year',
+};
 
 // ── sub-components ────────────────────────────────────────────────────────────
 
@@ -169,16 +165,18 @@ export default function StoreGeneralReportPage() {
   const { user } = useAuthContext();
   const companyId = user?.company_id;
 
-  const [period, setPeriod] = useState('30d');
+  const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
+  const { period, month, year, date } = periodState;
   const expensePeriod = EXPENSE_PERIOD_MAP[period] || 'month';
-  const trendPeriod = TREND_PERIOD_MAP[period] || '30d';
+
+  const handlePeriodChange = (next) => setPeriodState(next);
 
   // ── Data hooks ─────────────────────────────────────────────────────────────
-  const { stats, statsLoading } = useStoreDashboardStats(storeId, period);
+  const { stats, statsLoading } = useStoreDashboardStats(storeId, period, month, year, date);
   const { alerts, alertsLoading } = useStoreInventoryAlerts(storeId);
-  const { trend, trendLoading } = useStoreSalesTrend(storeId, trendPeriod);
-  const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period);
-  const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, period);
+  const { trend, trendLoading } = useStoreSalesTrend(storeId, period, month, year, date);
+  const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period, month, year, date);
+  const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, period, month, year, date);
   const { forecast, forecastLoading } = useStoreForecast(storeId);
 
   const { dailySales, dailySalesLoading } = useStoreDailySales(storeId);
@@ -358,18 +356,7 @@ export default function StoreGeneralReportPage() {
               Comprehensive overview — summaries, analytics and forecasts
             </Typography>
           </Box>
-          <ToggleButtonGroup
-            size="small"
-            value={period}
-            exclusive
-            onChange={(_, val) => val && setPeriod(val)}
-          >
-            {PERIODS.map((p) => (
-              <ToggleButton key={p.value} value={p.value} sx={{ px: 2 }}>
-                {p.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+          <ReportPeriodSelector period={period} onChange={handlePeriodChange} />
         </Stack>
 
         {/* ── SECTION 1: Summary KPIs ── */}

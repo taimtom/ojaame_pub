@@ -8,7 +8,26 @@ const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject((error.response && error.response.data) || 'Something went wrong!')
+  (error) => {
+    const data = (error.response && error.response.data) || 'Something went wrong!';
+    const httpStatus = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    // Subscription deactivation: owner → redirect to billing settings
+    if (httpStatus === 402 && detail === 'subscription_deactivated_owner') {
+      window.location.href = '/app/user/account?tab=billing';
+    }
+    // Subscription deactivation: staff → redirect to 404
+    if (httpStatus === 403 && detail === 'subscription_deactivated_staff') {
+      window.location.href = '/404';
+    }
+
+    // Attach the HTTP status so catch blocks can branch on it
+    const err = new Error(data?.detail || data?.message || 'Request failed');
+    err.data = data && typeof data === 'object' ? { ...data, _httpStatus: httpStatus } : data;
+    err._httpStatus = httpStatus;
+    return Promise.reject(err);
+  }
 );
 
 export default axiosInstance;
@@ -96,6 +115,7 @@ export const endpoints = {
     details: '/api/product/details', // Keep the parameter-based URL
     search: '/api/product/search',
     edit: '/api/product/edit',
+    changePrice: '/api/product/price',
     add: '/api/product/add',
     quantity: '/api/product/quantity',
     adjust: '/api/product/adjust',
@@ -258,5 +278,21 @@ export const endpoints = {
     markRead: (id) => `/api/notifications/${id}/read`,
     archive: (id) => `/api/notifications/${id}/archive`,
     generate: '/api/notifications/generate',
+  },
+
+  subscription: {
+    summary: '/api/subscription/summary',
+    seats: '/api/subscription/seats',
+    invoices: '/api/subscription/invoices',
+    status: '/api/subscription/status',
+  },
+
+  billing: {
+    cards:       '/api/billing/cards',
+    cardVerify:  '/api/billing/cards/verify',
+    card:        (id) => `/api/billing/cards/${id}`,
+    cardDefault: (id) => `/api/billing/cards/${id}/default`,
+    manageLink:  '/api/billing/cards/manage-link',
+    status:      '/api/subscription/status',
   },
 };
