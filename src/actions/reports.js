@@ -60,6 +60,24 @@ export function useStoreInventoryAlerts(storeId) {
   );
 }
 
+export function useStoreStockValue(storeId) {
+  const key = storeId
+    ? [endpoints.storeDashboard.stockValue, { params: { store_id: storeId } }]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      stockValue: data || null,
+      stockValueLoading: isLoading,
+      stockValueError: error,
+      refetchStockValue: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
 export function useStoreSalesTrend(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = storeId
     ? [

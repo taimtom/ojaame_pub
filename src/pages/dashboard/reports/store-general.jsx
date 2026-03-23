@@ -34,6 +34,7 @@ import {
 import {
   useStoreDashboardStats,
   useStoreInventoryAlerts,
+  useStoreStockValue,
   useStoreSalesTrend,
   useStoreCategoryPerformance,
   useStoreProfitLoss,
@@ -174,6 +175,7 @@ export default function StoreGeneralReportPage() {
   // ── Data hooks ─────────────────────────────────────────────────────────────
   const { stats, statsLoading } = useStoreDashboardStats(storeId, period, month, year, date);
   const { alerts, alertsLoading } = useStoreInventoryAlerts(storeId);
+  const { stockValue, stockValueLoading } = useStoreStockValue(storeId);
   const { trend, trendLoading } = useStoreSalesTrend(storeId, period, month, year, date);
   const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period, month, year, date);
   const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, period, month, year, date);
@@ -398,6 +400,17 @@ export default function StoreGeneralReportPage() {
             />
           </Grid>
           {/* 4. P&L Summary */}
+          <Grid item xs={12} sm={6} md={3}>
+            <KpiCard
+              icon="solar:archive-minimalistic-bold"
+              label="In-Stock Value"
+              color="secondary.main"
+              loading={stockValueLoading}
+              value={fCurrency(stockValue?.total_cost ?? 0)}
+              sub={`Expected revenue ${fCurrency(stockValue?.expected_revenue ?? 0)} · ${stockValue?.total_units ?? 0} units`}
+            />
+          </Grid>
+          {/* 5. P&L Summary */}
           <Grid item xs={12} sm={6} md={3}>
             <KpiCard
               icon="solar:graph-up-bold"

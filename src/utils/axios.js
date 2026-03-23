@@ -222,6 +222,7 @@ export const endpoints = {
   storeDashboard: {
     stats: '/api/store-dashboard/stats',
     inventoryAlerts: '/api/store-dashboard/inventory-alerts',
+    stockValue: '/api/store-dashboard/stock-value',
     salesTrend: '/api/store-dashboard/sales-trend',
     categoryPerformance: '/api/store-dashboard/category-performance',
     forecast: '/api/store-dashboard/forecast',
