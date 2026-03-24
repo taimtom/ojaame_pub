@@ -16,6 +16,7 @@ import { RouterLink } from 'src/routes/components';
 import { useTabs } from 'src/hooks/use-tabs';
 
 import { fCurrency } from 'src/utils/format-number';
+import { effectiveSaleLineQuantity } from 'src/utils/sale-line-quantity';
 
 import { varAlpha } from 'src/theme/styles';
 import { PRODUCT_PUBLISH_OPTIONS } from 'src/_mock';
@@ -174,6 +175,15 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
   const { productMovements } = useGetProductMovements(storeId, product?.id);
   const { productSalesHistory } = useGetProductSalesHistory(storeId, product?.id);
 
+  const normalizedSaleRows = useMemo(
+    () =>
+      productSalesHistory.map((r) => ({
+        ...r,
+        quantity: effectiveSaleLineQuantity(r),
+      })),
+    [productSalesHistory]
+  );
+
   const purchaseRows = useMemo(
     () => productMovements.filter((r) => PURCHASE_STATUSES.includes(r.status)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,8 +191,8 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
   );
 
   const totalUnitsSold = useMemo(
-    () => productSalesHistory.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
-    [productSalesHistory]
+    () => normalizedSaleRows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
+    [normalizedSaleRows]
   );
 
   const totalRevenue = useMemo(
@@ -350,7 +360,7 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           </Stack>
         </Stack>
 
-        <StockOverviewChart purchaseRows={purchaseRows} saleRows={productSalesHistory} />
+        <StockOverviewChart purchaseRows={purchaseRows} saleRows={normalizedSaleRows} />
       </Card>
 
       {/* Detail tabs */}
@@ -382,7 +392,11 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         )}
 
         {tabs.value === 'sale_history' && (
-          <ProductSaleHistoryTab storeId={storeId} productId={product?.id} />
+          <ProductSaleHistoryTab
+            storeId={storeId}
+            storeSlug={storeSlug}
+            productId={product?.id}
+          />
         )}
       </Card>
     </DashboardContent>

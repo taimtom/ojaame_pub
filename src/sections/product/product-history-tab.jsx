@@ -11,6 +11,12 @@ import { DataGrid, gridClasses } from '@mui/x-data-grid';
 
 import { fDateTime } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { effectiveSaleLineQuantity, formatSaleQtyDisplay } from 'src/utils/sale-line-quantity';
+
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
+
+import Link from '@mui/material/Link';
 
 import { Chart, useChart } from 'src/components/chart';
 import { EmptyContent } from 'src/components/empty-content';
@@ -145,7 +151,7 @@ function PurchaseListView({ rows, loading }) {
   );
 }
 
-function SaleListView({ rows, loading }) {
+function SaleListView({ rows, loading, storeSlug }) {
   const columns = [
     {
       field: 'sale_date',
@@ -158,7 +164,26 @@ function SaleListView({ rows, loading }) {
     {
       field: 'invoice_number',
       headerName: 'Invoice',
-      width: 160,
+      width: 180,
+      renderCell: ({ row, value }) => {
+        const label = value || '—';
+        const saleId = row.sale_id;
+        if (storeSlug && saleId != null && label !== '—') {
+          return (
+            <Link
+              component={RouterLink}
+              href={paths.dashboard.invoice.details(storeSlug, saleId)}
+              variant="body2"
+              color="primary"
+              underline="hover"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {label}
+            </Link>
+          );
+        }
+        return <Typography variant="body2">{label}</Typography>;
+      },
     },
     {
       field: 'customer_name',
@@ -169,10 +194,12 @@ function SaleListView({ rows, loading }) {
     {
       field: 'quantity',
       headerName: 'Qty',
-      width: 90,
-      type: 'number',
+      width: 110,
       headerAlign: 'left',
       align: 'left',
+      renderCell: ({ row }) => (
+        <Typography variant="body2">{formatSaleQtyDisplay(row.quantity)}</Typography>
+      ),
     },
     {
       field: 'price',
@@ -301,13 +328,22 @@ export function ProductPurchaseHistoryTab({ storeId, productId }) {
   );
 }
 
-export function ProductSaleHistoryTab({ storeId, productId }) {
+export function ProductSaleHistoryTab({ storeId, storeSlug, productId }) {
   const [subTab, setSubTab] = useState('list');
   const { productSalesHistory, productSalesHistoryLoading } = useGetProductSalesHistory(
     storeId,
     productId
   );
   const theme = useTheme();
+
+  const saleRowsNormalized = useMemo(
+    () =>
+      productSalesHistory.map((r) => ({
+        ...r,
+        quantity: effectiveSaleLineQuantity(r),
+      })),
+    [productSalesHistory]
+  );
 
   return (
     <Box sx={{ p: 3 }}>
@@ -320,11 +356,15 @@ export function ProductSaleHistoryTab({ storeId, productId }) {
       </Stack>
 
       {subTab === 'list' && (
-        <SaleListView rows={productSalesHistory} loading={productSalesHistoryLoading} />
+        <SaleListView
+          rows={saleRowsNormalized}
+          loading={productSalesHistoryLoading}
+          storeSlug={storeSlug}
+        />
       )}
       {subTab === 'chart' && (
         <HistoryLineChart
-          rows={productSalesHistory}
+          rows={saleRowsNormalized}
           dateKey="sale_date"
           valueKey="quantity"
           seriesName="Qty Sold"
