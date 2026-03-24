@@ -26,10 +26,10 @@ import TableCell from '@mui/material/TableCell';
 import Grid from '@mui/material/Unstable_Grid2';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
+import Autocomplete from '@mui/material/Autocomplete';
 
 import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useAuthContext } from 'src/auth/hooks';
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -318,11 +318,23 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, input
 // ----------------------------------------------------------------------
 
 export function QuickDashboardView() {
-  const { user } = useAuthContext();
   const { currencySymbol } = useCurrencyFormat();
   const searchRef = useRef(null);
 
-  const storeId = getStoreIdFromStorage();
+  const [storeId, setStoreId] = useState(() => getStoreIdFromStorage());
+
+  // Keep store in sync when workspace changes (other tabs, focus, or same-tab localStorage updates)
+  useEffect(() => {
+    const sync = () => setStoreId(getStoreIdFromStorage());
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', sync);
+    const interval = setInterval(sync, 2500);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', sync);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Today stats
   const [stats, setStats] = useState(null);
@@ -347,6 +359,12 @@ export function QuickDashboardView() {
   const [saleStatus, setSaleStatus] = useState('paid');
   const [creditCustomerName, setCreditCustomerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Optional customer (walk-in when unset — omit customer_id on submit)
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerInput, setCustomerInput] = useState('');
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────
 
@@ -404,6 +422,37 @@ export function QuickDashboardView() {
     // Auto-focus search on mount
     setTimeout(() => searchRef.current?.focus(), 300);
   }, [fetchStats, fetchRecent]);
+
+  // Clear picked customer when active store changes
+  useEffect(() => {
+    setSelectedCustomer(null);
+    setCustomerInput('');
+    setCustomerOptions([]);
+  }, [storeId]);
+
+  // Customer picker — debounced search (empty q loads up to limit for dropdown)
+  useEffect(() => {
+    if (!storeId) return undefined;
+    const t = setTimeout(async () => {
+      try {
+        setCustomerSearchLoading(true);
+        const res = await axiosInstance.get('/api/quick-dashboard/customers', {
+          params: {
+            store_id: storeId,
+            ...(customerInput.trim() ? { q: customerInput.trim() } : {}),
+            limit: 50,
+          },
+        });
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setCustomerOptions(rows);
+      } catch {
+        setCustomerOptions([]);
+      } finally {
+        setCustomerSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [customerInput, storeId]);
 
   // ── Search (debounced) ─────────────────────────────────────────
 
@@ -554,23 +603,29 @@ export function QuickDashboardView() {
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
     if (!storeId) { toast.error('No active store selected.'); return; }
-    if (saleStatus === 'credit' && !creditCustomerName.trim()) {
-      toast.error('Please enter the customer name for a credit sale.');
+    const hasCreditIdentity = Boolean(selectedCustomer?.id) || Boolean(creditCustomerName.trim());
+    if (saleStatus === 'credit' && !hasCreditIdentity) {
+      toast.error('Select a customer or enter a customer name for a credit sale.');
       return;
     }
     try {
       setSubmitting(true);
       const currencyCode = localStorage.getItem('current_currency') || 'NGN';
-      await axiosInstance.post('/api/quick-dashboard/sale', {
+      const payload = {
         store_id: storeId,
         items: cart.map(({ id, type, name, quantity, unit_price, subtotal }) => ({
           id, type, name, quantity, unit_price, subtotal,
         })),
         payment_method: paymentMethod,
         status: saleStatus,
-        customer_name: saleStatus === 'credit' ? creditCustomerName.trim() : undefined,
         currency_code: currencyCode,
-      });
+      };
+      if (selectedCustomer?.id) {
+        payload.customer_id = selectedCustomer.id;
+      } else if (saleStatus === 'credit' && creditCustomerName.trim()) {
+        payload.customer_name = creditCustomerName.trim();
+      }
+      await axiosInstance.post('/api/quick-dashboard/sale', payload);
       const label = saleStatus === 'credit' ? `Credit sale of ${fCurrency(cartTotal)} recorded!` : `Sale of ${fCurrency(cartTotal)} completed!`;
       toast.success(label);
       setCart([]);
@@ -578,6 +633,9 @@ export function QuickDashboardView() {
       setQuery('');
       setSearchResults([]);
       setCreditCustomerName('');
+      setSelectedCustomer(null);
+      setCustomerInput('');
+      setCustomerOptions([]);
       await Promise.all([fetchStats(), fetchRecent()]);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
@@ -780,6 +838,69 @@ export function QuickDashboardView() {
                 <Typography variant="subtitle1" fontWeight={700}>{fCurrency(cartTotal)}</Typography>
               </Stack>
 
+              {/* Customer (optional) — walk-in when cleared */}
+              <Autocomplete
+                fullWidth
+                size="small"
+                sx={{ mb: 1.5 }}
+                options={customerOptions}
+                loading={customerSearchLoading}
+                value={selectedCustomer}
+                onChange={(e, newValue) => {
+                  setSelectedCustomer(newValue);
+                  setCustomerInput(
+                    newValue
+                      ? `${newValue.name}${newValue.phone_number ? ` · ${newValue.phone_number}` : ''}`
+                      : ''
+                  );
+                }}
+                inputValue={customerInput}
+                onInputChange={(e, newInputValue, reason) => {
+                  if (reason === 'clear') {
+                    setSelectedCustomer(null);
+                    setCustomerInput('');
+                    return;
+                  }
+                  if (reason === 'input') {
+                    setCustomerInput(newInputValue);
+                    if (selectedCustomer) {
+                      const label = `${selectedCustomer.name}${
+                        selectedCustomer.phone_number ? ` · ${selectedCustomer.phone_number}` : ''
+                      }`;
+                      if (newInputValue !== label) {
+                        setSelectedCustomer(null);
+                      }
+                    }
+                  } else if (reason === 'reset') {
+                    setCustomerInput(newInputValue);
+                  }
+                }}
+                getOptionLabel={(option) =>
+                  option ? `${option.name}${option.phone_number ? ` · ${option.phone_number}` : ''}` : ''
+                }
+                isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                filterOptions={(opts) => opts}
+                noOptionsText={customerSearchLoading ? 'Searching…' : 'No customers'}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Customer"
+                    placeholder="Walk-in — search to attach a customer"
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {customerSearchLoading ? (
+                            <CircularProgress color="inherit" size={16} sx={{ mr: 0.5 }} />
+                          ) : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
+
               {/* Payment method */}
               <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
                 <InputLabel>Payment Method</InputLabel>
@@ -828,8 +949,8 @@ export function QuickDashboardView() {
                 </Select>
               </FormControl>
 
-              {/* Credit buyer name — shown only when status = credit */}
-              {saleStatus === 'credit' && (
+              {/* Credit buyer name — when not using customer picker above */}
+              {saleStatus === 'credit' && !selectedCustomer?.id && (
                 <TextField
                   fullWidth
                   size="small"
@@ -845,7 +966,7 @@ export function QuickDashboardView() {
                       </InputAdornment>
                     ),
                   }}
-                  helperText="A customer record will be created or matched automatically"
+                  helperText="Or pick a customer above. A new name will be matched or created."
                 />
               )}
 
@@ -855,7 +976,13 @@ export function QuickDashboardView() {
                 size="large"
                 variant="contained"
                 color={saleStatus === 'credit' ? 'warning' : saleStatus === 'draft' ? 'inherit' : 'primary'}
-                disabled={!cart.length || submitting || (saleStatus === 'credit' && !creditCustomerName.trim())}
+                disabled={
+                  !cart.length
+                  || submitting
+                  || (saleStatus === 'credit'
+                    && !selectedCustomer?.id
+                    && !creditCustomerName.trim())
+                }
                 onClick={handleCheckout}
                 startIcon={submitting
                   ? <CircularProgress size={16} color="inherit" />
@@ -878,7 +1005,12 @@ export function QuickDashboardView() {
                   fullWidth
                   size="small"
                   color="inherit"
-                  onClick={() => { setCart([]); setRowModes({}); }}
+                  onClick={() => {
+                    setCart([]);
+                    setRowModes({});
+                    setSelectedCustomer(null);
+                    setCustomerInput('');
+                  }}
                   sx={{ mt: 1, color: 'text.secondary' }}
                 >
                   Clear cart
