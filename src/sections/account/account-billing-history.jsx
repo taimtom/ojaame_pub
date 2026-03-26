@@ -46,7 +46,9 @@ export function AccountBillingHistory() {
         window.location.href = data.payment_url;
       }
     } catch (err) {
-      toast.error(err?.detail || err?.message || 'Could not initiate payment.');
+      const detail =
+        err?.response?.data?.detail || err?.data?.detail || err?.message || 'Could not initiate payment.';
+      toast.error(detail);
     } finally {
       paying.onFalse();
     }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -6,27 +6,29 @@ import { useTheme } from '@mui/material/styles';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
 
-import { fCurrency, fPercent } from 'src/utils/format-number';
-import { RouterLink } from 'src/routes/components';
 import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
+
+import { fPercent, fCurrency } from 'src/utils/format-number';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { SeoIllustration } from 'src/assets/illustrations';
 import {
   useStoreExpenses,
+  useStoreFeatured,
   useStoreDailySales,
   useStoreYearlySales,
   useStoreTopProducts,
   useStoreWeeklySales,
-  useStoreTopCashiers,
   useStorePerformance,
   useStoreMonthlySales,
-  useStoreFeatured,
   useStoreRecentInvoices,
   useStoreSalesByPaymentMethod,
 } from 'src/actions/dashboard';
 
 import { Iconify } from 'src/components/iconify';
+import { WelcomeGuidePopup } from 'src/components/onboarding/welcome-guide-popup';
+
 import { useAuthContext } from 'src/auth/hooks';
 
 import { AppWelcome } from '../app-welcome';
@@ -222,10 +224,12 @@ export function OverviewAppView({ storeId }) {
 
   return (
     <DashboardContent maxWidth="xl">
+      <WelcomeGuidePopup userId={user?.user_id} />
+
       <Grid container spacing={3}>
 
         {/* Welcome banner */}
-        <Grid xs={12} md={8}>
+        <Grid xs={12} md={8} id="overview-tour-welcome">
           <AppWelcome
             title={`Welcome back 👋 \n ${user?.displayName}`}
             description={
@@ -247,11 +251,12 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} md={4}>
+        <Grid xs={12} md={4} id="overview-tour-featured">
           <AppFeatured list={featuredProducts} loading={featuredLoading} />
         </Grid>
 
         {/* KPI summary cards */}
+        <Grid xs={12} container spacing={3} id="overview-tour-kpi">
         <Grid xs={12} md={4}>
           <AppWidgetSummary
             title="Today's Sales"
@@ -285,9 +290,10 @@ export function OverviewAppView({ storeId }) {
             }}
           />
         </Grid>
+        </Grid>
 
         {/* Payment method donut + Expense categories (share the `period` selector) */}
-        <Grid xs={12} md={6}>
+        <Grid xs={12} md={6} id="overview-tour-payment-method">
           <AppCurrentDownload
             title="Sales by Payment Method"
             subheader="Point-of-Sale Transactions"
@@ -309,7 +315,7 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} md={6}>
+        <Grid xs={12} md={6} id="overview-tour-expenses">
           <AppExpenseCategories
             title={`Expenses (${expenses.period || period})`}
             subheader={fCurrency(expenses.total_expenses)}
@@ -321,7 +327,7 @@ export function OverviewAppView({ storeId }) {
         </Grid>
 
         {/* Yearly income vs expenses area chart */}
-        <Grid xs={12}>
+        <Grid xs={12} id="overview-tour-yearly">
           <AppYearlySales
             title="Yearly Sales"
             subheader={yearlySalesSubheader}
@@ -330,7 +336,7 @@ export function OverviewAppView({ storeId }) {
         </Grid>
 
         {/* Performance radar (normalised 0–100) + top cashiers */}
-        <Grid xs={12} md={6}>
+        <Grid xs={12} md={6} id="overview-tour-performance">
           <AppPerformance
             title="Store Performance"
             subheader="Normalised across key metrics (0–100 scale)"
@@ -343,7 +349,7 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} md={6}>
+        <Grid xs={12} md={6} id="overview-tour-cashiers">
           <AppTopCashiers
             title="Top Cashier Staff"
             subheader="By Performance"
@@ -353,7 +359,7 @@ export function OverviewAppView({ storeId }) {
         </Grid>
 
         {/* Recent invoices + top products (both driven by shared `period`) */}
-        <Grid xs={12} lg={6}>
+        <Grid xs={12} lg={6} id="overview-tour-invoices">
           <AppNewInvoice
             title="Recent Invoices"
             subheader="Filter by status"
@@ -372,7 +378,7 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} lg={6}>
+        <Grid xs={12} lg={6} id="overview-tour-products">
           <AppNewProduct
             title="Top Selling Products"
             subheader="Point-of-Sale Top Products"

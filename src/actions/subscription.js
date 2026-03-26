@@ -66,15 +66,8 @@ export async function adjustSeats({ delta, scope, store_id }) {
 
 // ----------------------------------------------------------------------
 
-export async function generateInvoice() {
-  const res = await axiosInstance.post(endpoints.subscription.generateInvoice);
-  return res.data;
-}
-
-// ----------------------------------------------------------------------
-
 export async function initiatePayment({ invoice_id, callback_url }) {
-  const res = await axiosInstance.post(endpoints.subscription.initiatePayment, {
+  const res = await axiosInstance.post(endpoints.subscription.invoicesPay, {
     invoice_id,
     callback_url,
   });

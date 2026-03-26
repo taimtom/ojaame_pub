@@ -1,5 +1,5 @@
-import PaystackPop from '@paystack/inline-js';
 import { useState } from 'react';
+import PaystackPop from '@paystack/inline-js';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -11,19 +11,25 @@ import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
-import { toast } from 'src/components/snackbar';
-import { useAuthContext } from 'src/auth/hooks';
-import { Iconify } from 'src/components/iconify';
-import { ConfirmDialog } from 'src/components/custom-dialog';
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import {
-  useGetBillingCards,
-  useGetSubscriptionStatus,
-  verifyAndSaveCard,
   removeCard,
   clearAllCards,
   setDefaultCard,
+  verifyAndSaveCard,
+  useGetBillingCards,
+  useGetSubscriptionStatus,
   getSubscriptionManageLink,
 } from 'src/actions/billing';
+
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import { ConfirmDialog } from 'src/components/custom-dialog';
+
+import { useAuthContext } from 'src/auth/hooks';
+import { SIGNUP_PENDING_PAYMENT_METHOD_KEY } from 'src/auth/signup-constants';
 
 // ----------------------------------------------------------------------
 
@@ -38,9 +44,10 @@ const CARD_BRAND_ICONS = {
 // ----------------------------------------------------------------------
 
 export function AccountBillingPayment() {
+  const router = useRouter();
   const { user } = useAuthContext();
   const { cards, cardsLoading, mutateCards } = useGetBillingCards();
-  const { hasPaystackSubscription } = useGetSubscriptionStatus();
+  const { hasPaystackSubscription, mutateStatus } = useGetSubscriptionStatus();
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -64,7 +71,22 @@ export function AccountBillingPayment() {
         try {
           await verifyAndSaveCard(transaction.reference);
           await mutateCards();
+          await mutateStatus?.();
           toast.success('Payment method saved successfully.');
+          let pending = false;
+          try {
+            pending = localStorage.getItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY) === '1';
+          } catch {
+            /* ignore */
+          }
+          if (pending) {
+            try {
+              localStorage.removeItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY);
+            } catch {
+              /* ignore */
+            }
+            router.replace(paths.dashboard.root);
+          }
         } catch (err) {
           toast.error(err?.detail || err?.message || 'Failed to save card.');
         }

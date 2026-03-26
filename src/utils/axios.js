@@ -285,6 +285,7 @@ export const endpoints = {
     summary: '/api/subscription/summary',
     seats: '/api/subscription/seats',
     invoices: '/api/subscription/invoices',
+    invoicesPay: '/api/subscription/invoices/pay',
     status: '/api/subscription/status',
   },
 

@@ -4,8 +4,11 @@ import { paths } from 'src/routes/paths';
 import { useRouter, usePathname, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/config-global';
+import { useGetSubscriptionStatus } from 'src/actions/billing';
 
 import { SplashScreen } from 'src/components/loading-screen';
+
+import { SIGNUP_PENDING_PAYMENT_METHOD_KEY } from 'src/auth/signup-constants';
 
 import { useAuthContext } from '../hooks';
 
@@ -16,13 +19,17 @@ export function AuthGuard({ children }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { authenticated, loading, user } = useAuthContext();
+  const { hasPaymentMethod, statusLoading, isOwner } = useGetSubscriptionStatus();
   const [isChecking, setIsChecking] = useState(true);
 
-  const createQueryString = useCallback((name, value) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(name, value);
-    return params.toString();
-  }, [searchParams]);
+  const createQueryString = useCallback(
+    (name, value) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(name, value);
+      return params.toString();
+    },
+    [searchParams]
+  );
 
   const checkPermissions = async () => {
     if (loading) return;
@@ -42,11 +49,8 @@ export function AuthGuard({ children }) {
       return;
     }
 
-
     if (authenticated && user) {
-
-
-            // If user is verified but has no company (explicitly checking for null),
+      // If user is verified but has no company (explicitly checking for null),
       // redirect them to the company page.
       if (user.email_verified && user.company_id === null && pathname !== paths.auth.jwt.company) {
         router.replace(paths.auth.jwt.company);
@@ -59,22 +63,51 @@ export function AuthGuard({ children }) {
         return;
       }
 
-
-
       // If user is verified and has a company, but they are on the company page,
       // redirect them to the dashboard.
       if (user.email_verified && user.company_id !== null && pathname === paths.auth.jwt.company) {
         router.replace(paths.dashboard.root);
         return;
       }
+
+      const paymentGateApplies =
+        user.email_verified && user.company_id !== null && isOwner;
+
+      if (paymentGateApplies && statusLoading) {
+        return;
+      }
+
+      if (paymentGateApplies && !hasPaymentMethod) {
+        const onBillingTab =
+          pathname === paths.dashboard.user.account && searchParams.get('tab') === 'billing';
+        if (!onBillingTab) {
+          try {
+            localStorage.setItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY, '1');
+          } catch {
+            /* ignore */
+          }
+          router.replace(`${paths.dashboard.user.account}?tab=billing`);
+          return;
+        }
+      }
     }
+
     setIsChecking(false);
   };
 
   useEffect(() => {
     checkPermissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, loading, user, pathname]);
+  }, [
+    authenticated,
+    loading,
+    user,
+    pathname,
+    searchParams,
+    hasPaymentMethod,
+    statusLoading,
+    isOwner,
+  ]);
 
   if (isChecking) {
     return <SplashScreen />;
