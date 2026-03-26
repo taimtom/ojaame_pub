@@ -1,12 +1,11 @@
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
@@ -15,59 +14,51 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-const PLANS = [
+const PRICING_COMPONENTS = [
   {
-    title: 'Starter',
-    price: 'Free',
-    period: 'forever',
-    description: 'Perfect for small shops just getting started.',
-    color: 'default',
-    popular: false,
-    features: [
-      '1 store',
-      'Up to 50 products',
-      'Quick Sale dashboard',
-      'Basic invoicing',
-      'Sales reports',
-      'Email support',
-    ],
-    disabled: [],
-  },
-  {
-    title: 'Growth',
-    price: '₦9,900',
+    title: 'Base subscription',
+    price: '₦1,000',
     period: 'per month',
-    description: 'For growing businesses that need more power.',
-    color: 'primary',
-    popular: true,
+    description: 'Core monthly company subscription.',
     features: [
-      'Up to 3 stores',
-      'Unlimited products & services',
-      'Credit tracking',
-      'Advanced analytics',
-      'Customer management',
-      'Priority support',
-      'Invoice customisation',
+      'Charged once per company',
+      'Currency billed in NGN',
     ],
-    disabled: [],
   },
   {
-    title: 'Enterprise',
-    price: 'Custom',
-    period: 'contact us',
-    description: 'For chains and businesses with complex needs.',
-    color: 'default',
-    popular: false,
+    title: 'Additional store',
+    price: '₦1,000',
+    period: 'per month',
+    description: 'Charged for each store after your first store.',
     features: [
-      'Unlimited stores',
-      'Unlimited everything',
-      'Dedicated account manager',
-      'Custom integrations',
-      'SLA guarantee',
-      'On-site training',
-      'API access',
+      'First store has no store fee',
+      'Each extra store adds ₦1,000/month',
     ],
-    disabled: [],
+  },
+  {
+    title: 'Extra seats',
+    price: '₦1,000',
+    period: 'per seat/month',
+    description: 'Seat charge applies only beyond the included seat.',
+    features: [
+      'Each store includes 1 seat',
+      'Each seat above 1 in any store is billed',
+    ],
+  },
+];
+
+const EXAMPLES = [
+  {
+    name: 'Example A',
+    details: '1 store, 1 seat in that store',
+    total: '₦1,000/month',
+    formula: 'Base ₦1,000 + Store fees ₦0 + Extra seats ₦0',
+  },
+  {
+    name: 'Example B',
+    details: '2 stores, 2 seats in first store, 1 seat in second store',
+    total: '₦3,000/month',
+    formula: 'Base ₦1,000 + 1 extra store ₦1,000 + 1 extra seat ₦1,000',
   },
 ];
 
@@ -94,10 +85,11 @@ export function HomePricing() {
             Pricing
           </Typography>
           <Typography variant="h2" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
-            Simple, Transparent Pricing
+            Usage-Based Pricing
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 480, mx: 'auto' }}>
-            No hidden fees. No surprises. Start free and upgrade when your business grows.
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640, mx: 'auto' }}>
+            Your monthly total is calculated from clear billing components. First recurring charge starts about 1
+            month after signup.
           </Typography>
         </Box>
 
@@ -106,90 +98,91 @@ export function HomePricing() {
           spacing={3}
           alignItems={{ md: 'stretch' }}
         >
-          {PLANS.map((plan) => {
-            const isPopular = plan.popular;
-            return (
-              <Box key={plan.title} sx={{ flex: 1, position: 'relative' }}>
-                {isPopular && (
-                  <Box sx={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }}>
-                    <Chip
-                      label="Most Popular"
-                      color="primary"
-                      size="small"
-                      sx={{ fontWeight: 700, fontSize: 11, px: 1 }}
-                    />
-                  </Box>
-                )}
-                <Card
-                  sx={{
-                    p: 4,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: isPopular
-                      ? `2px solid ${theme.palette.primary.main}`
-                      : `1px solid ${theme.palette.divider}`,
-                    borderRadius: 3,
-                    boxShadow: isPopular ? `0 16px 48px ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
-                    position: 'relative',
-                    overflow: 'visible',
-                  }}
-                >
-                  <Typography variant="overline" color="text.secondary" fontWeight={700}>
-                    {plan.title}
+          {PRICING_COMPONENTS.map((item) => (
+            <Box key={item.title} sx={{ flex: 1 }}>
+              <Card
+                sx={{
+                  p: 4,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 3,
+                }}
+              >
+                <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                  {item.title}
+                </Typography>
+
+                <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 1 }}>
+                  <Typography variant="h3" fontWeight={800} lineHeight={1}>
+                    {item.price}
                   </Typography>
-
-                  <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 1 }}>
-                    <Typography variant="h3" fontWeight={800} lineHeight={1}>
-                      {plan.price}
-                    </Typography>
-                    {plan.period !== 'forever' && plan.price !== 'Custom' && (
-                      <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
-                        /{plan.period}
-                      </Typography>
-                    )}
-                    {(plan.period === 'forever' || plan.price === 'Custom') && (
-                      <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
-                        {plan.period}
-                      </Typography>
-                    )}
-                  </Stack>
-
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    {plan.description}
+                  <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
+                    /{item.period}
                   </Typography>
+                </Stack>
 
-                  <Divider sx={{ mb: 3 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  {item.description}
+                </Typography>
 
-                  <Stack spacing={1.5} sx={{ mb: 4, flex: 1 }}>
-                    {plan.features.map((feature) => (
-                      <Stack key={feature} direction="row" alignItems="center" spacing={1}>
-                        <Iconify
-                          icon="solar:check-circle-bold"
-                          width={18}
-                          sx={{ color: isPopular ? 'primary.main' : 'success.main', flexShrink: 0 }}
-                        />
-                        <Typography variant="body2">{feature}</Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
+                <Divider sx={{ mb: 3 }} />
 
-                  <Button
-                    component={RouterLink}
-                    href={plan.price === 'Custom' ? '/#contact' : paths.auth.jwt.signUp}
-                    fullWidth
-                    size="large"
-                    variant={isPopular ? 'contained' : 'outlined'}
-                    color="primary"
-                    sx={{ borderRadius: 2, fontWeight: 700, py: 1.5 }}
-                  >
-                    {plan.price === 'Custom' ? 'Contact Sales' : plan.price === 'Free' ? 'Get Started Free' : 'Start 14-Day Trial'}
-                  </Button>
-                </Card>
-              </Box>
-            );
-          })}
+                <Stack spacing={1.5} sx={{ mb: 4, flex: 1 }}>
+                  {item.features.map((feature) => (
+                    <Stack key={feature} direction="row" alignItems="center" spacing={1}>
+                      <Iconify
+                        icon="solar:check-circle-bold"
+                        width={18}
+                        sx={{ color: 'success.main', flexShrink: 0 }}
+                      />
+                      <Typography variant="body2">{feature}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Card>
+            </Box>
+          ))}
         </Stack>
+
+        <Card
+          sx={{
+            mt: 3,
+            p: { xs: 3, md: 4 },
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 3,
+          }}
+        >
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+            Example monthly totals
+          </Typography>
+          <Stack spacing={2.5}>
+            {EXAMPLES.map((example) => (
+              <Box key={example.name}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {example.name}: {example.total}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {example.details}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {example.formula}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+          <Button
+            component={RouterLink}
+            href={paths.auth.jwt.signUp}
+            size="large"
+            variant="contained"
+            color="primary"
+            sx={{ mt: 3, borderRadius: 2, fontWeight: 700, py: 1.5, px: 4 }}
+          >
+            Get Started
+          </Button>
+        </Card>
       </Container>
     </Box>
   );

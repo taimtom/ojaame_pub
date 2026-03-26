@@ -35,9 +35,19 @@ export const NewStoreSchema = zod.object({
   storeName: zod.string().min(1, { message: 'Store Name is required!' }),
   storeEmail: zod
     .string()
-    .min(1, { message: 'Email is required!' })
-    .email({ message: 'Email must be a valid email address!' }),
-  phoneNumber: schemaHelper.phoneNumber({ isValidPhoneNumber }),
+    .trim()
+    .optional()
+    .or(zod.literal(''))
+    .refine((value) => !value || zod.string().email().safeParse(value).success, {
+      message: 'Email must be a valid email address!',
+    }),
+  phoneNumber: zod
+    .string()
+    .optional()
+    .or(zod.literal(''))
+    .refine((value) => !value || isValidPhoneNumber(value), {
+      message: 'Phone number must be valid',
+    }),
   address: zod.string().min(1, { message: 'Address is required!' }),
   status: zod.string(),
   isVerified: zod.boolean(),
