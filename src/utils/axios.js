@@ -171,6 +171,7 @@ export const endpoints = {
   },
   uploads: {
     upload: '/api/uploads',
+    presign: '/api/uploads/presign',
   },
   dashboard: {
     // company-level (no storeId)

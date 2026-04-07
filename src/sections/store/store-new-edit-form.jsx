@@ -2,7 +2,7 @@ import { z as zod } from 'zod';
 import { useMemo, useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
-import { isValidPhoneNumber } from 'react-phone-number-input/input';
+import { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -27,6 +27,21 @@ import { addStore, editStore } from 'src/actions/store';
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
+
+// ----------------------------------------------------------------------
+// Derive a human-readable country name from an E.164 phone number.
+// Falls back to empty string if the number can't be parsed.
+function countryFromPhone(e164) {
+  if (!e164) return '';
+  try {
+    const parsed = parsePhoneNumber(e164);
+    if (!parsed?.country) return '';
+    const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    return displayNames.of(parsed.country) || '';
+  } catch {
+    return '';
+  }
+}
 
 // ----------------------------------------------------------------------
 // Validation schema for a new/edit store.
@@ -132,6 +147,13 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
       } else if (!data.avatarUrl || data.avatarUrl === '') {
         // If no image is uploaded, set to null
         data.avatarUrl = null;
+      }
+
+      // Derive country from the phone number's calling code so users never
+      // have to pick it manually.
+      const derivedCountry = countryFromPhone(data.phoneNumber);
+      if (derivedCountry) {
+        data.country = derivedCountry;
       }
 
       if (currentStore) {

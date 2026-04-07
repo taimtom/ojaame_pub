@@ -107,16 +107,24 @@ function getStoreIdFromStorage() {
   return null;
 }
 
+const LAGOS_TZ = 'Africa/Lagos';
+
 function fTime(isoString) {
   if (!isoString) return '—';
-  const d = new Date(isoString);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(isoString).toLocaleTimeString('en-NG', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: LAGOS_TZ,
+  });
 }
 
 function fDateShort(isoString) {
   if (!isoString) return '—';
-  const d = new Date(isoString);
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return new Date(isoString).toLocaleDateString('en-NG', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: LAGOS_TZ,
+  });
 }
 
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'pos'];
@@ -1211,7 +1219,7 @@ export function QuickDashboardView() {
             ⚡ Quick Dashboard
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Record a sale in under 30 seconds · {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+            Record a sale in under 30 seconds · {new Date().toLocaleDateString('en-NG', { weekday: 'long', month: 'long', day: 'numeric', timeZone: LAGOS_TZ })}
           </Typography>
         </Box>
         <Tooltip title="Refresh stats">
