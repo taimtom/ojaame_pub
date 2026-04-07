@@ -21,7 +21,6 @@ import { fCurrency } from 'src/utils/format-number';
 
 import { adjustProductStock } from 'src/actions/product';
 import { toast } from 'src/components/snackbar';
-import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
@@ -40,6 +39,7 @@ const AdjustSchema = zod.object({
   reason: zod.string().min(1, { message: 'Please select a reason.' }),
   quantity: zod.number().min(1, { message: 'Quantity must be at least 1.' }),
   description: zod.string().optional(),
+  addAsExpense: zod.boolean(),
 });
 
 const PackAdjustSchema = zod.object({
@@ -47,6 +47,7 @@ const PackAdjustSchema = zod.object({
   reason: zod.string().min(1, { message: 'Please select a reason.' }),
   packsToDeduct: zod.number().min(1, { message: 'Number of packs must be at least 1.' }),
   description: zod.string().optional(),
+  addAsExpense: zod.boolean(),
 });
 
 // ----------------------------------------------------------------------
@@ -108,7 +109,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
   const currentStock = currentProduct?.quantity ?? 0;
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '' }),
+    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '', addAsExpense: true }),
     [currentProduct]
   );
 
@@ -117,6 +118,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
 
   const quantity = useWatch({ control: methods.control, name: 'quantity' });
   const reason   = useWatch({ control: methods.control, name: 'reason' });
+  const addAsExpense = useWatch({ control: methods.control, name: 'addAsExpense' });
 
   useEffect(() => { if (currentProduct) reset(defaultValues); }, [currentProduct, defaultValues, reset]);
 
@@ -124,6 +126,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
   const newStock    = currentStock - deductQty;
   const overDeduct  = deductQty > currentStock;
   const selectedReason = LOSS_REASONS.find((r) => r.value === reason);
+  const lossValue = deductQty * Number(currentProduct?.costPrice || 0);
 
   const onSubmit = handleSubmit(async (data) => {
     try {
@@ -134,6 +137,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
         quantity: data.quantity,
         reason: data.reason,
         description: data.description || undefined,
+        add_as_expense: data.addAsExpense,
       });
       toast.success('Stock adjustment recorded!');
       setTimeout(() => router.push(paths.dashboard.product.root(storeSlug)), 2000);
@@ -229,6 +233,17 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
               rows={2}
               InputLabelProps={{ shrink: true }}
             />
+
+            <Field.Switch name="addAsExpense" label="Record as expense" />
+
+            {addAsExpense && Number(currentProduct?.costPrice || 0) > 0 && deductQty > 0 && (
+              <ReadonlyInfo
+                icon="solar:dollar-minimalistic-bold"
+                label="Loss value"
+                value={fCurrency(lossValue)}
+                color="warning.main"
+              />
+            )}
           </Stack>
         </Card>
 
@@ -261,7 +276,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
   const currentPacks     = Math.floor(currentUnits / quantityPerPack);
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '' }),
+    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: true }),
     [currentProduct]
   );
 
@@ -270,6 +285,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
 
   const packsToDeduct  = useWatch({ control: methods.control, name: 'packsToDeduct' });
   const reason         = useWatch({ control: methods.control, name: 'reason' });
+  const addAsExpense   = useWatch({ control: methods.control, name: 'addAsExpense' });
 
   useEffect(() => { if (currentProduct) reset(defaultValues); }, [currentProduct, defaultValues, reset]);
 
@@ -278,6 +294,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
   const newUnits       = currentUnits - unitsToDeduct;
   const overDeduct     = unitsToDeduct > currentUnits;
   const selectedReason = LOSS_REASONS.find((r) => r.value === reason);
+  const totalCost      = costPricePerPack != null ? deductPacks * costPricePerPack : null;
 
   const onSubmit = handleSubmit(async (data) => {
     try {
@@ -291,6 +308,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
         description:
           data.description ||
           `${data.packsToDeduct} pack(s) ${data.reason} — ${unitsLost} unit(s) removed from stock`,
+        add_as_expense: data.addAsExpense,
       });
       toast.success('Stock adjustment recorded!');
       setTimeout(() => router.push(paths.dashboard.product.root(storeSlug)), 2000);
@@ -409,6 +427,17 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
               rows={2}
               InputLabelProps={{ shrink: true }}
             />
+
+            <Field.Switch name="addAsExpense" label="Record as expense" />
+
+            {addAsExpense && totalCost != null && unitsToDeduct > 0 && (
+              <ReadonlyInfo
+                icon="solar:dollar-minimalistic-bold"
+                label="Loss value"
+                value={fCurrency(totalCost)}
+                color="warning.main"
+              />
+            )}
           </Stack>
         </Card>
 

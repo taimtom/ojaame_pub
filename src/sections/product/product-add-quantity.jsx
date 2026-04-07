@@ -21,9 +21,7 @@ import { fCurrency } from 'src/utils/format-number';
 import { updateProductQuantity } from 'src/actions/product';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { Label } from 'src/components/label';
 import { Form, Field } from 'src/components/hook-form';
-import { useCurrencyFormat } from 'src/hooks/use-currency-format';
 
 // ----------------------------------------------------------------------
 
@@ -33,6 +31,7 @@ const SingleSchema = zod.object({
   addQuantity: zod.number().min(1, { message: 'Quantity to add must be at least 1!' }),
   totalQuantity: zod.number().min(0).optional(),
   description: zod.string().optional(),
+  addAsExpense: zod.boolean(),
 });
 
 const PackSchema = zod.object({
@@ -40,6 +39,7 @@ const PackSchema = zod.object({
   quantity: zod.number().min(0),
   packsToAdd: zod.number().min(1, { message: 'Number of packs to add must be at least 1!' }),
   description: zod.string().optional(),
+  addAsExpense: zod.boolean(),
 });
 
 // ----------------------------------------------------------------------
@@ -84,6 +84,7 @@ function SingleItemForm({ currentProduct, storeSlug }) {
       addQuantity: 0,
       totalQuantity: baseQuantity,
       description: '',
+      addAsExpense: false,
     }),
     [currentProduct, baseQuantity]
   );
@@ -98,6 +99,8 @@ function SingleItemForm({ currentProduct, storeSlug }) {
   } = methods;
 
   const addQuantity = useWatch({ control: methods.control, name: 'addQuantity' });
+  const addAsExpense = useWatch({ control: methods.control, name: 'addAsExpense' });
+  const restockCost = (Number(addQuantity) || 0) * Number(currentProduct?.costPrice || 0);
 
   useEffect(() => {
     setValue('totalQuantity', baseQuantity + (Number(addQuantity) || 0));
@@ -116,6 +119,7 @@ function SingleItemForm({ currentProduct, storeSlug }) {
         quantity: data.addQuantity,
         status: 'received',
         description: data.description || undefined,
+        add_as_expense: data.addAsExpense,
       });
       toast.success('Stock updated successfully!');
       setTimeout(() => router.push(paths.dashboard.product.root(storeSlug)), 2000);
@@ -165,6 +169,17 @@ function SingleItemForm({ currentProduct, storeSlug }) {
               rows={2}
               InputLabelProps={{ shrink: true }}
             />
+
+            <Field.Switch name="addAsExpense" label="Record restock as expense" />
+
+            {addAsExpense && (
+              <ReadonlyField
+                icon="solar:dollar-minimalistic-bold"
+                label="Expense amount"
+                value={fCurrency(restockCost)}
+                color="warning.main"
+              />
+            )}
           </Stack>
         </Card>
 
@@ -182,7 +197,6 @@ function SingleItemForm({ currentProduct, storeSlug }) {
 
 function PackItemForm({ currentProduct, storeSlug }) {
   const router = useRouter();
-  const { currencySymbol } = useCurrencyFormat();
 
   const quantityPerPack = currentProduct?.quantity_per_pack ?? 1;
   const costPricePerPack = currentProduct?.cost_price_per_pack ?? null;
@@ -195,6 +209,7 @@ function PackItemForm({ currentProduct, storeSlug }) {
       quantity: currentUnits,
       packsToAdd: 0,
       description: '',
+      addAsExpense: false,
     }),
     [currentProduct, currentUnits]
   );
@@ -208,6 +223,7 @@ function PackItemForm({ currentProduct, storeSlug }) {
   } = methods;
 
   const packsToAdd = useWatch({ control: methods.control, name: 'packsToAdd' });
+  const addAsExpense = useWatch({ control: methods.control, name: 'addAsExpense' });
 
   useEffect(() => {
     if (currentProduct) reset(defaultValues);
@@ -232,6 +248,7 @@ function PackItemForm({ currentProduct, storeSlug }) {
         description:
           data.description ||
           `${data.packsToAdd} pack(s) received — ${unitsBeingAdded} unit(s) added to stock`,
+        add_as_expense: data.addAsExpense,
       });
 
       toast.success('Stock updated successfully!');
@@ -383,6 +400,17 @@ function PackItemForm({ currentProduct, storeSlug }) {
               rows={2}
               InputLabelProps={{ shrink: true }}
             />
+
+            <Field.Switch name="addAsExpense" label="Record restock as expense" />
+
+            {addAsExpense && totalCost != null && (
+              <ReadonlyField
+                icon="solar:dollar-minimalistic-bold"
+                label="Expense amount"
+                value={fCurrency(totalCost)}
+                color="warning.main"
+              />
+            )}
           </Stack>
         </Card>
 

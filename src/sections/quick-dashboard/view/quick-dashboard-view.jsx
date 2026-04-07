@@ -27,17 +27,72 @@ import Grid from '@mui/material/Unstable_Grid2';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Autocomplete from '@mui/material/Autocomplete';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
+import { useOfflineSync } from 'src/hooks/use-offline-sync';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/utils/axios';
+import { enqueueSale } from 'src/utils/offlineQueue';
+
+// ── Offline product search cache (localStorage) ────────────────────────────
+const SEARCH_CACHE_KEY = 'qs_search_cache';
+const SEARCH_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 h
+
+function saveSearchCache(results) {
+  try {
+    localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify({ results, ts: Date.now() }));
+  } catch {
+    // storage quota exceeded — skip
+  }
+}
+
+function loadSearchCache() {
+  try {
+    const raw = localStorage.getItem(SEARCH_CACHE_KEY);
+    if (!raw) return [];
+    const { results, ts } = JSON.parse(raw);
+    if (Date.now() - ts > SEARCH_CACHE_MAX_AGE_MS) return [];
+    return Array.isArray(results) ? results : [];
+  } catch {
+    return [];
+  }
+}
+
+function filterCacheByQuery(cachedResults, q) {
+  const lower = q.toLowerCase();
+  return cachedResults.filter((r) => r.name?.toLowerCase().includes(lower));
+}
 
 // ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
+
+/** Cart line id: pack products split unit vs pack mode so lines do not merge incorrectly. */
+function cartIdForSearchItem(item, packMode = 'unit') {
+  if (item.type === 'product' && item.is_pack) {
+    return `${item.type}-${item.id}-${packMode}`;
+  }
+  return `${item.type}-${item.id}`;
+}
+
+/** Normalize API fields (snake_case vs camelCase) so pack UI always works. */
+function normalizeQuickSearchProduct(item) {
+  if (!item || item.type !== 'product') return item;
+  const isPack = Boolean(item.is_pack ?? item.isPack);
+  const qpp = item.quantity_per_pack ?? item.quantityPerPack ?? null;
+  return {
+    ...item,
+    is_pack: isPack,
+    quantity_per_pack: qpp,
+    cost_price_per_pack: item.cost_price_per_pack ?? item.costPricePerPack ?? null,
+    pack_sell_price: item.pack_sell_price ?? item.packSellPrice ?? null,
+  };
+}
 
 function getStoreIdFromStorage() {
   try {
@@ -148,9 +203,25 @@ function ItemCard({ item, onAdd }) {
             {item.name}
           </Typography>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="caption" color="text.secondary">
-              {fCurrency(item.price)}
-            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+              <Typography variant="caption" color="text.secondary">
+                {fCurrency(item.price)}
+                {item.is_pack && item.quantity_per_pack ? ` /item` : ''}
+              </Typography>
+              {item.is_pack && (
+                <Chip
+                  size="small"
+                  label={`Pack ×${item.quantity_per_pack}`}
+                  variant="outlined"
+                  sx={{ height: 18, fontSize: 10 }}
+                />
+              )}
+              {item.is_pack && item.pack_sell_price != null && (
+                <Typography variant="caption" sx={{ color: 'primary.main' }} noWrap>
+                  Pack {fCurrency(item.pack_sell_price)}
+                </Typography>
+              )}
+            </Stack>
             {item.stock != null && (
               <Chip
                 size="small"
@@ -171,15 +242,49 @@ function ItemCard({ item, onAdd }) {
 // Cart row
 // ----------------------------------------------------------------------
 
-function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, inputMode, onToggleMode, onAmountInput }) {
+function CartRow({
+  item,
+  onQtyChange,
+  onQtyInput,
+  onVariablePriceCommit,
+  onVariablePriceFocus,
+  onVariablePriceBlur,
+  onRemove,
+  inputMode,
+  onToggleMode,
+  onAmountInput,
+  onTogglePackSaleMode,
+  onPackPriceCommit,
+}) {
   const { currencySymbol } = useCurrencyFormat();
   const isAmountMode = inputMode === 'amount';
+  const isPackLine = Boolean(item.is_pack && item.pack_sale_mode === 'pack');
+
+  // Variable price: keep a draft while typing so we don't clamp min/max on every keystroke.
+  const [priceDraft, setPriceDraft] = useState(() => String(item.unit_price ?? ''));
+  const [priceFocused, setPriceFocused] = useState(false);
+
+  // Pack price (per whole pack) draft when in pack sale mode
+  const [packPriceDraft, setPackPriceDraft] = useState(() => String(item.unit_price ?? ''));
+  const [packPriceFocused, setPackPriceFocused] = useState(false);
 
   // Keep a raw string for the amount field while the user is actively typing.
   // This prevents React from replacing the input with float-precision noise
   // (e.g. "30.000000000000004") on every keystroke.
   const [amountDraft, setAmountDraft] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
+
+  useEffect(() => {
+    if (!priceFocused) {
+      setPriceDraft(String(item.unit_price ?? ''));
+    }
+  }, [item.unit_price, item.cartId, priceFocused]);
+
+  useEffect(() => {
+    if (!packPriceFocused) {
+      setPackPriceDraft(String(item.unit_price ?? ''));
+    }
+  }, [item.unit_price, item.cartId, packPriceFocused]);
 
   const handleAmountFocus = () => {
     const clean = item.subtotal != null ? parseFloat(item.subtotal.toFixed(2)) : 0;
@@ -196,54 +301,47 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, input
     setAmountFocused(false);
   };
 
-  return (
-    <TableRow>
-      <TableCell sx={{ py: 1, pl: 0 }}>
-        <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 140 }}>
-          {item.name}
-        </Typography>
-        {item.allow_variable_price ? (
-          <TextField
-            value={item.unit_price}
-            onChange={(e) => onPriceChange?.(item.cartId, e.target.value)}
-            type="number"
-            variant="outlined"
-            size="small"
-            sx={{ mt: 0.25, maxWidth: 120 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
-                </InputAdornment>
-              ),
-            }}
-            inputProps={{ step: 0.01 }}
-            helperText={
-              item.variable_price_min != null && item.variable_price_max != null
-                ? `Var: ${currencySymbol}${item.variable_price_min}–${currencySymbol}${item.variable_price_max}`
-                : 'Variable price'
-            }
-          />
-        ) : (
-          <Typography variant="caption" color="text.secondary">
-            {currencySymbol}{item.unit_price.toLocaleString()}
-          </Typography>
-        )}
-      </TableCell>
+  const packPriceError =
+    isPackLine &&
+    item.cost_price_per_pack != null &&
+    item.unit_price < item.cost_price_per_pack;
 
-      <TableCell sx={{ py: 1 }} align="center">
-        {isAmountMode ? (
-          /* ── Amount mode: user enters the total they want to pay ── */
-          <Stack direction="row" alignItems="center" spacing={0.5}>
+  return (
+    <>
+      {/* ── Main row: name | qty stepper | total | delete ── */}
+      <TableRow>
+        <TableCell sx={{ py: 0.5, pl: 0, pr: 0.5, verticalAlign: 'middle' }}>
+          <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
+            {item.name}
+          </Typography>
+          {/* Fixed price caption (non-variable, non-pack-mode) */}
+          {!item.allow_variable_price && !isPackLine && (
+            <Typography variant="caption" color="text.secondary">
+              {currencySymbol}{item.unit_price.toLocaleString()}
+              {item.is_pack ? ' /item' : ''}
+            </Typography>
+          )}
+          {/* Variable price input */}
+          {item.allow_variable_price && !isPackLine && (
             <TextField
-              value={amountFocused ? amountDraft : (item.subtotal ? parseFloat(item.subtotal.toFixed(2)) : '')}
-              onFocus={handleAmountFocus}
-              onBlur={handleAmountBlur}
-              onChange={handleAmountChange}
-              type="number"
+              value={priceFocused ? priceDraft : String(item.unit_price ?? '')}
+              onFocus={() => {
+                setPriceDraft(String(item.unit_price ?? ''));
+                setPriceFocused(true);
+                onVariablePriceFocus?.(item.cartId);
+              }}
+              onChange={(e) => setPriceDraft(e.target.value)}
+              onBlur={() => {
+                setPriceFocused(false);
+                const raw = priceDraft.trim();
+                if (raw !== '') onVariablePriceCommit?.(item.cartId, raw);
+                onVariablePriceBlur?.();
+              }}
+              type="text"
+              inputMode="decimal"
               variant="outlined"
               size="small"
-              placeholder="0"
+              sx={{ mt: 0.25, width: 100 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -251,65 +349,159 @@ function CartRow({ item, onQtyChange, onQtyInput, onPriceChange, onRemove, input
                   </InputAdornment>
                 ),
               }}
-              inputProps={{ step: 1, min: 0, style: { textAlign: 'center', width: 60 } }}
+              error={
+                (item.variable_price_min != null && item.unit_price < item.variable_price_min) ||
+                (item.variable_price_max != null && item.unit_price > item.variable_price_max)
+              }
+              helperText={
+                item.variable_price_min != null && item.variable_price_max != null
+                  ? `${currencySymbol}${item.variable_price_min}–${currencySymbol}${item.variable_price_max}`
+                  : 'Variable'
+              }
             />
-            <Tooltip title="Switch to quantity mode">
-              <IconButton
-                size="small"
-                onClick={() => onToggleMode?.(item.cartId)}
-                sx={{ p: 0.25, color: 'primary.main' }}
-              >
-                <Iconify icon="solar:hashtag-bold" width={14} />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        ) : (
-          /* ── Qty mode: default +/- stepper ── */
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
-              <Iconify icon="eva:minus-fill" width={14} />
-            </IconButton>
-            <TextField
-              value={item.quantity}
-              onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
-              type="number"
-              variant="outlined"
-              size="small"
-              inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 56 } }}
-            />
-            <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
-              <Iconify icon="eva:plus-fill" width={14} />
-            </IconButton>
-            <Tooltip title="Enter total amount instead of quantity">
-              <IconButton
-                size="small"
-                onClick={() => onToggleMode?.(item.cartId)}
-                sx={{ p: 0.25, color: 'text.secondary' }}
-              >
-                <Iconify icon="solar:dollar-minimalistic-bold" width={14} />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        )}
-      </TableCell>
+          )}
+        </TableCell>
 
-      <TableCell sx={{ py: 1, pr: 0 }} align="right">
-        <Typography variant="body2" fontWeight={600}>
-          {fCurrency(item.subtotal)}
-        </Typography>
-        {isAmountMode && (
-          <Typography variant="caption" color="text.disabled" display="block">
-            qty: {Number(item.quantity).toFixed(4)}
+        <TableCell sx={{ py: 0.5 }} align="center">
+          {isAmountMode ? (
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <TextField
+                value={amountFocused ? amountDraft : (item.subtotal ? parseFloat(item.subtotal.toFixed(2)) : '')}
+                onFocus={handleAmountFocus}
+                onBlur={handleAmountBlur}
+                onChange={handleAmountChange}
+                type="number"
+                variant="outlined"
+                size="small"
+                placeholder="0"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                    </InputAdornment>
+                  ),
+                }}
+                inputProps={{ step: 1, min: 0, style: { textAlign: 'center', width: 56 } }}
+              />
+              <Tooltip title="Switch to quantity mode">
+                <IconButton size="small" onClick={() => onToggleMode?.(item.cartId)} sx={{ p: 0.25, color: 'primary.main' }}>
+                  <Iconify icon="solar:hashtag-bold" width={14} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ) : (
+            <Stack direction="row" alignItems="center" spacing={0.25}>
+              <IconButton size="small" onClick={() => onQtyChange(item.cartId, -1)} sx={{ p: 0.25 }}>
+                <Iconify icon="eva:minus-fill" width={14} />
+              </IconButton>
+              <TextField
+                value={item.quantity}
+                onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
+                type="number"
+                variant="outlined"
+                size="small"
+                inputProps={{ step: 0.01, min: 0.01, style: { textAlign: 'center', width: 38 } }}
+              />
+              <IconButton size="small" onClick={() => onQtyChange(item.cartId, 1)} sx={{ p: 0.25 }}>
+                <Iconify icon="eva:plus-fill" width={14} />
+              </IconButton>
+              <Tooltip title="Enter total amount instead">
+                <IconButton size="small" onClick={() => onToggleMode?.(item.cartId)} sx={{ p: 0.25, color: 'text.secondary' }}>
+                  <Iconify icon="solar:dollar-minimalistic-bold" width={14} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          )}
+          {isPackLine && (
+            <Typography variant="caption" sx={{ color: 'primary.main', display: 'block', textAlign: 'center' }}>
+              {item.quantity} pack{item.quantity !== 1 ? 's' : ''}
+            </Typography>
+          )}
+        </TableCell>
+
+        <TableCell sx={{ py: 0.5, pr: 0 }} align="right">
+          <Typography variant="body2" fontWeight={600}>
+            {fCurrency(item.subtotal)}
           </Typography>
-        )}
-      </TableCell>
+          {isAmountMode && (
+            <Typography variant="caption" color="text.disabled" display="block">
+              qty: {Number(item.quantity).toFixed(2)}
+            </Typography>
+          )}
+        </TableCell>
 
-      <TableCell sx={{ py: 1, pr: 0, pl: 0.5 }} align="right">
-        <IconButton size="small" color="error" onClick={() => onRemove(item.cartId)} sx={{ p: 0.5 }}>
-          <Iconify icon="eva:trash-2-outline" width={16} />
-        </IconButton>
-      </TableCell>
-    </TableRow>
+        <TableCell sx={{ py: 0.5, pr: 0, pl: 0.25 }} align="right">
+          <IconButton size="small" color="error" onClick={() => onRemove(item.cartId)} sx={{ p: 0.5 }}>
+            <Iconify icon="eva:trash-2-outline" width={16} />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+
+      {/* ── Pack toggle row — only for pack products ── */}
+      {item.is_pack && (
+        <TableRow sx={{ '& td': { border: 0, pt: 0, pb: 0.75 } }}>
+          <TableCell colSpan={4} sx={{ pl: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+              {/* Single ↔ Pack toggle */}
+              <FormControlLabel
+                sx={{ m: 0 }}
+                control={
+                  <Switch
+                    size="small"
+                    checked={isPackLine}
+                    onChange={() => onTogglePackSaleMode?.(item.cartId)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="caption" sx={{ color: isPackLine ? 'primary.main' : 'text.secondary' }}>
+                    {isPackLine ? `Sell by pack (×${item.quantity_per_pack})` : 'Sell by item'}
+                  </Typography>
+                }
+              />
+
+              {/* Pack price input — visible only in pack mode */}
+              {isPackLine && (
+                <TextField
+                  value={packPriceFocused ? packPriceDraft : String(item.unit_price ?? '')}
+                  onFocus={() => {
+                    setPackPriceDraft(String(item.unit_price ?? ''));
+                    setPackPriceFocused(true);
+                    onVariablePriceFocus?.(item.cartId);
+                  }}
+                  onChange={(e) => setPackPriceDraft(e.target.value)}
+                  onBlur={() => {
+                    setPackPriceFocused(false);
+                    const raw = packPriceDraft.trim();
+                    if (raw !== '') onPackPriceCommit?.(item.cartId, raw);
+                    onVariablePriceBlur?.();
+                  }}
+                  type="text"
+                  inputMode="decimal"
+                  variant="outlined"
+                  size="small"
+                  placeholder="Pack price"
+                  sx={{ width: 150 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box sx={{ typography: 'caption', color: 'text.disabled' }}>{currencySymbol}</Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  error={packPriceError}
+                  helperText={
+                    item.cost_price_per_pack != null
+                      ? `Min ${currencySymbol}${item.cost_price_per_pack}`
+                      : 'Whole pack price'
+                  }
+                />
+              )}
+            </Stack>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -322,6 +514,22 @@ export function QuickDashboardView() {
   const searchRef = useRef(null);
 
   const [storeId, setStoreId] = useState(() => getStoreIdFromStorage());
+
+  // ── Offline sync ───────────────────────────────────────────────
+  const {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    syncErrors,
+    discardError,
+    refreshCount: refreshOfflineCount,
+  } = useOfflineSync({
+    onSyncComplete: (count) => {
+      toast.success(`${count} offline sale${count === 1 ? '' : 's'} synced successfully!`);
+    },
+  });
+
+  const [showSyncErrors, setShowSyncErrors] = useState(false);
 
   // Keep store in sync when workspace changes (other tabs, focus, or same-tab localStorage updates)
   useEffect(() => {
@@ -359,6 +567,8 @@ export function QuickDashboardView() {
   const [saleStatus, setSaleStatus] = useState('paid');
   const [creditCustomerName, setCreditCustomerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  /** Block checkout while a variable price field is focused (draft not yet committed). */
+  const [variablePriceFocusCartId, setVariablePriceFocusCartId] = useState(null);
 
   // Optional customer (walk-in when unset — omit customer_id on submit)
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -454,12 +664,17 @@ export function QuickDashboardView() {
     return () => clearTimeout(t);
   }, [customerInput, storeId]);
 
-  // ── Search (debounced) ─────────────────────────────────────────
+  // ── Search (debounced, with offline cache fallback) ────────────
 
   useEffect(() => {
     let timer;
     if (!query.trim() || !storeId) {
       setSearchResults([]);
+    } else if (!isOnline) {
+      // Offline — filter cached products locally
+      const cached = loadSearchCache();
+      const filtered = filterCacheByQuery(cached, query.trim());
+      setSearchResults(filtered.map(normalizeQuickSearchProduct));
     } else {
       timer = setTimeout(async () => {
         try {
@@ -467,24 +682,44 @@ export function QuickDashboardView() {
           const res = await axiosInstance.get('/api/quick-dashboard/search', {
             params: { query: query.trim(), store_id: storeId, limit: 20 },
           });
-          setSearchResults(res.data?.results || []);
+          const raw = res.data?.results || [];
+          const normalized = raw.map(normalizeQuickSearchProduct);
+          // Merge new results into cache (deduplicate by type+id)
+          const existing = loadSearchCache();
+          const existingMap = new Map(existing.map((r) => [`${r.type}-${r.id}`, r]));
+          raw.forEach((r) => existingMap.set(`${r.type}-${r.id}`, r));
+          saveSearchCache(Array.from(existingMap.values()));
+          setSearchResults(normalized);
         } catch {
-          setSearchResults([]);
+          // On network error, fall back to cached results
+          const cached = loadSearchCache();
+          const filtered = filterCacheByQuery(cached, query.trim());
+          setSearchResults(filtered.map(normalizeQuickSearchProduct));
         } finally {
           setSearching(false);
         }
       }, 300);
     }
     return () => clearTimeout(timer);
-  }, [query, storeId]);
+  }, [query, storeId, isOnline]);
 
   // ── Cart logic ─────────────────────────────────────────────────
 
   const addToCart = useCallback((item) => {
+    const row = normalizeQuickSearchProduct(item);
     setCart((prev) => {
-      const existing = prev.find((c) => c.cartId === `${item.type}-${item.id}`);
+      const lineId = cartIdForSearchItem(row, 'unit');
+      const existing = prev.find((c) => c.cartId === lineId);
       if (existing) {
-        const maxQty = existing.stock != null ? existing.stock : Infinity;
+        const isPackSale = existing.is_pack && existing.pack_sale_mode === 'pack';
+        const qpp = existing.quantity_per_pack || 1;
+        const maxPacks =
+          existing.stock != null && qpp > 0 ? Math.floor(existing.stock / qpp) : Infinity;
+        const maxQty = isPackSale
+          ? maxPacks
+          : existing.stock != null
+            ? existing.stock
+            : Infinity;
         if (existing.quantity >= maxQty) return prev;
         const newQty = Math.min(existing.quantity + 1, maxQty);
         return prev.map((c) =>
@@ -496,17 +731,24 @@ export function QuickDashboardView() {
       return [
         ...prev,
         {
-          cartId: `${item.type}-${item.id}`,
-          id: item.id,
-          type: item.type,
-          name: item.name,
-          unit_price: item.price,
+          cartId: lineId,
+          id: row.id,
+          type: row.type,
+          name: row.name,
+          unit_price: row.price,
           quantity: 1,
-          subtotal: item.price,
-          stock: item.stock ?? null,
-          allow_variable_price: item.allow_variable_price ?? false,
-          variable_price_min: item.variable_price_min ?? null,
-          variable_price_max: item.variable_price_max ?? null,
+          subtotal: row.price,
+          stock: row.stock ?? null,
+          cost_price: row.cost_price ?? null,
+          allow_variable_price: row.allow_variable_price ?? false,
+          variable_price_min: row.variable_price_min ?? null,
+          variable_price_max: row.variable_price_max ?? null,
+          is_pack: Boolean(row.is_pack),
+          quantity_per_pack: row.quantity_per_pack ?? null,
+          cost_price_per_pack: row.cost_price_per_pack ?? null,
+          pack_sell_price: row.pack_sell_price ?? null,
+          pack_sale_mode: 'unit',
+          base_unit_price: row.price,
         },
       ];
     });
@@ -519,7 +761,15 @@ export function QuickDashboardView() {
           if (c.cartId !== cartId) return c;
           const newQty = c.quantity + delta;
           if (newQty < 0.01) return null;
-          const maxQty = c.stock != null ? c.stock : Infinity;
+          const isPackSale = c.is_pack && c.pack_sale_mode === 'pack';
+          const qpp = c.quantity_per_pack || 1;
+          const maxPacks =
+            c.stock != null && qpp > 0 ? Math.floor(c.stock / qpp) : Infinity;
+          const maxQty = isPackSale
+            ? maxPacks
+            : c.stock != null
+              ? c.stock
+              : Infinity;
           const clampedQty = Math.min(newQty, maxQty);
           return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
         })
@@ -533,36 +783,125 @@ export function QuickDashboardView() {
     setCart((prev) =>
       prev.map((c) => {
         if (c.cartId !== cartId) return c;
-        const maxQty = c.stock != null ? c.stock : Infinity;
+        const isPackSale = c.is_pack && c.pack_sale_mode === 'pack';
+        const qpp = c.quantity_per_pack || 1;
+        const maxPacks =
+          c.stock != null && qpp > 0 ? Math.floor(c.stock / qpp) : Infinity;
+        const maxQty = isPackSale
+          ? maxPacks
+          : c.stock != null
+            ? c.stock
+            : Infinity;
         const clampedQty = Math.min(value, maxQty);
         return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
       })
     );
   }, []);
 
-  const changeUnitPrice = useCallback((cartId, rawValue) => {
-    const input = Number(rawValue);
-    if (Number.isNaN(input) || input < 0) return;
+  /** Committed on blur for variable-priced lines — does not clamp to min/max (validation disables checkout). */
+  const commitPackPriceCommit = useCallback(
+    (cartId, rawValue) => {
+      const input = Number.parseFloat(String(rawValue).replace(',', '.'));
+      if (!Number.isFinite(input) || input < 0) {
+        toast.error('Enter a valid pack price.');
+        return;
+      }
+      setCart((prev) =>
+        prev.map((c) => {
+          if (c.cartId !== cartId) return c;
+          if (c.pack_sale_mode !== 'pack') return c;
+          const cpp = Number(c.cost_price_per_pack ?? 0);
+          if (cpp > 0 && input < cpp) {
+            toast.error(
+              `Pack price cannot be lower than cost per pack (${currencySymbol}${cpp}).`
+            );
+            return c;
+          }
+          const rounded = Math.round(input * 100) / 100;
+          return { ...c, unit_price: rounded, subtotal: rounded * c.quantity };
+        })
+      );
+    },
+    [currencySymbol]
+  );
+
+  const togglePackSaleMode = useCallback((cartId) => {
     setCart((prev) =>
       prev.map((c) => {
         if (c.cartId !== cartId) return c;
-        let price = input;
-        if (c.allow_variable_price) {
-          const min = c.variable_price_min;
-          const max = c.variable_price_max;
-          if (min != null && price < min) price = min;
-          if (max != null && price > max) price = max;
-        } else {
-          // If variable pricing not enabled, keep original price
-          price = c.unit_price;
+        if (!c.is_pack || !c.quantity_per_pack) return c;
+        if (c.pack_sale_mode === 'unit') {
+          const qpp = c.quantity_per_pack;
+          const raw =
+            c.pack_sell_price != null && String(c.pack_sell_price).trim() !== ''
+              ? Number(c.pack_sell_price)
+              : NaN;
+          const defaultPack =
+            Number.isFinite(raw) && raw > 0 ? raw : qpp * c.base_unit_price;
+          const packPrice = Math.round(defaultPack * 100) / 100;
+          const packs = Math.max(1, Math.floor(Number(c.quantity) / qpp) || 1);
+          const maxPacks = c.stock != null ? Math.floor(c.stock / qpp) : Infinity;
+          const clampedPacks = Math.min(packs, maxPacks);
+          return {
+            ...c,
+            cartId: `${c.type}-${c.id}-pack`,
+            pack_sale_mode: 'pack',
+            quantity: clampedPacks,
+            unit_price: packPrice,
+            subtotal: clampedPacks * packPrice,
+          };
         }
-        return { ...c, unit_price: price, subtotal: price * c.quantity };
+        const qpp = c.quantity_per_pack;
+        const units = Math.min(
+          Math.round(c.quantity) * qpp,
+          c.stock != null ? c.stock : Infinity
+        );
+        const up = Math.round(c.base_unit_price * 100) / 100;
+        const u = Math.max(1, units);
+        return {
+          ...c,
+          cartId: `${c.type}-${c.id}-unit`,
+          pack_sale_mode: 'unit',
+          quantity: u,
+          unit_price: up,
+          subtotal: u * up,
+        };
       })
     );
+    setRowModes((prev) => {
+      const next = { ...prev };
+      delete next[cartId];
+      return next;
+    });
   }, []);
+
+  const commitVariableUnitPrice = useCallback((cartId, rawValue) => {
+    const input = Number.parseFloat(String(rawValue).replace(',', '.'));
+    if (!Number.isFinite(input) || input < 0) {
+      toast.error('Enter a valid price.');
+      return;
+    }
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartId !== cartId) return c;
+        if (!c.allow_variable_price) return c;
+        const price = input;
+        const cp = Number(c.cost_price ?? 0);
+        if (cp > 0 && price < cp) {
+          toast.error(
+            `Price cannot be lower than cost (${currencySymbol}${cp}). Keeping previous price.`
+          );
+          return c;
+        }
+        const rounded = Math.round(price * 100) / 100;
+        return { ...c, unit_price: rounded, subtotal: rounded * c.quantity };
+      })
+    );
+  }, [currencySymbol]);
 
   const removeFromCart = useCallback((cartId) => {
     setCart((prev) => prev.filter((c) => c.cartId !== cartId));
+    setVariablePriceFocusCartId((id) => (id === cartId ? null : id));
     setRowModes((prev) => {
       const next = { ...prev };
       delete next[cartId];
@@ -586,7 +925,15 @@ export function QuickDashboardView() {
         if (c.cartId !== cartId) return c;
         if (c.unit_price <= 0) return c;
         const newQty = amount / c.unit_price;
-        const maxQty = c.stock != null ? c.stock : Infinity;
+        const isPackSale = c.is_pack && c.pack_sale_mode === 'pack';
+        const qpp = c.quantity_per_pack || 1;
+        const maxPacks =
+          c.stock != null && qpp > 0 ? Math.floor(c.stock / qpp) : Infinity;
+        const maxQty = isPackSale
+          ? maxPacks
+          : c.stock != null
+            ? c.stock
+            : Infinity;
         const clampedQty = Math.min(newQty, maxQty);
         // Round to 2 decimal places to prevent IEEE-754 noise (e.g. 30.000000000000004)
         const clampedAmount = parseFloat((clampedQty * c.unit_price).toFixed(2));
@@ -598,10 +945,37 @@ export function QuickDashboardView() {
 
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
 
+  const cartHasInvalidVariablePrice = cart.some((c) => {
+    if (!c.allow_variable_price) return false;
+    const { unit_price: p, variable_price_min: min, variable_price_max: max } = c;
+    if (min != null && p < min) return true;
+    if (max != null && p > max) return true;
+    return false;
+  });
+
+  const cartHasInvalidPackPrice = cart.some((c) => {
+    if (!c.is_pack || c.pack_sale_mode !== 'pack') return false;
+    const cpp = c.cost_price_per_pack;
+    return cpp != null && c.unit_price < cpp;
+  });
+
+  const checkoutBlockedByVariablePrice =
+    cartHasInvalidVariablePrice || cartHasInvalidPackPrice || variablePriceFocusCartId != null;
+
   // ── Checkout ───────────────────────────────────────────────────
 
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
+    if (checkoutBlockedByVariablePrice) {
+      if (variablePriceFocusCartId != null) {
+        toast.error('Finish editing the price field (click outside or press Tab) before completing the sale.');
+      } else if (cartHasInvalidPackPrice) {
+        toast.error('Set every pack price at or above cost per pack before completing the sale.');
+      } else {
+        toast.error('Set every variable price within its allowed range before completing the sale.');
+      }
+      return;
+    }
     if (!storeId) { toast.error('No active store selected.'); return; }
     const hasCreditIdentity = Boolean(selectedCustomer?.id) || Boolean(creditCustomerName.trim());
     if (saleStatus === 'credit' && !hasCreditIdentity) {
@@ -613,9 +987,40 @@ export function QuickDashboardView() {
       const currencyCode = localStorage.getItem('current_currency') || 'NGN';
       const payload = {
         store_id: storeId,
-        items: cart.map(({ id, type, name, quantity, unit_price, subtotal }) => ({
-          id, type, name, quantity, unit_price, subtotal,
-        })),
+        items: cart.map((c) => {
+          const {
+            id,
+            type,
+            name,
+            quantity,
+            unit_price: up,
+            subtotal: st,
+            is_pack: isPack,
+            pack_sale_mode: psm,
+            quantity_per_pack: qpp,
+          } = c;
+          if (type === 'product' && isPack && psm === 'pack' && qpp > 0) {
+            const unitQty = quantity * qpp;
+            const effective = unitQty > 0 ? st / unitQty : 0;
+            const round6 = Math.round(effective * 1e6) / 1e6;
+            return {
+              id,
+              type,
+              name,
+              quantity: unitQty,
+              unit_price: round6,
+              subtotal: st,
+            };
+          }
+          return {
+            id,
+            type,
+            name,
+            quantity,
+            unit_price: up,
+            subtotal: st,
+          };
+        }),
         payment_method: paymentMethod,
         status: saleStatus,
         currency_code: currencyCode,
@@ -625,10 +1030,46 @@ export function QuickDashboardView() {
       } else if (saleStatus === 'credit' && creditCustomerName.trim()) {
         payload.customer_name = creditCustomerName.trim();
       }
-      await axiosInstance.post('/api/quick-dashboard/sale', payload);
-      const label = saleStatus === 'credit' ? `Credit sale of ${fCurrency(cartTotal)} recorded!` : `Sale of ${fCurrency(cartTotal)} completed!`;
-      toast.success(label);
+
+      if (!isOnline) {
+        // Network is down — save to offline queue
+        await enqueueSale(payload);
+        await refreshOfflineCount();
+        const offlineLabel =
+          saleStatus === 'credit'
+            ? `Credit sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`
+            : `Sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`;
+        toast.warning(offlineLabel);
+      } else {
+        try {
+          await axiosInstance.post('/api/quick-dashboard/sale', payload);
+          const label =
+            saleStatus === 'credit'
+              ? `Credit sale of ${fCurrency(cartTotal)} recorded!`
+              : `Sale of ${fCurrency(cartTotal)} completed!`;
+          toast.success(label);
+          await Promise.all([fetchStats(), fetchRecent()]);
+        } catch (networkErr) {
+          // Request failed despite navigator.onLine — could be server issue or spotty signal
+          const isNetworkFailure =
+            !networkErr?.response || networkErr?.code === 'ERR_NETWORK' || networkErr?.code === 'ECONNABORTED';
+          if (isNetworkFailure) {
+            await enqueueSale(payload);
+            await refreshOfflineCount();
+            toast.warning(
+              `Couldn't reach server. Sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`
+            );
+          } else {
+            toast.error(networkErr?.response?.data?.detail || 'Sale failed. Please try again.');
+            setSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      // Clear cart regardless of online/offline path
       setCart([]);
+      setVariablePriceFocusCartId(null);
       setRowModes({});
       setQuery('');
       setSearchResults([]);
@@ -636,7 +1077,6 @@ export function QuickDashboardView() {
       setSelectedCustomer(null);
       setCustomerInput('');
       setCustomerOptions([]);
-      await Promise.all([fetchStats(), fetchRecent()]);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
     } finally {
@@ -660,6 +1100,110 @@ export function QuickDashboardView() {
 
   return (
     <DashboardContent maxWidth="xl">
+      {/* ── Offline / sync status banner ── */}
+      {(!isOnline || pendingCount > 0 || syncErrors.length > 0) && (
+        <Box mb={2}>
+          {!isOnline && (
+            <Alert
+              severity="warning"
+              icon={<Iconify icon="solar:wifi-router-bold" width={20} />}
+              sx={{ mb: pendingCount > 0 || syncErrors.length > 0 ? 1 : 0 }}
+            >
+              You are offline. Sales will be saved on this device and synced automatically when you reconnect.
+              {pendingCount > 0 && (
+                <Typography component="span" variant="body2" fontWeight={700} sx={{ ml: 0.5 }}>
+                  ({pendingCount} waiting)
+                </Typography>
+              )}
+            </Alert>
+          )}
+
+          {isOnline && isSyncing && (
+            <Alert
+              severity="info"
+              icon={<CircularProgress size={16} color="inherit" />}
+              sx={{ mb: pendingCount > 0 ? 1 : 0 }}
+            >
+              Syncing {pendingCount} offline sale{pendingCount === 1 ? '' : 's'}…
+            </Alert>
+          )}
+
+          {isOnline && !isSyncing && pendingCount > 0 && (
+            <Alert severity="info" sx={{ mb: syncErrors.length > 0 ? 1 : 0 }}>
+              {pendingCount} sale{pendingCount === 1 ? '' : 's'} pending sync.
+            </Alert>
+          )}
+
+          {syncErrors.length > 0 && (
+            <Alert
+              severity="error"
+              action={
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => setShowSyncErrors((p) => !p)}
+                >
+                  {showSyncErrors ? 'Hide' : 'Show'} ({syncErrors.length})
+                </Button>
+              }
+            >
+              {syncErrors.length} sale{syncErrors.length === 1 ? '' : 's'} could not sync after multiple attempts.
+            </Alert>
+          )}
+
+          {showSyncErrors && syncErrors.length > 0 && (
+            <Box
+              sx={{
+                mt: 1,
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: 'background.neutral',
+                border: '1px solid',
+                borderColor: 'error.light',
+              }}
+            >
+              <Typography variant="subtitle2" mb={1}>
+                Failed sales — review and discard if needed
+              </Typography>
+              <Stack spacing={1}>
+                {syncErrors.map((rec) => (
+                  <Stack
+                    key={rec.id}
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ p: 1, borderRadius: 1, bgcolor: 'background.paper' }}
+                  >
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>
+                        {rec.payload?.items?.length ?? 0} item(s) · {fCurrency(
+                          rec.payload?.items?.reduce((s, it) => s + (it.subtotal || 0), 0) ?? 0
+                        )}
+                      </Typography>
+                      <Typography variant="caption" color="error">
+                        {rec.lastError}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Saved {new Date(rec.timestamp).toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <Tooltip title="Discard this sale from the queue">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => discardError(rec.id)}
+                      >
+                        <Iconify icon="eva:trash-2-fill" width={16} />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Box>
+      )}
+
       {/* Page header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Box>
@@ -792,7 +1336,7 @@ export function QuickDashboardView() {
               </Stack>
             </Box>
 
-            <Box sx={{ p: 2, minHeight: 200, maxHeight: 340, overflowY: 'auto' }}>
+            <Box sx={{ p: 2, minHeight: 200, maxHeight: 400, overflowY: 'auto' }}>
               {cart.length === 0 ? (
                 <Box textAlign="center" py={5}>
                   <Iconify icon="solar:cart-plus-bold" width={48} sx={{ color: 'text.disabled', mb: 1.5 }} />
@@ -804,10 +1348,10 @@ export function QuickDashboardView() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ pl: 0, py: 0.5, fontWeight: 700 }}>Item</TableCell>
-                      <TableCell align="center" sx={{ py: 0.5, fontWeight: 700 }}>Qty</TableCell>
-                      <TableCell align="right" sx={{ pr: 0, py: 0.5, fontWeight: 700 }}>Total</TableCell>
-                      <TableCell sx={{ p: 0 }} />
+                      <TableCell sx={{ pl: 0, py: 0.5, fontWeight: 700, width: '35%' }}>Item</TableCell>
+                      <TableCell align="center" sx={{ py: 0.5, fontWeight: 700, width: '35%' }}>Qty</TableCell>
+                      <TableCell align="right" sx={{ pr: 0, py: 0.5, fontWeight: 700, width: '22%' }}>Total</TableCell>
+                      <TableCell sx={{ p: 0, width: '8%' }} />
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -817,11 +1361,15 @@ export function QuickDashboardView() {
                         item={item}
                         onQtyChange={changeQty}
                         onQtyInput={setQtyExact}
-                        onPriceChange={changeUnitPrice}
+                        onVariablePriceCommit={commitVariableUnitPrice}
+                        onVariablePriceFocus={setVariablePriceFocusCartId}
+                        onVariablePriceBlur={() => setVariablePriceFocusCartId(null)}
                         onRemove={removeFromCart}
                         inputMode={rowModes[item.cartId] || 'qty'}
                         onToggleMode={toggleRowMode}
                         onAmountInput={setAmountExact}
+                        onTogglePackSaleMode={togglePackSaleMode}
+                        onPackPriceCommit={commitPackPriceCommit}
                       />
                     ))}
                   </TableBody>
@@ -979,6 +1527,7 @@ export function QuickDashboardView() {
                 disabled={
                   !cart.length
                   || submitting
+                  || checkoutBlockedByVariablePrice
                   || (saleStatus === 'credit'
                     && !selectedCustomer?.id
                     && !creditCustomerName.trim())
@@ -1007,6 +1556,7 @@ export function QuickDashboardView() {
                   color="inherit"
                   onClick={() => {
                     setCart([]);
+                    setVariablePriceFocusCartId(null);
                     setRowModes({});
                     setSelectedCustomer(null);
                     setCustomerInput('');

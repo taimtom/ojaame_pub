@@ -10,6 +10,8 @@ import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 
+import { isUsageHistoryMovement } from 'src/utils/product-movement-usage';
+
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
@@ -33,7 +35,11 @@ import { ProductDetailsToolbar } from '../product-details-toolbar';
 import { ProductDetailsCarousel } from '../product-details-carousel';
 import { ProductDetailsDescription } from '../product-details-description';
 import { ProductDashboardSummary } from '../product-dashboard-summary';
-import { ProductPurchaseHistoryTab, ProductSaleHistoryTab } from '../product-history-tab';
+import {
+  ProductPurchaseHistoryTab,
+  ProductSaleHistoryTab,
+  ProductUsageHistoryTab,
+} from '../product-history-tab';
 
 // ----------------------------------------------------------------------
 
@@ -92,7 +98,7 @@ function StockStatCard({ icon, label, value, color = 'primary', sub }) {
 
 // ─── Combined stock chart ─────────────────────────────────────────────────────
 
-function StockOverviewChart({ purchaseRows, saleRows }) {
+function StockOverviewChart({ purchaseRows, saleRows, outboundLabel = 'Units Sold' }) {
   const theme = useTheme();
 
   const { categories: purchaseDates, series: purchaseQtys } = useMemo(
@@ -146,7 +152,7 @@ function StockOverviewChart({ purchaseRows, saleRows }) {
       type="area"
       series={[
         { name: 'Stock In', data: purchaseSeries },
-        { name: 'Units Sold', data: saleSeries },
+        { name: outboundLabel, data: saleSeries },
       ]}
       options={chartOptions}
       height={320}
@@ -175,6 +181,8 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
   const { productMovements } = useGetProductMovements(storeId, product?.id);
   const { productSalesHistory } = useGetProductSalesHistory(storeId, product?.id);
 
+  const isProductionInput = product?.product_kind === 'production_input';
+
   const normalizedSaleRows = useMemo(
     () =>
       productSalesHistory.map((r) => ({
@@ -183,6 +191,22 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
       })),
     [productSalesHistory]
   );
+
+  const usageMovementRows = useMemo(
+    () => productMovements.filter(isUsageHistoryMovement),
+    [productMovements]
+  );
+
+  const usageChartRows = useMemo(
+    () =>
+      usageMovementRows.map((r) => ({
+        sale_date: r.created_at,
+        quantity: r.quantity,
+      })),
+    [usageMovementRows]
+  );
+
+  const outboundRows = isProductionInput ? usageChartRows : normalizedSaleRows;
 
   const purchaseRows = useMemo(
     () => productMovements.filter((r) => PURCHASE_STATUSES.includes(r.status)),
@@ -193,6 +217,11 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
   const totalUnitsSold = useMemo(
     () => normalizedSaleRows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
     [normalizedSaleRows]
+  );
+
+  const totalUnitsUsed = useMemo(
+    () => usageMovementRows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
+    [usageMovementRows]
   );
 
   const totalRevenue = useMemo(
@@ -265,6 +294,36 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         </Grid>
       </Grid>
 
+      {product?.product_kind === 'sellable' && (
+        <Card sx={{ mt: 4 }}>
+          <Stack sx={{ p: 3 }} spacing={1.5}>
+            <Typography variant="h6">Ingredients (per unit sold)</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Production-input products consumed when you sell one unit of this product.
+            </Typography>
+            {(product.sub_items || product.subItems || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                None configured. Use <strong>Edit</strong> to add ingredients.
+              </Typography>
+            ) : (
+              <Stack component="ul" spacing={0.5} sx={{ pl: 2.5, m: 0 }}>
+                {(product.sub_items || product.subItems || []).map((row) => (
+                  <Typography
+                    component="li"
+                    key={row.id ?? `bom-${row.component_product_id}`}
+                    variant="body2"
+                  >
+                    <strong>{row.component_name || `Product #${row.component_product_id}`}</strong>
+                    {' — '}
+                    {row.quantity_per_unit} per unit sold
+                  </Typography>
+                ))}
+              </Stack>
+            )}
+          </Stack>
+        </Card>
+      )}
+
       {/* Inventory stat cards */}
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
@@ -293,18 +352,20 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         />
         <StockStatCard
           icon="solar:cart-bold"
-          label="Units Sold"
-          value={totalUnitsSold}
+          label={isProductionInput ? 'Units used' : 'Units Sold'}
+          value={isProductionInput ? totalUnitsUsed : totalUnitsSold}
           color="error"
           sub="all time"
         />
-        <StockStatCard
-          icon="solar:wallet-money-bold"
-          label="Total Revenue"
-          value={fCurrency(totalRevenue)}
-          color="primary"
-          sub="from sales"
-        />
+        {!isProductionInput && (
+          <StockStatCard
+            icon="solar:wallet-money-bold"
+            label="Total Revenue"
+            value={fCurrency(totalRevenue)}
+            color="primary"
+            sub="from sales"
+          />
+        )}
         {product?.costPrice != null && (
           <StockStatCard
             icon="solar:safe-square-bold"
@@ -327,7 +388,9 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           <Stack>
             <Typography variant="h6">Stock Overview</Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Stock received vs units sold over time
+              {isProductionInput
+                ? 'Stock received vs units used over time'
+                : 'Stock received vs units sold over time'}
             </Typography>
           </Stack>
           <Stack direction="row" spacing={2}>
@@ -354,13 +417,17 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
                 }}
               />
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                Units Sold
+                {isProductionInput ? 'Units used' : 'Units Sold'}
               </Typography>
             </Stack>
           </Stack>
         </Stack>
 
-        <StockOverviewChart purchaseRows={purchaseRows} saleRows={normalizedSaleRows} />
+        <StockOverviewChart
+          purchaseRows={purchaseRows}
+          saleRows={outboundRows}
+          outboundLabel={isProductionInput ? 'Units used' : 'Units Sold'}
+        />
       </Card>
 
       {/* Detail tabs */}
@@ -377,7 +444,10 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           {[
             { value: 'description', label: 'Description' },
             { value: 'purchase_history', label: 'Purchase History' },
-            { value: 'sale_history', label: 'Sale History' },
+            {
+              value: 'sale_history',
+              label: isProductionInput ? 'Usage History' : 'Sale History',
+            },
           ].map((tab) => (
             <Tab key={tab.value} value={tab.value} label={tab.label} />
           ))}
@@ -391,13 +461,16 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
           <ProductPurchaseHistoryTab storeId={storeId} productId={product?.id} />
         )}
 
-        {tabs.value === 'sale_history' && (
-          <ProductSaleHistoryTab
-            storeId={storeId}
-            storeSlug={storeSlug}
-            productId={product?.id}
-          />
-        )}
+        {tabs.value === 'sale_history' &&
+          (isProductionInput ? (
+            <ProductUsageHistoryTab storeId={storeId} productId={product?.id} />
+          ) : (
+            <ProductSaleHistoryTab
+              storeId={storeId}
+              storeSlug={storeSlug}
+              productId={product?.id}
+            />
+          ))}
       </Card>
     </DashboardContent>
   );

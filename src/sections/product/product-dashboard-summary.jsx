@@ -79,6 +79,7 @@ export function ProductDashboardSummary({ product }) {
     is_pack,
     quantity_per_pack,
     cost_price_per_pack,
+    pack_sell_price: packSellPriceField,
     allow_variable_price,
     variable_price_min,
     variable_price_max,
@@ -91,6 +92,8 @@ export function ProductDashboardSummary({ product }) {
     saleLabel,
     publish,
   } = product;
+
+  const pack_sell_price = packSellPriceField ?? product.packSellPrice ?? null;
 
   const stockQty = available ?? quantity ?? 0;
   const profitMargin =
@@ -224,6 +227,16 @@ export function ProductDashboardSummary({ product }) {
                 value={fCurrency(cost_price_per_pack)}
               />
             )}
+            <InfoRow
+              icon="solar:cart-large-bold"
+              label="Pack Sell Price"
+              value={
+                pack_sell_price != null && pack_sell_price !== ''
+                  ? fCurrency(Number(pack_sell_price))
+                  : '—'
+              }
+              valueColor={pack_sell_price != null ? 'primary.main' : 'text.disabled'}
+            />
           </Stack>
         </>
       )}

@@ -8,6 +8,41 @@ import { ProductGridSection } from './product-grid-section';
 import { ContactSection } from './contact-section';
 import { FooterSection } from './footer-section';
 
+const FALLBACK_SECTIONS = [
+  { type: 'hero', key: 'hero' },
+  { type: 'productGrid', key: 'featuredProducts' },
+  { type: 'about', key: 'about' },
+  { type: 'contact', key: 'contact' },
+  { type: 'footer', key: 'footer' },
+];
+
+const FALLBACK_CONTENT = {
+  hero: {
+    title: 'Welcome to Your Store',
+    subtitle: 'Discover our latest products and best deals.',
+    ctaLabel: 'Shop now',
+  },
+  featuredProducts: {
+    title: 'Featured products',
+    source: 'auto',
+    maxItems: 8,
+  },
+  about: {
+    title: 'About us',
+    body: 'Share your story, mission, and what makes your business unique.',
+  },
+  contact: {
+    title: 'Visit or contact us',
+    address: '',
+    phoneNumber: '',
+    email: '',
+  },
+  footer: {
+    copyrightText: '© Your Store. All rights reserved.',
+    links: [],
+  },
+};
+
 export function StoreWebsiteView({ website, template }) {
   if (!website || !template) {
     return (
@@ -18,11 +53,14 @@ export function StoreWebsiteView({ website, template }) {
   }
 
   const { content_config: contentConfig = {}, theme_config: themeConfig = {} } = website;
-  const content = { ...template.defaultContent, ...contentConfig };
+  const sections = Array.isArray(template.sections) && template.sections.length
+    ? template.sections
+    : FALLBACK_SECTIONS;
+  const content = { ...FALLBACK_CONTENT, ...(template.defaultContent || {}), ...contentConfig };
 
   return (
     <Box component="main">
-      {template.sections.map((section) => {
+      {sections.map((section) => {
         const key = section.key;
         const sectionContent = content[key] || {};
 

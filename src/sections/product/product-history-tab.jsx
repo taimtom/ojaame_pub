@@ -9,6 +9,8 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import { DataGrid, gridClasses } from '@mui/x-data-grid';
 
+import { isUsageHistoryMovement } from 'src/utils/product-movement-usage';
+
 import { fDateTime } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
 import { effectiveSaleLineQuantity, formatSaleQtyDisplay } from 'src/utils/sale-line-quantity';
@@ -39,6 +41,7 @@ const STATUS_COLORS = {
   expired: 'warning',
   stolen: 'error',
   lost: 'default',
+  usage: 'warning',
 };
 
 // Which movement statuses count as "purchase" (stock additions)
@@ -322,6 +325,132 @@ export function ProductPurchaseHistoryTab({ storeId, productId }) {
           valueKey="quantity"
           seriesName="Qty Received"
           color={theme.palette.success.main}
+        />
+      )}
+    </Box>
+  );
+}
+
+function UsageListView({ rows, loading }) {
+  const columns = [
+    {
+      field: 'created_at',
+      headerName: 'Date',
+      width: 160,
+      renderCell: ({ value }) => (
+        <Typography variant="body2">{value ? fDateTime(value) : '—'}</Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: 'Type',
+      width: 120,
+      renderCell: ({ row, value }) => {
+        const isLegacyBomSold =
+          value === 'sold' &&
+          typeof row.description === 'string' &&
+          row.description.includes('BOM consumption');
+        const label = isLegacyBomSold ? 'usage' : value || 'usage';
+        const colorKey = isLegacyBomSold ? 'usage' : value;
+        return (
+          <Chip
+            size="small"
+            label={label}
+            color={STATUS_COLORS[colorKey] || 'warning'}
+            variant="soft"
+          />
+        );
+      },
+    },
+    {
+      field: 'quantity',
+      headerName: 'Qty used',
+      width: 110,
+      type: 'number',
+    },
+    {
+      field: 'previous_quantity',
+      headerName: 'Stock before',
+      width: 120,
+      type: 'number',
+    },
+    {
+      field: 'updated_quantity',
+      headerName: 'Stock after',
+      width: 120,
+      type: 'number',
+    },
+    {
+      field: 'user_name',
+      headerName: 'Recorded by',
+      flex: 1,
+      minWidth: 140,
+    },
+    {
+      field: 'description',
+      headerName: 'Note',
+      flex: 1,
+      minWidth: 160,
+    },
+  ];
+
+  return (
+    <Box sx={{ height: 420 }}>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        getRowHeight={() => 'auto'}
+        pageSizeOptions={[5, 10, 25]}
+        initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+        disableRowSelectionOnClick
+        slots={{
+          noRowsOverlay: () => <EmptyContent title="No usage history yet" />,
+          noResultsOverlay: () => <EmptyContent title="No results found" />,
+        }}
+        sx={{ [`& .${gridClasses.cell}`]: { alignItems: 'center', display: 'inline-flex' } }}
+      />
+    </Box>
+  );
+}
+
+export function ProductUsageHistoryTab({ storeId, productId }) {
+  const [subTab, setSubTab] = useState('list');
+  const { productMovements, productMovementsLoading } = useGetProductMovements(storeId, productId);
+  const theme = useTheme();
+
+  const rows = useMemo(
+    () => productMovements.filter(isUsageHistoryMovement),
+    [productMovements]
+  );
+
+  const chartRows = useMemo(
+    () =>
+      rows.map((r) => ({
+        sale_date: r.created_at,
+        quantity: r.quantity,
+      })),
+    [rows]
+  );
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Typography variant="h6">Usage History</Typography>
+        <Tabs value={subTab} onChange={(_, v) => setSubTab(v)} sx={{ minHeight: 36 }}>
+          <Tab value="list" label="List" sx={{ minHeight: 36, py: 0 }} />
+          <Tab value="chart" label="Chart" sx={{ minHeight: 36, py: 0 }} />
+        </Tabs>
+      </Stack>
+
+      {subTab === 'list' && <UsageListView rows={rows} loading={productMovementsLoading} />}
+      {subTab === 'chart' && (
+        <HistoryLineChart
+          rows={chartRows}
+          dateKey="sale_date"
+          valueKey="quantity"
+          seriesName="Qty used"
+          color={theme.palette.warning.main}
         />
       )}
     </Box>

@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
     discount: 'Discount',
     shipping: 'Shipping',
     taxes: 'Taxes',
+    productionInput: 'Production input',
   },
   fields: {
     product: {
@@ -48,6 +49,7 @@ const DEFAULT_CONFIG = {
     serviceManagement: 'Service Management',
     pointOfSales: 'Point of Sales',
     salesInvoice: 'Sales Invoice',
+    usageDashboard: 'Usage dashboard',
   },
 };
 
@@ -327,6 +329,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== RESTAURANT ==========
   [createKey('Tourism & Hospitality', 'Restaurants', 'Restaurant')]: {
     terminology: {
+      productionInput: 'Ingredient',
       product: 'Menu Item',
       service: 'Service',
       invoice: 'Check',
@@ -362,6 +365,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Order Entry',
       salesInvoice: 'Checks',
+      usageDashboard: 'Ingredient usage',
     },
   },
 
@@ -551,6 +555,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== MANUFACTURING ==========
   [createKey('Manufacturing (Light & Heavy)', 'Food processing (flour, sugar, beverages)', 'Food manufacturing')]: {
     terminology: {
+      productionInput: 'Raw material',
       product: 'Product',
       service: 'Service',
       invoice: 'Invoice',
@@ -588,6 +593,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Sales Entry',
       salesInvoice: 'Invoices',
+      usageDashboard: 'Raw material usage',
     },
   },
 

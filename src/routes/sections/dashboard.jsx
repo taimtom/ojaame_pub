@@ -16,6 +16,7 @@ import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
 const OverviewEcommercePage = lazy(() => import('src/pages/dashboard/ecommerce'));
 const OverviewAnalyticsPage = lazy(() => import('src/pages/dashboard/analytics'));
@@ -183,6 +184,7 @@ export const dashboardRoutes = [
     children: [
       { path: 'analytics', element: <OverviewAnalyticsPage /> },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'usage-dashboard', element: <UsageDashboardPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
 
       { index: true, element: <DashboardRootRedirect /> },

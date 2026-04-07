@@ -49,7 +49,7 @@ export function useGetProduct(productId, storeId) {
   const url =
     productId && storeId ? `/api/product/detail/${storeId}/${productId}/` : null;
 
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating, mutate } = useSWR(url, fetcher, swrOptions);
 
   const memoizedValue = useMemo(
     () => ({
@@ -58,8 +58,10 @@ export function useGetProduct(productId, storeId) {
       productLoading: isLoading,
       productError: error,
       productValidating: isValidating,
+      /** Call after mutations (e.g. save product) to refetch detail including sub_items */
+      mutateProduct: mutate,
     }),
-    [data, error, isLoading, isValidating]
+    [data, error, isLoading, isValidating, mutate]
   );
 
   return memoizedValue;
@@ -202,6 +204,25 @@ export async function adjustProductStock(productId, adjustmentData) {
     return response.data;
   } catch (error) {
     console.error('Error adjusting product stock:', error);
+    throw error;
+  }
+}
+
+/**
+ * Record usage/consumption for a production-input product (ingredient/raw material).
+ * PATCH /api/product/usage/{productId}
+ */
+export async function recordProductUsage(productId, { store_id, quantity, description }) {
+  try {
+    const url = `${endpoints.product.usage}/${productId}`;
+    const response = await axiosInstance.patch(url, {
+      store_id,
+      quantity,
+      description: description || undefined,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error recording usage:', error);
     throw error;
   }
 }

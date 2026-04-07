@@ -221,6 +221,7 @@ export const useNavData = () => {
         icon: ICONS.dashboard,
       },
       { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
     ],
   },
   /**

@@ -122,6 +122,7 @@ export const endpoints = {
     history: '/api/product/history',
     movement: '/api/product/movement',
     salesHistory: '/api/product/sales-history',
+    usage: '/api/product/usage',
   },
   shop: {
     list: '/api/product/list',

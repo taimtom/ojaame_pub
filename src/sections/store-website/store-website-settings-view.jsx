@@ -7,7 +7,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
@@ -55,13 +54,39 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
                   label="Slug (subdomain identifier)"
                   helperText="Used for URLs like /site/your-slug"
                 />
-                <Field.Select name="template_id" label="Template">
-                  {STORE_WEBSITE_TEMPLATES.map((tpl) => (
-                    <MenuItem key={tpl.id} value={tpl.id}>
-                      {tpl.name}
-                    </MenuItem>
-                  ))}
-                </Field.Select>
+                <Typography variant="subtitle2">Template</Typography>
+                <Grid container spacing={1.5}>
+                  {STORE_WEBSITE_TEMPLATES.map((tpl) => {
+                    const selected = (templateId || website?.template_id) === tpl.id;
+                    return (
+                      <Grid item xs={12} sm={6} key={tpl.id}>
+                        <Card
+                          onClick={() => methods.setValue('template_id', tpl.id)}
+                          sx={{
+                            p: 1.5,
+                            cursor: 'pointer',
+                            border: '1px solid',
+                            borderColor: selected ? 'primary.main' : 'divider',
+                            boxShadow: selected ? 4 : 0,
+                          }}
+                        >
+                          <Stack spacing={0.5}>
+                            <Typography variant="subtitle2">{tpl.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {tpl.category}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {tpl.description}
+                            </Typography>
+                            <Typography variant="caption" color={selected ? 'primary.main' : 'text.secondary'}>
+                              {selected ? 'Selected' : 'Click to select'}
+                            </Typography>
+                          </Stack>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
               </Stack>
             </Card>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
@@ -40,6 +40,11 @@ export function InvoiceNewEditDetails() {
 
   const { products, productsLoading } = useGetProducts(storeId);
   const { services, servicesLoading } = useGetServices(storeId);
+
+  const sellableProducts = useMemo(
+    () => (products || []).filter((p) => p.product_kind !== 'production_input'),
+    [products]
+  );
 
   const [itemTypes, setItemTypes] = useState([]);
   // const [prevPrices, setPrevPrices] = useState({});
@@ -122,8 +127,8 @@ export function InvoiceNewEditDetails() {
         }
       } else if (currentType === 'product' && !currentItemValue) {
         const productId = getValues(`items[${index}].product_id`);
-        if (productId && products.length) {
-          const found = products.find((p) => p.id === productId);
+        if (productId && sellableProducts.length) {
+          const found = sellableProducts.find((p) => p.id === productId);
           if (found) {
             setValue(`items[${index}].item`, found.name);
             currentItemValue = found.name;
@@ -135,7 +140,7 @@ export function InvoiceNewEditDetails() {
         setValue(`items[${index}].item`, '');
       }
     });
-  }, [fields, itemTypes, setValue, getValues, services, products]);
+  }, [fields, itemTypes, setValue, getValues, services, sellableProducts]);
 
 
   useEffect(() => {
@@ -239,7 +244,7 @@ export function InvoiceNewEditDetails() {
           setValue(`items[${index}].originalPrice`, service.price || 0);
         }
       } else if (type === 'product') {
-        const product = products.find(p => p.name === selectedName);
+        const product = sellableProducts.find(p => p.name === selectedName);
         if (product) {
           setValue(`items[${index}].price`, product.price || 0);
           setValue(`items[${index}].total`, (values.items[index]?.quantity || 1) * (product.price || 0));
@@ -252,7 +257,7 @@ export function InvoiceNewEditDetails() {
         }
       }
     },
-    [setValue, values.items, products, services]
+    [setValue, values.items, sellableProducts, services]
   );
 
 
@@ -272,7 +277,7 @@ export function InvoiceNewEditDetails() {
       if (type === 'product') {
         const selectedProductName = values.items[index]?.item;
         if (selectedProductName) {
-          const selectedProduct = products.find(prod => prod.name === selectedProductName);
+          const selectedProduct = sellableProducts.find(prod => prod.name === selectedProductName);
           if (selectedProduct) {
             if (enteredQuantity > selectedProduct.quantity) {
               toast.error(`Quantity cannot exceed available stock of ${selectedProduct.quantity}.`);
@@ -287,7 +292,7 @@ export function InvoiceNewEditDetails() {
       setValue(`items[${index}].quantity`, enteredQuantity);
       setValue(`items[${index}].total`, enteredQuantity * price);
     },
-    [itemTypes, setValue, values.items, products]
+    [itemTypes, setValue, values.items, sellableProducts]
   );
 
   // const handleChangePrice = useCallback(
@@ -301,14 +306,17 @@ export function InvoiceNewEditDetails() {
 
   const handleChangePrice = useCallback(
     (event, index) => {
-      const enteredPrice = Number(event.target.value);
+      const raw = event.target.value;
+      if (raw === '') return;
+      const enteredPrice = Number.parseFloat(String(raw).replace(',', '.'));
+      if (!Number.isFinite(enteredPrice)) return;
       const currentType =
         itemTypes[index] ||
         (values.items[index]?.product_id ? 'product' : values.items[index]?.service_id ? 'service' : 'none');
 
       if (currentType === 'product') {
         const selectedProductName = values.items[index]?.item;
-        const product = selectedProductName ? products.find((p) => p.name === selectedProductName) : null;
+        const product = selectedProductName ? sellableProducts.find((p) => p.name === selectedProductName) : null;
         const costPrice = Number(values.items[index]?.costPrice) || 0;
         const originalPrice = Number(values.items[index]?.originalPrice) || 0;
 
@@ -350,7 +358,7 @@ export function InvoiceNewEditDetails() {
       setValue(`items[${index}].price`, enteredPrice);
       setValue(`items[${index}].total`, enteredPrice * (values.items[index]?.quantity || 1));
     },
-    [setValue, values.items, itemTypes, products, currencySymbol]
+    [setValue, values.items, itemTypes, sellableProducts, currencySymbol]
   );
 
   const renderTotal = (
@@ -407,7 +415,7 @@ export function InvoiceNewEditDetails() {
                 : 'none');
           let optionsList = [];
           if (currentType === 'service' || currentType === 'product') {
-            const allOptions = currentType === 'service' ? services : products;
+            const allOptions = currentType === 'service' ? services : sellableProducts;
             const selectedItems = values.items
               .filter((itm, i) => i !== index && itm.item)
               .map((itm) => itm.item);
@@ -421,7 +429,7 @@ export function InvoiceNewEditDetails() {
           const selectedItemName = values.items[index]?.item;
           const selectedProduct =
             currentType === 'product' && selectedItemName
-              ? products.find((p) => p.name === selectedItemName)
+              ? sellableProducts.find((p) => p.name === selectedItemName)
               : null;
           return (
             <Stack key={item.id} alignItems="flex-end" spacing={1.5}>
@@ -450,7 +458,7 @@ export function InvoiceNewEditDetails() {
                   }
                   value={values.items[index]?.item || ''}
                   onChange={(e) => {
-                    const selectedItem = (currentType === 'service' ? services : products).find(
+                    const selectedItem = (currentType === 'service' ? services : sellableProducts).find(
                       (option) => option.name === e.target.value
                     );
                     setValue(`items[${index}].item`, selectedItem?.name || '');
