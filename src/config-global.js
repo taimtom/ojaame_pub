@@ -66,8 +66,8 @@ export const CONFIG = {
    * Google OAuth - Using static configuration
    */
   google: {
-    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '541093981222-hujc3uce8udf8ibfdt4vfjd5e180gtsc.apps.googleusercontent.com',
-    clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET ?? 'isX8kUpmYO32V5G7pwcyytTw',
+    clientId: import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET ?? '',
     authUrl: import.meta.env.VITE_GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/auth',
     tokenUrl: import.meta.env.VITE_GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token',
     redirectBase: import.meta.env.VITE_OAUTH_REDIRECT_BASE ?? '/app/integration/oauth-success',

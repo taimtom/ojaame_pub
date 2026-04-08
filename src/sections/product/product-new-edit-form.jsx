@@ -415,10 +415,10 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
        // Delay redirection for 5 seconds.
       setTimeout(() => {
         if (currentProduct) {
-          // Redirect to product list page after update.
-          router.push(paths.dashboard.product.root(storeSlug));
+          router.push(paths.dashboard.product.details(storeSlug, currentProduct.id));
+        } else if (response?.id != null) {
+          router.push(paths.dashboard.product.details(storeSlug, response.id));
         } else {
-          // Redirect to product root after creation.
           router.push(paths.dashboard.product.root(storeSlug));
         }
       }, 2000);

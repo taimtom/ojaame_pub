@@ -286,7 +286,11 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
       {/* Product overview: image + stock info panel */}
       <Grid container spacing={{ xs: 3, md: 5, lg: 6 }}>
         <Grid xs={12} md={6} lg={5}>
-          <ProductDetailsCarousel images={product?.images ?? []} />
+          <ProductDetailsCarousel
+            coverUrl={product?.coverUrl}
+            images={product?.images ?? []}
+            productName={product?.name}
+          />
         </Grid>
 
         <Grid xs={12} md={6} lg={7}>

@@ -157,7 +157,7 @@ export function ProductChangePriceForm({ currentProduct, storeSlug }) {
 
       await changeProductPrice(currentProduct.id, payload);
       toast.success('Prices updated successfully');
-      router.push(paths.dashboard.product.root(storeSlug));
+      router.push(paths.dashboard.product.details(storeSlug, currentProduct.id));
     } catch (error) {
       const message =
         error?.response?.data?.detail || error?.message || 'Failed to update prices';

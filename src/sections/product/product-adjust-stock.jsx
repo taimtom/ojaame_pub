@@ -140,7 +140,10 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
         add_as_expense: data.addAsExpense,
       });
       toast.success('Stock adjustment recorded!');
-      setTimeout(() => router.push(paths.dashboard.product.root(storeSlug)), 2000);
+      setTimeout(
+        () => router.push(paths.dashboard.product.details(storeSlug, currentProduct.id)),
+        2000
+      );
       reset();
     } catch (error) {
       handleApiError(error);
@@ -311,7 +314,10 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
         add_as_expense: data.addAsExpense,
       });
       toast.success('Stock adjustment recorded!');
-      setTimeout(() => router.push(paths.dashboard.product.root(storeSlug)), 2000);
+      setTimeout(
+        () => router.push(paths.dashboard.product.details(storeSlug, currentProduct.id)),
+        2000
+      );
       reset();
     } catch (error) {
       handleApiError(error);

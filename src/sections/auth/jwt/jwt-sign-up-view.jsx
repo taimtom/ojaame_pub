@@ -26,6 +26,7 @@ import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
 import { signUp } from 'src/auth/context/jwt';
 import { useAuthContext } from 'src/auth/hooks';
+import { getGoogleAuthRedirectUrl, getGoogleClientId } from 'src/utils/google-auth-env';
 
 // ----------------------------------------------------------------------
 
@@ -205,11 +206,18 @@ export function JwtSignUpView() {
           fullWidth
           variant="outlined"
           onClick={() => {
-            const GOOGLE_CLIENT_ID = '181864963042-iu9uubcbthf2tncerkarlnp4ehepk7cr.apps.googleusercontent.com';
-            const redirectUri = encodeURIComponent('http://localhost:3030/auth/google');
+            const clientId = getGoogleClientId();
+            const redirectUrl = getGoogleAuthRedirectUrl();
+            if (!clientId || !redirectUrl) {
+              toast.error(
+                'Google sign-up is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URL in your .env file.'
+              );
+              return;
+            }
+            const redirectUri = encodeURIComponent(redirectUrl);
             const scope = encodeURIComponent('openid email profile');
             const nonce = Math.random().toString(36).substring(2);
-            window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+            window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
           }}
           startIcon={<Iconify icon="logos:google-icon" width={20} height={20} />}
           sx={{ textTransform: 'none', py: 1.5, borderRadius: 3, fontWeight: 600, boxShadow: 1, borderColor: 'grey.300', bgcolor: 'background.paper', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)', bgcolor: 'grey.50' } }}

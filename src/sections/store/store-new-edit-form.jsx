@@ -17,7 +17,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
 
 import { fData } from 'src/utils/format-number';
 
@@ -72,8 +71,8 @@ export const NewStoreSchema = zod.object({
 // StoreNewEditForm Component
 // Use a default value of null for currentStore in create mode.
 export function StoreNewEditForm({ currentStore = null, mutate }) {
-  const router = useRouter();
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Memoize default values based on currentStore.
   const defaultValues = useMemo(
@@ -141,11 +140,10 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      // Process avatarUrl: if it's a File, upload it first.
+      // avatarUrl is normally an https URL after immediate upload on drop; keep File fallback.
       if (data.avatarUrl && data.avatarUrl instanceof File) {
         data.avatarUrl = await uploadFile(data.avatarUrl, data.storeName);
       } else if (!data.avatarUrl || data.avatarUrl === '') {
-        // If no image is uploaded, set to null
         data.avatarUrl = null;
       }
 
@@ -224,6 +222,9 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
             <Box sx={{ mb: 5 }}>
               <Field.UploadAvatar
                 name="avatarUrl"
+                uploadImmediately
+                getUploadName={() => values.storeName || currentStore?.storeName || 'store'}
+                onUploadingChange={setAvatarUploading}
                 maxSize={3145728}
                 helperText={
                   <Typography
@@ -354,7 +355,12 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
               <Field.Text name="address" label="Address" />
             </Box>
             <Stack alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              <LoadingButton
+                type="submit"
+                variant="contained"
+                loading={isSubmitting || avatarUploading}
+                disabled={avatarUploading}
+              >
                 {!currentStore ? 'Create Store' : 'Save changes'}
               </LoadingButton>
             </Stack>

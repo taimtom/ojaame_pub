@@ -9,6 +9,7 @@ import { Router } from 'src/routes/sections';
 import { useScrollToTop } from 'src/hooks/use-scroll-to-top';
 
 import { CONFIG } from 'src/config-global';
+import { getGoogleClientId } from 'src/utils/google-auth-env';
 import { LocalizationProvider } from 'src/locales';
 import { I18nProvider } from 'src/locales/i18n-provider';
 import { ThemeProvider } from 'src/theme/theme-provider';
@@ -42,7 +43,7 @@ export default function App() {
   useScrollToTop();
 
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider clientId={getGoogleClientId()}>
       <I18nProvider>
         <LocalizationProvider>
           <AuthProvider>
