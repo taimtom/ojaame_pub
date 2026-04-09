@@ -300,11 +300,13 @@ export const paths = {
       financial: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/financial`,
       profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
       salesTrends: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/sales-trends`,
+      endOfDay: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/end-of-day`,
 
       // Company-level reports (not scoped to a single store)
       companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
     },
     notifications: `${ROOTS.DASHBOARD}/notifications`,
+    helpSupport: `${ROOTS.DASHBOARD}/help-support`,
 
     order: {
       root: `${ROOTS.DASHBOARD}/order`,

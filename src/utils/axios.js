@@ -299,4 +299,9 @@ export const endpoints = {
     manageLink:  '/api/billing/cards/manage-link',
     status:      '/api/subscription/status',
   },
+
+  support: {
+    tickets: '/api/support/tickets',
+    ticketComments: (id) => `/api/support/tickets/${id}/comments`,
+  },
 };

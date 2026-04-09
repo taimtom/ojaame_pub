@@ -43,6 +43,9 @@ export const NAV_PERMISSIONS = {
     // Overview items (always visible)
     'Company Dashboard': [],
     'Store Dashboard': [],
+    'Quick Dashboard': [],
+    'Usage dashboard': [],
+    'Help & Support': [],
     
     // Sales & Orders items
     'Point of Sales': ['orders.create', 'sales.create'], // Show if user has ANY
@@ -73,6 +76,9 @@ export const NAV_PERMISSIONS = {
     Permission: ['users.manage'],
     'View Public Site': [], // Always visible
     Blank: [], // Always visible
+
+    // Reports (store)
+    'End of day': ['reports.read'],
   },
 };
 

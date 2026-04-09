@@ -102,7 +102,8 @@ export const useNavData = () => {
       location.pathname === paths.dashboard.role.new ||
       location.pathname === paths.dashboard.reports.companyRoot ||
       location.pathname.startsWith(paths.dashboard.user.root) ||
-      location.pathname.startsWith(paths.dashboard.integration.root)
+      location.pathname.startsWith(paths.dashboard.integration.root) ||
+      location.pathname === paths.dashboard.helpSupport
     );
 
     // List of store-scoped roots we guard (only meaningful when currentStore is truthy)
@@ -222,6 +223,7 @@ export const useNavData = () => {
       },
       { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
       { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
+      { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
     ],
   },
   /**
@@ -325,6 +327,7 @@ export const useNavData = () => {
           { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
           { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
           { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
+          { title: 'End of day', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
         ],
       },
       {

@@ -36,6 +36,16 @@ export default defineConfig({
       },
     ],
   },
-  server: { port: PORT, host: true },
+  server: {
+    port: PORT,
+    host: true,
+    // If VITE_SERVER_URL is empty, browser calls same-origin /api/*; forward to API.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_SERVER_URL || 'http://localhost:8004',
+        changeOrigin: true,
+      },
+    },
+  },
   preview: { port: PORT, host: true },
 });

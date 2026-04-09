@@ -156,6 +156,7 @@ const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/we
 
 // Notifications
 const NotificationsPage = lazy(() => import('src/pages/dashboard/notifications'));
+const HelpSupportPage = lazy(() => import('src/pages/dashboard/help-support'));
 
 // Reports
 const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/store-general'));
@@ -163,6 +164,7 @@ const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/
 const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
 const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
 const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
+const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
 const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
 
 // ----------------------------------------------------------------------
@@ -186,6 +188,7 @@ export const dashboardRoutes = [
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
       { path: 'usage-dashboard', element: <UsageDashboardPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'help-support', element: <HelpSupportPage /> },
 
       { index: true, element: <DashboardRootRedirect /> },
       {
@@ -287,6 +290,7 @@ export const dashboardRoutes = [
             { path: 'financial', element: <StoreFinancialReportPage /> },
             { path: 'profit-loss', element: <StoreProfitLossReportPage /> },
             { path: 'sales-trends', element: <StoreSalesTrendsReportPage /> },
+            { path: 'end-of-day', element: <EndOfDayReportPage /> },
           ],
         },
       ],

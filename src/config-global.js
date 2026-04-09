@@ -7,7 +7,8 @@ import packageJson from '../package.json';
 export const CONFIG = {
   site: {
     name: 'Ojaa Me',
-    serverUrl: import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8004',
+    // Use || so empty string falls back (?? only treats null/undefined).
+    serverUrl: import.meta.env.VITE_SERVER_URL || 'http://localhost:8004',
     assetURL: import.meta.env.VITE_ASSET_URL ?? '',
     basePath: import.meta.env.VITE_BASE_PATH ?? '',
     version: packageJson.version,
