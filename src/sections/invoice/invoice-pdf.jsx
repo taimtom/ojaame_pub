@@ -73,6 +73,17 @@ const useStyles = () =>
 
 // ----------------------------------------------------------------------
 
+function lineItemTotal(item) {
+  if (item?.total != null && item.total !== '') {
+    const t = Number(item.total);
+    if (!Number.isNaN(t)) return t;
+  }
+  const p = Number(item?.price);
+  const q = Number(item?.quantity);
+  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
+  return 0;
+}
+
 export function InvoicePDF({ invoice, currentStatus }) {
   // Destructure keys using the keys from your provided data.
   const {
@@ -81,7 +92,6 @@ export function InvoicePDF({ invoice, currentStatus }) {
     due_date,
     discount,
     shipping,
-    subtotal,
     create_date,
     total_amount,
     invoice_number,
@@ -103,6 +113,8 @@ export function InvoicePDF({ invoice, currentStatus }) {
   } = invoice;
 
   const styles = useStyles();
+
+  const computedSubtotal = (items || []).reduce((acc, item) => acc + lineItemTotal(item), 0);
 
   const renderHeader = (
     <View style={[styles.container, styles.mb40]}>
@@ -198,7 +210,7 @@ export function InvoicePDF({ invoice, currentStatus }) {
           </View>
         </View>
         <View>
-          {items.map((item, index) => (
+          {(items || []).map((item, index) => (
             <View key={item.id || index} style={styles.row}>
               <View style={styles.cell_1}>
                 <Text>{index + 1}</Text>
@@ -225,12 +237,12 @@ export function InvoicePDF({ invoice, currentStatus }) {
                 <Text>{fCurrency(item.price)}</Text>
               </View>
               <View style={[styles.cell_5, { textAlign: 'right' }]}>
-                <Text>{fCurrency(item.price * item.quantity)}</Text>
+                <Text>{fCurrency(lineItemTotal(item))}</Text>
               </View>
             </View>
           ))}
           {[
-            { name: 'Subtotal', value: subtotal },
+            { name: 'Subtotal', value: computedSubtotal },
             { name: 'Shipping', value: -shipping },
             { name: 'Discount', value: -discount },
             { name: 'Taxes', value: taxes },

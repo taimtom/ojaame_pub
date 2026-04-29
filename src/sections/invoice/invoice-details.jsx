@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -31,13 +31,23 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+/** Prefer persisted line total; supports fractional quantities. */
+function lineItemTotal(item) {
+  if (item?.total != null && item.total !== '') {
+    const t = Number(item.total);
+    if (!Number.isNaN(t)) return t;
+  }
+  const p = Number(item?.price);
+  const q = Number(item?.quantity);
+  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
+  return 0;
+}
 
 export function InvoiceDetails({ invoice }) {
-  // Calculate subtotal by multiplying price and quantity for each item.
-  const computedSubtotal = invoice?.items?.reduce((acc, item) => {
-    const itemTotal = Number(item.price) * Number(item.quantity);
-    return acc + itemTotal;
-  }, 0) || 0;
+  const computedSubtotal = useMemo(
+    () => invoice?.items?.reduce((acc, item) => acc + lineItemTotal(item), 0) || 0,
+    [invoice?.items]
+  );
 
   // Use local state for status (fallback to invoice.status if available)
   const [currentStatus, setCurrentStatus] = useState(invoice?.status || '');
@@ -152,7 +162,7 @@ export function InvoiceDetails({ invoice }) {
               </TableCell>
               <TableCell>{row.quantity}</TableCell>
               <TableCell align="right">{fCurrency(row.price)}</TableCell>
-              <TableCell align="right">{fCurrency(row.price * row.quantity)}</TableCell>
+              <TableCell align="right">{fCurrency(lineItemTotal(row))}</TableCell>
             </TableRow>
           ))}
 

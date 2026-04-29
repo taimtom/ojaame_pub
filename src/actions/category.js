@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR Options
@@ -13,20 +14,24 @@ const swrOptions = {
 
 // ----------------------------------------------------------------------
 // useGetCategories - Fetches a list of categories for a given store.
-export function useGetCategories(storeId) {
+export function useGetCategories(storeId, queryParams = {}) {
   // Use endpoints.categories.list (plural) instead of endpoints.category.list
-  const key = storeId ? [endpoints.categories.list, { params: { store_id: storeId } }] : null;
+  const key = storeId ? [endpoints.categories.list, { params: { store_id: storeId, ...queryParams } }] : null;
   const { data, isLoading, error, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
 
   const memoizedValue = useMemo(
-    () => ({
-      categories: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      categories: paged.items,
+      categoriesPagination: paged.pagination,
       categoriesLoading: isLoading,
       categoriesError: error,
       categoriesValidating: isValidating,
-      categoriesEmpty: !isLoading && (!data || data.length === 0),
+      categoriesEmpty: !isLoading && paged.items.length === 0,
       mutateCategories: mutate, // Expose mutate function for manual refresh
-    }),
+    };
+    },
     [data, error, isLoading, isValidating, mutate]
   );
 
@@ -56,9 +61,11 @@ export function useGetCategory(categoryId, storeId) {
 
 // ----------------------------------------------------------------------
 // useSearchCategories - Searches categories by name and store id.
-export function useSearchCategories(query, storeId) {
+export function useSearchCategories(query, storeId, queryParams = {}) {
   const key =
-    query && storeId ? [endpoints.categories.search, { params: { query, store_id: storeId } }] : null;
+    query && storeId
+      ? [endpoints.categories.search, { params: { query, q: query, store_id: storeId, ...queryParams } }]
+      : null;
   const { data, isLoading, error, isValidating } = useSWR(
     key,
     fetcher,
@@ -66,13 +73,17 @@ export function useSearchCategories(query, storeId) {
   );
 
   return useMemo(
-    () => ({
-      searchResults: data?.results || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      searchResults: paged.items,
+      searchPagination: paged.pagination,
       searchLoading: isLoading,
       searchError: error,
       searchValidating: isValidating,
-      searchEmpty: !isLoading && (!data || data.results.length === 0),
-    }),
+      searchEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }

@@ -25,6 +25,8 @@ const initialState = {
   shipping: 0,
   billing: null,
   totalItems: 0,
+  storeSlug: null,
+  orderResult: null,
 };
 
 // ----------------------------------------------------------------------
@@ -177,6 +179,20 @@ function Container({ children }) {
     [setField]
   );
 
+  const onSetStoreSlug = useCallback(
+    (slug) => {
+      setField('storeSlug', slug);
+    },
+    [setField]
+  );
+
+  const onSetOrderResult = useCallback(
+    (result) => {
+      setField('orderResult', result);
+    },
+    [setField]
+  );
+
   // Reset
   const onReset = useCallback(() => {
     if (completed) {
@@ -204,6 +220,8 @@ function Container({ children }) {
       onCreateBilling,
       onApplyDiscount,
       onApplyShipping,
+      onSetStoreSlug,
+      onSetOrderResult,
       //
       activeStep,
       initialStep,
@@ -230,6 +248,8 @@ function Container({ children }) {
       onCreateBilling,
       onDecreaseQuantity,
       onIncreaseQuantity,
+      onSetStoreSlug,
+      onSetOrderResult,
     ]
   );
 

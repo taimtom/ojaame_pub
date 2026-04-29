@@ -1,288 +1,189 @@
-import { m } from 'framer-motion';
-
 import Box from '@mui/material/Box';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Container from '@mui/material/Container';
-import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
-
-import { useTabs } from 'src/hooks/use-tabs';
-
-import { CONFIG } from 'src/config-global';
-import { varAlpha } from 'src/theme/styles';
+import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
-import { varFade, varScale, MotionViewport } from 'src/components/animate';
-
-import { SectionTitle } from './components/section-title';
-import { FloatLine, FloatXIcon } from './components/svg-elements';
 
 // ----------------------------------------------------------------------
 
-export function HomePricing({ sx, ...other }) {
+const PRICING_COMPONENTS = [
+  {
+    title: 'Base subscription',
+    price: '₦3,000',
+    period: 'per month',
+    description: 'Core monthly company subscription.',
+    features: [
+      'Charged once per company',
+      'Currency billed in NGN',
+    ],
+  },
+  {
+    title: 'Additional store',
+    price: '₦3,000',
+    period: 'per month',
+    description: 'Charged for each store after your first store.',
+    features: [
+      'First store has no store fee',
+      'Each extra store adds ₦3,000/month',
+    ],
+  },
+  {
+    title: 'Extra seats',
+    price: '₦1,000',
+    period: 'per seat/month',
+    description: 'Seat charge applies only beyond the included seat.',
+    features: [
+      'Each store includes 1 seat',
+      'Each seat above 1 in any store is billed',
+    ],
+  },
+];
+
+const EXAMPLES = [
+  {
+    name: 'Example A',
+    details: '1 store, 1 seat in that store',
+    total: '₦3,000/month',
+    formula: 'Base ₦3,000 + Store fees ₦0 + Extra seats ₦0',
+  },
+  {
+    name: 'Example B',
+    details: '2 stores, 2 seats in first store, 1 seat in second store',
+    total: '₦7,000/month',
+    formula: 'Base ₦3,000 + 1 extra store ₦3,000 + 1 extra seat ₦1,000',
+  },
+];
+
+// ----------------------------------------------------------------------
+
+export function HomePricing() {
   const theme = useTheme();
 
-  const tabs = useTabs('Standard');
-
-  const renderDescription = (
-    <SectionTitle
-      caption="plans"
-      title="Transparent"
-      txtGradient="pricing"
-      description="Choose from flexible pricing options designed to fit your business needs and budget with no hidden fees."
-      sx={{ mb: 8, textAlign: 'center' }}
-    />
-  );
-
-  const renderContentDesktop = (
-    <Box gridTemplateColumns="repeat(3, 1fr)" sx={{ display: { xs: 'none', md: 'grid' } }}>
-      {PLANS.map((plan) => (
-        <PlanCard
-          key={plan.license}
-          plan={plan}
-          sx={{
-            ...(plan.license === 'Plus' && {
-              [theme.breakpoints.down(1440)]: {
-                borderLeft: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-                borderRight: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-              },
-            }),
-          }}
-        />
-      ))}
-    </Box>
-  );
-
-  const renderContentMobile = (
-    <Stack spacing={5} alignItems="center" sx={{ display: { md: 'none' } }}>
-      <Tabs
-        value={tabs.value}
-        onChange={tabs.onChange}
-        sx={{
-          boxShadow: `0px -2px 0px 0px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)} inset`,
-        }}
-      >
-        {PLANS.map((tab) => (
-          <Tab key={tab.license} value={tab.license} label={tab.license} />
-        ))}
-      </Tabs>
-
-      <Box
-        sx={{
-          width: 1,
-          borderRadius: 2,
-          border: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
-        }}
-      >
-        {PLANS.map(
-          (tab) => tab.license === tabs.value && <PlanCard key={tab.license} plan={tab} />
-        )}
-      </Box>
-    </Stack>
-  );
-
   return (
-    <Stack component="section" sx={{ py: 10, position: 'relative', ...sx }} {...other}>
-      <MotionViewport>
-        <FloatLine vertical sx={{ top: 0, left: 80 }} />
-
-        <Container>{renderDescription}</Container>
-
-        <Box
-          sx={{
-            position: 'relative',
-            '&::before, &::after': {
-              width: 64,
-              height: 64,
-              content: "''",
-              [theme.breakpoints.up(1440)]: {
-                display: 'block',
-              },
-            },
-          }}
-        >
-          <Container>{renderContentDesktop}</Container>
-
-          <FloatLine sx={{ top: 64, left: 0 }} />
-          <FloatLine sx={{ bottom: 64, left: 0 }} />
+    <Box
+      id="pricing"
+      sx={{
+        py: { xs: 8, md: 12 },
+        bgcolor: 'background.default',
+        scrollMarginTop: 64,
+      }}
+    >
+      <Container maxWidth="lg">
+        <Box sx={{ textAlign: 'center', mb: { xs: 6, md: 8 } }}>
+          <Typography
+            variant="overline"
+            sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 2, display: 'block', mb: 1.5 }}
+          >
+            Pricing
+          </Typography>
+          <Typography variant="h2" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+            Usage-Based Pricing
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640, mx: 'auto' }}>
+            Your monthly total is calculated from clear billing components. First recurring charge starts about 1
+            month after signup.
+          </Typography>
         </Box>
 
-        <Container>{renderContentMobile}</Container>
-      </MotionViewport>
-    </Stack>
-  );
-}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={3}
+          alignItems={{ md: 'stretch' }}
+        >
+          {PRICING_COMPONENTS.map((item) => (
+            <Box key={item.title} sx={{ flex: 1 }}>
+              <Card
+                sx={{
+                  p: 4,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 3,
+                }}
+              >
+                <Typography variant="overline" color="text.secondary" fontWeight={700}>
+                  {item.title}
+                </Typography>
 
-function PlanCard({ plan, sx, ...other }) {
-  const standardLicense = plan.license === 'Standard';
+                <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 1 }}>
+                  <Typography variant="h3" fontWeight={800} lineHeight={1}>
+                    {item.price}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
+                    /{item.period}
+                  </Typography>
+                </Stack>
 
-  const plusLicense = plan.license === 'Plus';
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  {item.description}
+                </Typography>
 
-  const renderLines = (
-    <>
-      <FloatLine vertical sx={{ top: -64, left: 0, height: 'calc(100% + (64px * 2))' }} />
-      <FloatLine vertical sx={{ top: -64, right: 0, height: 'calc(100% + (64px * 2))' }} />
-      <FloatXIcon sx={{ top: -8, left: -8 }} />
-      <FloatXIcon sx={{ top: -8, right: -8 }} />
-      <FloatXIcon sx={{ bottom: -8, left: -8 }} />
-      <FloatXIcon sx={{ bottom: -8, right: -8 }} />
-    </>
-  );
+                <Divider sx={{ mb: 3 }} />
 
-  return (
-    <Stack
-      spacing={5}
-      component={MotionViewport}
-      sx={{
-        px: 6,
-        py: 8,
-        position: 'relative',
-        ...sx,
-      }}
-      {...other}
-    >
-      {plusLicense && renderLines}
-
-      <Stack direction="row" alignItems="center">
-        <Stack flexGrow={1}>
-          <m.div variants={varFade({ distance: 24 }).inLeft}>
-            <Typography variant="h4" component="h6">
-              {plan.license}
-            </Typography>
-          </m.div>
-
-          <m.div variants={varScale({ distance: 24 }).inX}>
-            <Box
-              sx={{
-                width: 32,
-                height: 6,
-                opacity: 0.24,
-                borderRadius: 1,
-                bgcolor: 'error.main',
-                ...(standardLicense && { bgcolor: 'primary.main' }),
-                ...(plusLicense && { bgcolor: 'secondary.main' }),
-              }}
-            />
-          </m.div>
+                <Stack spacing={1.5} sx={{ mb: 4, flex: 1 }}>
+                  {item.features.map((feature) => (
+                    <Stack key={feature} direction="row" alignItems="center" spacing={1}>
+                      <Iconify
+                        icon="solar:check-circle-bold"
+                        width={18}
+                        sx={{ color: 'success.main', flexShrink: 0 }}
+                      />
+                      <Typography variant="body2">{feature}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Card>
+            </Box>
+          ))}
         </Stack>
 
-        <m.div variants={varFade({ distance: 24 }).inLeft}>
-          <Box component="span" sx={{ typography: 'h3' }}>
-            ${plan.price}
-          </Box>
-        </m.div>
-      </Stack>
-
-      <Stack direction="row" spacing={2}>
-        {plan.icons.map((icon, index) => (
-          <Box
-            component={m.img}
-            variants={varFade().in}
-            key={icon}
-            alt={icon}
-            src={icon}
-            sx={{
-              width: 24,
-              height: 24,
-              ...(standardLicense && [1, 2].includes(index) && { display: 'none' }),
-            }}
-          />
-        ))}
-        {standardLicense && (
-          <Box component={m.span} variants={varFade().in} sx={{ ml: -1 }}>
-            (only)
-          </Box>
-        )}
-      </Stack>
-
-      <Stack spacing={2.5}>
-        {plan.commons.map((option) => (
-          <Stack
-            key={option}
-            component={m.div}
-            variants={varFade().in}
-            spacing={1.5}
-            direction="row"
-            alignItems="center"
-            sx={{ typography: 'body2' }}
-          >
-            <Iconify width={16} icon="eva:checkmark-fill" />
-            {option}
-          </Stack>
-        ))}
-
-        <m.div variants={varFade({ distance: 24 }).inLeft}>
-          <Divider sx={{ borderStyle: 'dashed' }} />
-        </m.div>
-
-        {plan.options.map((option, index) => {
-          const disabled =
-            (standardLicense && [1, 2, 3].includes(index)) || (plusLicense && [3].includes(index));
-
-          return (
-            <Stack
-              key={option}
-              component={m.div}
-              variants={varFade().in}
-              spacing={1.5}
-              direction="row"
-              alignItems="center"
-              sx={{
-                typography: 'body2',
-                ...(disabled && { color: 'text.disabled', textDecoration: 'line-through' }),
-              }}
-            >
-              <Iconify width={18} icon={disabled ? 'mingcute:close-line' : 'eva:checkmark-fill'} />
-              {option}
-            </Stack>
-          );
-        })}
-      </Stack>
-
-      <m.div variants={varFade({ distance: 24 }).inUp}>
-        <Button
-          fullWidth
-          variant={plusLicense ? 'contained' : 'outlined'}
-          color="inherit"
-          size="large"
-          target="_blank"
-          rel="noopener"
-          href={paths.minimalStore}
+        <Card
+          sx={{
+            mt: 3,
+            p: { xs: 3, md: 4 },
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 3,
+          }}
         >
-          Get started
-        </Button>
-      </m.div>
-    </Stack>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+            Example monthly totals
+          </Typography>
+          <Stack spacing={2.5}>
+            {EXAMPLES.map((example) => (
+              <Box key={example.name}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {example.name}: {example.total}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {example.details}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {example.formula}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+          <Button
+            component={RouterLink}
+            href={paths.auth.jwt.signUp}
+            size="large"
+            variant="contained"
+            color="primary"
+            sx={{ mt: 3, borderRadius: 2, fontWeight: 700, py: 1.5, px: 4 }}
+          >
+            Get Started
+          </Button>
+        </Card>
+      </Container>
+    </Box>
   );
 }
-
-// ----------------------------------------------------------------------
-
-const PLANS = [...Array(3)].map((_, index) => ({
-  license: ['Standard', 'Plus', 'Extended'][index],
-  price: [69, 129, 599][index],
-  commons: [
-    'One end products',
-    '12 months updates',
-    '6 months of support',
-    'One-time payments',
-    'Lifetime perpetual license.',
-  ],
-  options: [
-    'JavaScript version',
-    'TypeScript version',
-    'Design resources (Figma)',
-    'Commercial applications',
-  ],
-  icons: [
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-js.svg`,
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-ts.svg`,
-    `${CONFIG.site.basePath}/assets/icons/platforms/ic-figma.svg`,
-  ],
-}));

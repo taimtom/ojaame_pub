@@ -253,6 +253,9 @@ function CurrencySection() {
 // ----------------------------------------------------------------------
 
 function BankAccountsSection() {
+  const { user } = useAuthContext();
+  const companyId = user?.company_id;
+
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connectOpen, setConnectOpen] = useState(false);
@@ -261,20 +264,32 @@ function BankAccountsSection() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const fetchAccounts = useCallback(async () => {
+    if (!companyId) {
+      setAccounts([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const res = await axiosInstance.get('/api/banking/accounts');
+      const res = await axiosInstance.get('/api/banking/accounts', {
+        params: { company_id: companyId },
+      });
       setAccounts(res.data || []);
     } catch {
       toast.error('Failed to load bank accounts.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [companyId]);
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
   const handleSync = async (accountId) => {
+    const acc = accounts.find((a) => a.id === accountId);
+    if (acc?.provider === 'manual') {
+      toast.error('Manual accounts do not sync with the bank. Add or edit rows in Finance.');
+      return;
+    }
     try {
       setSyncing(accountId);
       await axiosInstance.post('/api/banking/sync', { account_id: accountId });
@@ -288,6 +303,11 @@ function BankAccountsSection() {
   };
 
   const handleUpdateBalance = async (accountId) => {
+    const acc = accounts.find((a) => a.id === accountId);
+    if (acc?.provider === 'manual') {
+      toast.error('Manual accounts: update the balance when adding the account or contact support to edit.');
+      return;
+    }
     try {
       setSyncing(accountId);
       await axiosInstance.post(`/api/banking/accounts/${accountId}/update-balance`);
@@ -377,9 +397,17 @@ function BankAccountsSection() {
                         </Typography>
                       )}
                       <Chip
-                        label={account.connection_status || 'active'}
+                        label={
+                          account.provider === 'manual'
+                            ? 'Manual'
+                            : account.connection_status || 'active'
+                        }
                         size="small"
-                        color={connectionStatusColor(account.connection_status)}
+                        color={
+                          account.provider === 'manual'
+                            ? 'default'
+                            : connectionStatusColor(account.connection_status)
+                        }
                         variant="soft"
                       />
                     </Stack>
@@ -407,9 +435,13 @@ function BankAccountsSection() {
                   {/* Sync */}
                   <IconButton
                     size="small"
-                    title="Sync transactions"
+                    title={
+                      account.provider === 'manual'
+                        ? 'Not available for manual accounts'
+                        : 'Sync transactions'
+                    }
                     onClick={() => handleSync(account.id)}
-                    disabled={syncing === account.id}
+                    disabled={syncing === account.id || account.provider === 'manual'}
                   >
                     {syncing === account.id ? (
                       <CircularProgress size={16} />
@@ -421,9 +453,13 @@ function BankAccountsSection() {
                   {/* Update Balance */}
                   <IconButton
                     size="small"
-                    title="Update balance"
+                    title={
+                      account.provider === 'manual'
+                        ? 'Not available for manual accounts'
+                        : 'Update balance'
+                    }
                     onClick={() => handleUpdateBalance(account.id)}
-                    disabled={syncing === account.id}
+                    disabled={syncing === account.id || account.provider === 'manual'}
                   >
                     <Iconify icon="solar:wallet-money-bold-duotone" width={18} />
                   </IconButton>
@@ -494,18 +530,50 @@ function BankAccountsSection() {
 }
 
 // ----------------------------------------------------------------------
-// Connect Bank Dialog (lightweight wrapper around the banking API)
+// Connect Bank Dialog (Plaid / Mono / Manual)
 // ----------------------------------------------------------------------
+
+const emptyManualTx = () => ({
+  date: new Date().toISOString().slice(0, 10),
+  description: '',
+  amount: '',
+  direction: 'debit',
+});
 
 function ConnectBankDialog({ open, onClose, onSuccess }) {
   const { user } = useAuthContext();
-  const [activeTab, setActiveTab] = useState(0); // 0: International (Plaid), 1: African (Mono)
+  // 0: Plaid, 1: Mono, 2: Manual (no live API)
+  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [linkToken, setLinkToken] = useState(null);
   const [error, setError] = useState(null);
 
+  const [manualInstitution, setManualInstitution] = useState('');
+  const [manualAccountName, setManualAccountName] = useState('');
+  const [manualAccountType, setManualAccountType] = useState('checking');
+  const [manualMask, setManualMask] = useState('');
+  const [manualCurrency, setManualCurrency] = useState('NGN');
+  const [manualBalance, setManualBalance] = useState('');
+  const [manualAvailable, setManualAvailable] = useState('');
+  const [manualStatementUrl, setManualStatementUrl] = useState('');
+  const [manualTxRows, setManualTxRows] = useState([emptyManualTx()]);
+
+  const resetManual = () => {
+    setManualInstitution('');
+    setManualAccountName('');
+    setManualAccountType('checking');
+    setManualMask('');
+    setManualCurrency('NGN');
+    setManualBalance('');
+    setManualAvailable('');
+    setManualStatementUrl('');
+    setManualTxRows([emptyManualTx()]);
+  };
+
   useEffect(() => {
-    if (open && activeTab === 0) fetchPlaidToken();
+    if (!open) return;
+    setError(null);
+    if (activeTab === 0) fetchPlaidToken();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeTab]);
 
@@ -527,25 +595,112 @@ function ConnectBankDialog({ open, onClose, onSuccess }) {
 
   const PROVIDER_TABS = [
     {
-      label: 'International Banks',
+      label: 'International',
       icon: 'solar:earth-bold-duotone',
       description: 'Connect banks from the US, Canada, UK, Europe, and more. Powered by Plaid.',
       regions: ['US', 'CA', 'GB', 'FR', 'ES', 'IE', 'NL'],
       features: ['Real-time balance updates', 'Transaction history', 'Bank-level encryption'],
     },
     {
-      label: 'African Banks',
+      label: 'African',
       icon: 'solar:map-point-bold-duotone',
       description: 'Connect banks from Nigeria, Ghana, Kenya, South Africa, and more. Powered by Mono.',
       regions: ['Nigeria', 'Ghana', 'Kenya', 'South Africa'],
       features: ['Account statements', 'Balance monitoring', 'Transaction sync'],
     },
+    {
+      label: 'Manual',
+      icon: 'solar:pen-new-square-bold-duotone',
+      description:
+        'Add an account without linking Plaid or Mono. Enter balances yourself, attach a statement of account, and optionally type transaction lines. This account will not sync with any bank API.',
+      regions: ['Any bank'],
+      features: ['Statement upload', 'Balances you enter', 'Optional transaction lines', 'No API sync'],
+    },
   ];
 
   const tab = PROVIDER_TABS[activeTab];
 
+  const handleManualStatementUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', `bank-statement-${Date.now()}`);
+    try {
+      setLoading(true);
+      const res = await axiosInstance.post('/api/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = res.data?.fileUrl;
+      if (url) {
+        setManualStatementUrl(url);
+        toast.success('Statement uploaded.');
+      }
+    } catch {
+      toast.error('Upload failed.');
+    } finally {
+      setLoading(false);
+    }
+    e.target.value = '';
+  };
+
+  const submitManual = async () => {
+    if (!user?.company_id) {
+      toast.error('No company on your account.');
+      return;
+    }
+    const bal = parseFloat(manualBalance, 10);
+    if (!manualInstitution.trim() || !manualAccountName.trim() || Number.isNaN(bal)) {
+      toast.error('Institution, account name, and current balance are required.');
+      return;
+    }
+    const describedRows = manualTxRows.filter((row) => row.description?.trim());
+    const invalidAmount = describedRows.find((row) =>
+      Number.isNaN(parseFloat(row.amount, 10))
+    );
+    if (invalidAmount) {
+      toast.error('Enter a valid amount for each transaction row.');
+      return;
+    }
+    const transactions = describedRows.map((row) => {
+      const amt = parseFloat(row.amount, 10);
+      return {
+        date: row.date,
+        description: row.description.trim(),
+        amount: Math.abs(amt),
+        direction: row.direction === 'credit' ? 'credit' : 'debit',
+      };
+    });
+    try {
+      setLoading(true);
+      setError(null);
+      await axiosInstance.post('/api/banking/manual-accounts', {
+        company_id: user.company_id,
+        institution_name: manualInstitution.trim(),
+        account_name: manualAccountName.trim(),
+        account_type: manualAccountType,
+        mask: manualMask.trim() || null,
+        currency_code: manualCurrency.trim().toUpperCase() || 'NGN',
+        current_balance: bal,
+        available_balance:
+          manualAvailable === '' ? null : parseFloat(manualAvailable, 10),
+        statement_file_url: manualStatementUrl || null,
+        transactions: transactions.length ? transactions : null,
+      });
+      toast.success('Manual bank account added.');
+      resetManual();
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      setError(typeof d === 'string' ? d : 'Could not save manual account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Iconify icon="solar:buildings-3-bold-duotone" />
@@ -554,15 +709,17 @@ function ConnectBankDialog({ open, onClose, onSuccess }) {
       </DialogTitle>
 
       <DialogContent>
-        {/* Provider tabs */}
-        <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 3 }}>
           {PROVIDER_TABS.map((t, i) => (
             <Button
               key={t.label}
               variant={activeTab === i ? 'contained' : 'outlined'}
               size="small"
               startIcon={<Iconify icon={t.icon} />}
-              onClick={() => { setActiveTab(i); setError(null); }}
+              onClick={() => {
+                setActiveTab(i);
+                setError(null);
+              }}
               sx={{ flexGrow: 1 }}
             >
               {t.label}
@@ -576,48 +733,238 @@ function ConnectBankDialog({ open, onClose, onSuccess }) {
           </Alert>
         )}
 
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          {tab.description}
-        </Typography>
+        {activeTab === 2 ? (
+          <Stack spacing={2}>
+            <Alert severity="warning" sx={{ py: 0.5 }}>
+              Manual accounts are stored only in Ojaa Me. Balances and transactions are not fetched from
+              your bank (no Plaid or Mono).
+            </Alert>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Bank / institution name"
+                value={manualInstitution}
+                onChange={(e) => setManualInstitution(e.target.value)}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Account name"
+                value={manualAccountName}
+                onChange={(e) => setManualAccountName(e.target.value)}
+                fullWidth
+                required
+                placeholder="e.g. Main operating"
+              />
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                select
+                label="Account type"
+                value={manualAccountType}
+                onChange={(e) => setManualAccountType(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="checking">Checking</MenuItem>
+                <MenuItem value="savings">Savings</MenuItem>
+                <MenuItem value="current">Current</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </TextField>
+              <TextField
+                label="Last 4 digits (optional)"
+                value={manualMask}
+                onChange={(e) => setManualMask(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                fullWidth
+                inputProps={{ maxLength: 4 }}
+              />
+              <TextField
+                label="Currency"
+                value={manualCurrency}
+                onChange={(e) => setManualCurrency(e.target.value.toUpperCase().slice(0, 3))}
+                fullWidth
+                placeholder="NGN"
+              />
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Current balance"
+                type="number"
+                value={manualBalance}
+                onChange={(e) => setManualBalance(e.target.value)}
+                fullWidth
+                required
+                inputProps={{ step: '0.01' }}
+              />
+              <TextField
+                label="Available balance (optional)"
+                type="number"
+                value={manualAvailable}
+                onChange={(e) => setManualAvailable(e.target.value)}
+                fullWidth
+                inputProps={{ step: '0.01' }}
+              />
+            </Stack>
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-          <Card variant="outlined" sx={{ flex: 1, p: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Supported Regions</Typography>
-            <Box display="flex" flexWrap="wrap" gap={0.5}>
-              {tab.regions.map((r) => (
-                <Chip key={r} label={r} size="small" />
-              ))}
-            </Box>
-          </Card>
-          <Card variant="outlined" sx={{ flex: 1, p: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Features</Typography>
-            {tab.features.map((f) => (
-              <Typography key={f} variant="body2" sx={{ color: 'text.secondary' }}>
-                • {f}
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Statement of account (optional)
               </Typography>
-            ))}
-          </Card>
-        </Stack>
+              <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+                <Button variant="outlined" component="label" size="small" disabled={loading}>
+                  Upload file
+                  <input type="file" hidden onChange={handleManualStatementUpload} />
+                </Button>
+                {manualStatementUrl && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary', wordBreak: 'break-all' }}>
+                    {manualStatementUrl}
+                  </Typography>
+                )}
+              </Stack>
+            </Box>
 
-        <Alert severity="info">
-          Your bank credentials are never stored. We use bank-level security.
-        </Alert>
+            <Box>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2">Transactions (optional)</Typography>
+                <Button
+                  size="small"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                  onClick={() => setManualTxRows((prev) => [...prev, emptyManualTx()])}
+                >
+                  Add row
+                </Button>
+              </Stack>
+              <Stack spacing={1.5}>
+                {manualTxRows.map((row, idx) => (
+                  <Card key={idx} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                      <TextField
+                        type="date"
+                        label="Date"
+                        value={row.date}
+                        onChange={(e) => {
+                          const next = [...manualTxRows];
+                          next[idx] = { ...next[idx], date: e.target.value };
+                          setManualTxRows(next);
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        size="small"
+                        sx={{ minWidth: 140 }}
+                      />
+                      <TextField
+                        label="Description"
+                        value={row.description}
+                        onChange={(e) => {
+                          const next = [...manualTxRows];
+                          next[idx] = { ...next[idx], description: e.target.value };
+                          setManualTxRows(next);
+                        }}
+                        size="small"
+                        sx={{ flex: 1 }}
+                      />
+                      <TextField
+                        select
+                        label="Type"
+                        value={row.direction}
+                        onChange={(e) => {
+                          const next = [...manualTxRows];
+                          next[idx] = { ...next[idx], direction: e.target.value };
+                          setManualTxRows(next);
+                        }}
+                        size="small"
+                        sx={{ minWidth: 100 }}
+                      >
+                        <MenuItem value="debit">Debit</MenuItem>
+                        <MenuItem value="credit">Credit</MenuItem>
+                      </TextField>
+                      <TextField
+                        label="Amount"
+                        type="number"
+                        value={row.amount}
+                        onChange={(e) => {
+                          const next = [...manualTxRows];
+                          next[idx] = { ...next[idx], amount: e.target.value };
+                          setManualTxRows(next);
+                        }}
+                        size="small"
+                        sx={{ minWidth: 120 }}
+                        inputProps={{ step: '0.01' }}
+                      />
+                      {manualTxRows.length > 1 && (
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setManualTxRows((prev) => prev.filter((_, i) => i !== idx))}
+                          aria-label="Remove row"
+                        >
+                          <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Card>
+                ))}
+              </Stack>
+            </Box>
+          </Stack>
+        ) : (
+          <>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+              {tab.description}
+            </Typography>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+              <Card variant="outlined" sx={{ flex: 1, p: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Supported Regions
+                </Typography>
+                <Box display="flex" flexWrap="wrap" gap={0.5}>
+                  {tab.regions.map((r) => (
+                    <Chip key={r} label={r} size="small" />
+                  ))}
+                </Box>
+              </Card>
+              <Card variant="outlined" sx={{ flex: 1, p: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Features
+                </Typography>
+                {tab.features.map((f) => (
+                  <Typography key={f} variant="body2" sx={{ color: 'text.secondary' }}>
+                    • {f}
+                  </Typography>
+                ))}
+              </Card>
+            </Stack>
+
+            <Alert severity="info">
+              {activeTab === 1
+                ? 'We use secure, read-only access where supported. Mono connection opens from your environment when configured.'
+                : 'Your bank credentials are never stored on our servers when using Plaid.'}
+            </Alert>
+          </>
+        )}
       </DialogContent>
 
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={loading || (activeTab === 0 && !linkToken)}
-          startIcon={loading ? <CircularProgress size={16} /> : <Iconify icon="solar:link-bold" />}
-          onClick={() => {
-            // Plaid: link token is ready, Plaid SDK should be invoked by caller
-            // Mono: open Mono widget
-            toast.info('Bank connection flow would launch here with the respective provider SDK.');
-          }}
-        >
-          Connect
-        </Button>
+        {activeTab === 2 ? (
+          <Button
+            variant="contained"
+            disabled={loading}
+            onClick={submitManual}
+            startIcon={loading ? <CircularProgress size={16} /> : <Iconify icon="solar:check-circle-bold" />}
+          >
+            Save manual account
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            disabled={loading || (activeTab === 0 && !linkToken)}
+            startIcon={loading ? <CircularProgress size={16} /> : <Iconify icon="solar:link-bold" />}
+            onClick={() => {
+              toast.info('Plaid / Mono connection is configured in your deployment. Use Manual to add an account without APIs.');
+            }}
+          >
+            Connect
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

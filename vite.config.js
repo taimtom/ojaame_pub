@@ -1,16 +1,17 @@
 import path from 'path';
 import checker from 'vite-plugin-checker';
-import { loadEnv, defineConfig } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 
 // ----------------------------------------------------------------------
 
 const PORT = 3030;
 
-const env = loadEnv('all', process.cwd());
-
 export default defineConfig({
-  // base: env.VITE_BASE_PATH,
+  // Expose GOOGLE_* so client code can read GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URL from .env
+  // (Vite only exposes VITE_ by default.)
+  envPrefix: ['VITE_', 'GOOGLE_'],
+  // base: import.meta.env.VITE_BASE_PATH, // set via defineConfig callback + loadEnv if needed
   plugins: [
     react(),
     checker({
@@ -23,7 +24,17 @@ export default defineConfig({
       },
     }),
   ],
+  optimizeDeps: {
+    include: [
+      '@emotion/react',
+      '@emotion/styled',
+      '@mui/material',
+      '@mui/system',
+      '@mui/system/createTheme',
+    ],
+  },
   resolve: {
+    dedupe: ['@mui/material', '@mui/system', '@emotion/react', '@emotion/styled'],
     alias: [
       {
         find: /^~(.+)/,
@@ -35,6 +46,16 @@ export default defineConfig({
       },
     ],
   },
-  server: { port: PORT, host: true },
+  server: {
+    port: PORT,
+    host: true,
+    // If VITE_SERVER_URL is empty, browser calls same-origin /api/*; forward to API.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_SERVER_URL || 'http://localhost:8004',
+        changeOrigin: true,
+      },
+    },
+  },
   preview: { port: PORT, host: true },
 });

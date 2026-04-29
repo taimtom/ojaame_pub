@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
@@ -40,6 +40,11 @@ export function InvoiceNewEditDetails() {
 
   const { products, productsLoading } = useGetProducts(storeId);
   const { services, servicesLoading } = useGetServices(storeId);
+
+  const sellableProducts = useMemo(
+    () => (products || []).filter((p) => p.product_kind !== 'production_input'),
+    [products]
+  );
 
   const [itemTypes, setItemTypes] = useState([]);
   // const [prevPrices, setPrevPrices] = useState({});
@@ -122,8 +127,8 @@ export function InvoiceNewEditDetails() {
         }
       } else if (currentType === 'product' && !currentItemValue) {
         const productId = getValues(`items[${index}].product_id`);
-        if (productId && products.length) {
-          const found = products.find((p) => p.id === productId);
+        if (productId && sellableProducts.length) {
+          const found = sellableProducts.find((p) => p.id === productId);
           if (found) {
             setValue(`items[${index}].item`, found.name);
             currentItemValue = found.name;
@@ -135,7 +140,7 @@ export function InvoiceNewEditDetails() {
         setValue(`items[${index}].item`, '');
       }
     });
-  }, [fields, itemTypes, setValue, getValues, services, products]);
+  }, [fields, itemTypes, setValue, getValues, services, sellableProducts]);
 
 
   useEffect(() => {
@@ -229,12 +234,17 @@ export function InvoiceNewEditDetails() {
           );
           setValue(`items[${index}].service_id`, service.id);
           setValue(`items[${index}].item`, service.name);
+          // Auto-fill description with service name if not already set
+          const currentDesc = values.items[index]?.description;
+          if (!currentDesc) {
+            setValue(`items[${index}].description`, service.sub_description || service.description || service.name);
+          }
           // For services, costPrice is not used.
           setValue(`items[${index}].costPrice`, undefined);
           setValue(`items[${index}].originalPrice`, service.price || 0);
         }
       } else if (type === 'product') {
-        const product = products.find(p => p.name === selectedName);
+        const product = sellableProducts.find(p => p.name === selectedName);
         if (product) {
           setValue(`items[${index}].price`, product.price || 0);
           setValue(`items[${index}].total`, (values.items[index]?.quantity || 1) * (product.price || 0));
@@ -247,7 +257,7 @@ export function InvoiceNewEditDetails() {
         }
       }
     },
-    [setValue, values.items, products, services]
+    [setValue, values.items, sellableProducts, services]
   );
 
 
@@ -267,7 +277,7 @@ export function InvoiceNewEditDetails() {
       if (type === 'product') {
         const selectedProductName = values.items[index]?.item;
         if (selectedProductName) {
-          const selectedProduct = products.find(prod => prod.name === selectedProductName);
+          const selectedProduct = sellableProducts.find(prod => prod.name === selectedProductName);
           if (selectedProduct) {
             if (enteredQuantity > selectedProduct.quantity) {
               toast.error(`Quantity cannot exceed available stock of ${selectedProduct.quantity}.`);
@@ -282,7 +292,7 @@ export function InvoiceNewEditDetails() {
       setValue(`items[${index}].quantity`, enteredQuantity);
       setValue(`items[${index}].total`, enteredQuantity * price);
     },
-    [itemTypes, setValue, values.items, products]
+    [itemTypes, setValue, values.items, sellableProducts]
   );
 
   // const handleChangePrice = useCallback(
@@ -296,14 +306,47 @@ export function InvoiceNewEditDetails() {
 
   const handleChangePrice = useCallback(
     (event, index) => {
-      const enteredPrice = Number(event.target.value);
-      // Only for product items, validate against costPrice.
+      const raw = event.target.value;
+      if (raw === '') return;
+      const enteredPrice = Number.parseFloat(String(raw).replace(',', '.'));
+      if (!Number.isFinite(enteredPrice)) return;
       const currentType =
         itemTypes[index] ||
         (values.items[index]?.product_id ? 'product' : values.items[index]?.service_id ? 'service' : 'none');
+
       if (currentType === 'product') {
+        const selectedProductName = values.items[index]?.item;
+        const product = selectedProductName ? sellableProducts.find((p) => p.name === selectedProductName) : null;
         const costPrice = Number(values.items[index]?.costPrice) || 0;
         const originalPrice = Number(values.items[index]?.originalPrice) || 0;
+
+        // Enforce variable pricing rules when enabled on the product
+        if (product && product.allow_variable_price) {
+          const min = product.variable_price_min ?? null;
+          const max = product.variable_price_max ?? null;
+          if (min != null && enteredPrice < min) {
+            toast.error(`Price for ${product.name} cannot be less than ${currencySymbol}${min}.`);
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+          if (max != null && enteredPrice > max) {
+            toast.error(`Price for ${product.name} cannot be greater than ${currencySymbol}${max}.`);
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+        } else if (product) {
+          // Variable pricing not allowed: revert to original price if user tries to override
+          if (enteredPrice !== originalPrice) {
+            toast.error(`Variable pricing is not enabled for ${product.name}. Using default price ${currencySymbol}${originalPrice}.`);
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+        }
+
+        // Cost price floor still applies
         if (costPrice > 0 && enteredPrice < costPrice) {
           toast.error(`Price cannot be lower than cost price (${currencySymbol}${costPrice}). Reverting to product price (${currencySymbol}${originalPrice}).`);
           setValue(`items[${index}].price`, originalPrice);
@@ -311,10 +354,11 @@ export function InvoiceNewEditDetails() {
           return;
         }
       }
+
       setValue(`items[${index}].price`, enteredPrice);
       setValue(`items[${index}].total`, enteredPrice * (values.items[index]?.quantity || 1));
     },
-    [setValue, values.items, itemTypes, currencySymbol]
+    [setValue, values.items, itemTypes, sellableProducts, currencySymbol]
   );
 
   const renderTotal = (
@@ -371,7 +415,7 @@ export function InvoiceNewEditDetails() {
                 : 'none');
           let optionsList = [];
           if (currentType === 'service' || currentType === 'product') {
-            const allOptions = currentType === 'service' ? services : products;
+            const allOptions = currentType === 'service' ? services : sellableProducts;
             const selectedItems = values.items
               .filter((itm, i) => i !== index && itm.item)
               .map((itm) => itm.item);
@@ -382,6 +426,11 @@ export function InvoiceNewEditDetails() {
               })
               .sort((a, b) => a.name.localeCompare(b.name));
           }
+          const selectedItemName = values.items[index]?.item;
+          const selectedProduct =
+            currentType === 'product' && selectedItemName
+              ? sellableProducts.find((p) => p.name === selectedItemName)
+              : null;
           return (
             <Stack key={item.id} alignItems="flex-end" spacing={1.5}>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: 1 }}>
@@ -409,7 +458,7 @@ export function InvoiceNewEditDetails() {
                   }
                   value={values.items[index]?.item || ''}
                   onChange={(e) => {
-                    const selectedItem = (currentType === 'service' ? services : products).find(
+                    const selectedItem = (currentType === 'service' ? services : sellableProducts).find(
                       (option) => option.name === e.target.value
                     );
                     setValue(`items[${index}].item`, selectedItem?.name || '');
@@ -445,13 +494,18 @@ export function InvoiceNewEditDetails() {
                   onInput={(event) => handleChangeQuantity(event, index)}
                   disabled={currentType === 'service'}
                   InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 0.01 }}
                   sx={{ maxWidth: { md: 96 } }}
                 />
                 <Field.Text
                   size="small"
                   type="number"
                   name={`items[${index}].price`}
-                  label={t('price')}
+                  label={
+                    selectedProduct?.allow_variable_price
+                      ? `${t('price')} (variable)`
+                      : t('price')
+                  }
                   placeholder="0.00"
                   onChange={(event) => {
                     const enteredPrice = Number(event.target.value);
@@ -469,6 +523,13 @@ export function InvoiceNewEditDetails() {
                       </InputAdornment>
                     ),
                   }}
+                  helperText={
+                    selectedProduct?.allow_variable_price &&
+                    selectedProduct.variable_price_min != null &&
+                    selectedProduct.variable_price_max != null
+                      ? `Variable range: ${currencySymbol}${selectedProduct.variable_price_min}–${currencySymbol}${selectedProduct.variable_price_max}`
+                      : undefined
+                  }
                   sx={{ maxWidth: { md: 96 } }}
                 />
 

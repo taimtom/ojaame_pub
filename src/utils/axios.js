@@ -8,7 +8,26 @@ const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject((error.response && error.response.data) || 'Something went wrong!')
+  (error) => {
+    const data = (error.response && error.response.data) || 'Something went wrong!';
+    const httpStatus = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    // Subscription deactivation: owner → redirect to billing settings
+    if (httpStatus === 402 && detail === 'subscription_deactivated_owner') {
+      window.location.href = '/app/user/account?tab=billing';
+    }
+    // Subscription deactivation: staff → redirect to 404
+    if (httpStatus === 403 && detail === 'subscription_deactivated_staff') {
+      window.location.href = '/404';
+    }
+
+    // Attach the HTTP status so catch blocks can branch on it
+    const err = new Error(data?.detail || data?.message || 'Request failed');
+    err.data = data && typeof data === 'object' ? { ...data, _httpStatus: httpStatus } : data;
+    err._httpStatus = httpStatus;
+    return Promise.reject(err);
+  }
 );
 
 export default axiosInstance;
@@ -96,10 +115,15 @@ export const endpoints = {
     details: '/api/product/details', // Keep the parameter-based URL
     search: '/api/product/search',
     edit: '/api/product/edit',
+    changePrice: '/api/product/price',
     add: '/api/product/add',
     quantity: '/api/product/quantity',
+    adjust: '/api/product/adjust',
     history: '/api/product/history',
     movement: '/api/product/movement',
+    salesHistory: '/api/product/sales-history',
+    usage: '/api/product/usage',
+    publish: '/api/product/publish',
   },
   shop: {
     list: '/api/product/list',
@@ -148,6 +172,7 @@ export const endpoints = {
   },
   uploads: {
     upload: '/api/uploads',
+    presign: '/api/uploads/presign',
   },
   dashboard: {
     // company-level (no storeId)
@@ -191,8 +216,29 @@ export const endpoints = {
       topProducts: (storeId) => `/api/dashboard/${storeId}/dashboard/top-products`,
       expenses: (storeId) => `/api/dashboard/${storeId}/dashboard/expenses`,
       yearlySales: (storeId) => `/api/dashboard/${storeId}/dashboard/yearly-sales`,
+      featured: (storeId) => `/api/dashboard/${storeId}/dashboard/featured`,
       verify: (storeId) => `/api/dashboard/${storeId}/verify`
     }
+  },
+
+  // Store-level dashboard / report endpoints (query-param style: ?store_id=X)
+  storeDashboard: {
+    stats: '/api/store-dashboard/stats',
+    inventoryAlerts: '/api/store-dashboard/inventory-alerts',
+    stockValue: '/api/store-dashboard/stock-value',
+    salesTrend: '/api/store-dashboard/sales-trend',
+    categoryPerformance: '/api/store-dashboard/category-performance',
+    forecast: '/api/store-dashboard/forecast',
+  },
+  // Company dashboard (query-param style: ?company_id=X)
+  companyDashboard: {
+    revenueTrend: '/api/company-dashboard/revenue-trend',
+  },
+  // Financial / company-level reports (query-param style: ?company_id=X)
+  reports: {
+    profitLoss: '/api/reports/profit-loss',
+    cashFlow: '/api/reports/cash-flow',
+    tax: '/api/reports/tax',
   },
 
   paymentMethod:{
@@ -209,8 +255,7 @@ export const endpoints = {
     add: '/api/services/add', // For adding a new service
     edit: '/api/services/edit', // For editing a service (append /{serviceId})
     detail: '/api/services/detail',
-    // The detail endpoint is constructed directly in useGetService:
-    // `/services/detail/${storeId}/${serviceId}/`
+    saleHistory: '/api/services/sale-history',
   },
   customers: {
     list: '/api/customers/list/',
@@ -228,5 +273,36 @@ export const endpoints = {
     edit: '/api/sales/edit',
     history: '/api/sales/history/',
     saleslist: '/api/sales/historylist/',
+  },
+
+  notifications: {
+    list: '/api/notifications/list',
+    summary: '/api/notifications/summary',
+    markAllRead: '/api/notifications/mark-all-read',
+    markRead: (id) => `/api/notifications/${id}/read`,
+    archive: (id) => `/api/notifications/${id}/archive`,
+    generate: '/api/notifications/generate',
+  },
+
+  subscription: {
+    summary: '/api/subscription/summary',
+    seats: '/api/subscription/seats',
+    invoices: '/api/subscription/invoices',
+    invoicesPay: '/api/subscription/invoices/pay',
+    status: '/api/subscription/status',
+  },
+
+  billing: {
+    cards:       '/api/billing/cards',
+    cardVerify:  '/api/billing/cards/verify',
+    card:        (id) => `/api/billing/cards/${id}`,
+    cardDefault: (id) => `/api/billing/cards/${id}/default`,
+    manageLink:  '/api/billing/cards/manage-link',
+    status:      '/api/subscription/status',
+  },
+
+  support: {
+    tickets: '/api/support/tickets',
+    ticketComments: (id) => `/api/support/tickets/${id}/comments`,
   },
 };

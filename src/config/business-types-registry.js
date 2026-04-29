@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
     discount: 'Discount',
     shipping: 'Shipping',
     taxes: 'Taxes',
+    productionInput: 'Production input',
   },
   fields: {
     product: {
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG = {
         quantity: 'Quantity',
         price: 'Price',
         category: 'Category',
+        code: 'Barcode',
       },
     },
     service: {
@@ -48,6 +50,7 @@ const DEFAULT_CONFIG = {
     serviceManagement: 'Service Management',
     pointOfSales: 'Point of Sales',
     salesInvoice: 'Sales Invoice',
+    usageDashboard: 'Usage dashboard',
   },
 };
 
@@ -86,6 +89,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -134,6 +138,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Aisle',
+          code: 'Barcode',
         },
       },
     },
@@ -174,6 +179,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Stock',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -215,6 +221,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -264,6 +271,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -313,6 +321,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -327,6 +336,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== RESTAURANT ==========
   [createKey('Tourism & Hospitality', 'Restaurants', 'Restaurant')]: {
     terminology: {
+      productionInput: 'Ingredient',
       product: 'Menu Item',
       service: 'Service',
       invoice: 'Check',
@@ -354,6 +364,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -362,6 +373,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Order Entry',
       salesInvoice: 'Checks',
+      usageDashboard: 'Ingredient usage',
     },
   },
 
@@ -394,6 +406,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Portions',
           price: 'Menu Price',
           category: 'Menu Category',
+          code: 'Barcode',
         },
       },
       service: {
@@ -442,6 +455,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -483,6 +497,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -537,6 +552,7 @@ const BUSINESS_TYPE_CONFIGS = {
           batch_number: 'Batch Number',
           harvest_date: 'Harvest Date',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -551,6 +567,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== MANUFACTURING ==========
   [createKey('Manufacturing (Light & Heavy)', 'Food processing (flour, sugar, beverages)', 'Food manufacturing')]: {
     terminology: {
+      productionInput: 'Raw material',
       product: 'Product',
       service: 'Service',
       invoice: 'Invoice',
@@ -580,6 +597,7 @@ const BUSINESS_TYPE_CONFIGS = {
           category: 'Category',
           batch_number: 'Batch Number',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -588,6 +606,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Sales Entry',
       salesInvoice: 'Invoices',
+      usageDashboard: 'Raw material usage',
     },
   },
 
@@ -621,6 +640,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },

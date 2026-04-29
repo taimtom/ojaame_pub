@@ -21,18 +21,20 @@ import {
   FormControlLabel,
   Checkbox
 } from '@mui/material';
-import {
-  Business as BusinessIcon,
-  Category as IndustryIcon,
-  Store as StoreIcon,
-  People as TeamIcon,
-  AccountBalance as BankIcon,
-  CheckCircle as CompleteIcon
-} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+
+import axios from '../../utils/axios';
+
 import IndustrySelector from './IndustrySelector';
 import BankConnectionFlow from '../banking/BankConnectionFlow';
-import axios from '../../utils/axios';
+import { Iconify } from 'src/components/iconify';
+
+const BusinessIcon = (props) => <Iconify icon="solar:buildings-bold" width={20} {...props} />;
+const IndustryIcon = (props) => <Iconify icon="solar:tag-bold" width={20} {...props} />;
+const StoreIcon = (props) => <Iconify icon="solar:shop-bold" width={20} {...props} />;
+const TeamIcon = (props) => <Iconify icon="solar:users-group-rounded-bold" width={20} {...props} />;
+const BankIcon = (props) => <Iconify icon="solar:bank-bold" width={20} {...props} />;
+const CompleteIcon = (props) => <Iconify icon="solar:check-circle-bold" width={20} {...props} />;
 
 const STEPS = [
   'Business Information',

@@ -30,17 +30,19 @@ import {
   Select,
   Tooltip
 } from '@mui/material';
-import {
-  FilterList as FilterIcon,
-  CheckCircle as ReconciledIcon,
-  Warning as UnreconciledIcon,
-  Edit as EditIcon,
-  Link as LinkIcon,
-  Download as ExportIcon
-} from '@mui/icons-material';
-import { useCurrency } from '../../contexts/CurrencyContext';
-import axios from '../../utils/axios';
 import { format } from 'date-fns';
+
+import axios from '../../utils/axios';
+import { useCurrency } from '../../contexts/CurrencyContext';
+
+import { Iconify } from 'src/components/iconify';
+
+const FilterIcon = (props) => <Iconify icon="solar:filter-bold" width={20} {...props} />;
+const ReconciledIcon = (props) => <Iconify icon="solar:check-circle-bold" width={20} {...props} />;
+const UnreconciledIcon = (props) => <Iconify icon="solar:danger-triangle-bold" width={20} {...props} />;
+const EditIcon = (props) => <Iconify icon="solar:pen-bold" width={20} {...props} />;
+const LinkIcon = (props) => <Iconify icon="solar:link-bold" width={20} {...props} />;
+const ExportIcon = (props) => <Iconify icon="solar:download-bold" width={20} {...props} />;
 
 const TransactionList = ({ accountId = null, storeId = null }) => {
   const [transactions, setTransactions] = useState([]);

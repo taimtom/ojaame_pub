@@ -13,10 +13,9 @@ import CardHeader from '@mui/material/CardHeader';
 
 import { fNumber } from 'src/utils/format-number';
 
-import { _socials } from 'src/_mock';
 import { varAlpha } from 'src/theme/styles';
 
-import { Iconify, SocialIcon } from 'src/components/iconify';
+import { Iconify } from 'src/components/iconify';
 
 import { ProfilePostItem } from './profile-post-item';
 
@@ -137,30 +136,6 @@ export function ProfileHome({ info, posts }) {
     </Card>
   );
 
-  const renderSocials = (
-    <Card>
-      <CardHeader title="Social" />
-
-      <Stack spacing={2} sx={{ p: 3 }}>
-        {_socials.map((link) => (
-          <Stack
-            key={link.name}
-            spacing={2}
-            direction="row"
-            sx={{ wordBreak: 'break-all', typography: 'body2' }}
-          >
-            <SocialIcon icon={link.value} />
-            <Link color="inherit">
-              {link.value === 'facebook' && info.socialLinks.facebook}
-              {link.value === 'instagram' && info.socialLinks.instagram}
-              {link.value === 'linkedin' && info.socialLinks.linkedin}
-              {link.value === 'twitter' && info.socialLinks.twitter}
-            </Link>
-          </Stack>
-        ))}
-      </Stack>
-    </Card>
-  );
 
   return (
     <Grid container spacing={3}>
@@ -169,8 +144,6 @@ export function ProfileHome({ info, posts }) {
           {renderFollows}
 
           {renderAbout}
-
-          {renderSocials}
         </Stack>
       </Grid>
 

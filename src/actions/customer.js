@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR Options
@@ -16,22 +17,26 @@ const swrOptions = {
 // useGetCustomers - Fetches a list of customers for a given store.
 // The API is expected to accept a query parameter "store_id".
 // ----------------------------------------------------------------------
-export function useGetCustomers(storeId) {
-  const key = storeId ? [endpoints.customers.list, { params: { store_id: storeId } }] : null;
+export function useGetCustomers(storeId, queryParams = {}) {
+  const key = storeId ? [endpoints.customers.list, { params: { store_id: storeId, ...queryParams } }] : null;
   const { data, isLoading, error, isValidating, mutate } = useSWR(key, fetcher, {
     ...swrOptions,
     keepPreviousData: true,
   });
 
   return useMemo(
-    () => ({
-      customers: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      customers: paged.items,
+      customersPagination: paged.pagination,
       customersLoading: isLoading,
       customersError: error,
       customersValidating: isValidating,
-      customersEmpty: !isLoading && (!data || data.length === 0),
+      customersEmpty: !isLoading && paged.items.length === 0,
       refetch: mutate,
-    }),
+    };
+    },
     [data, error, isLoading, isValidating, mutate]
   );
 }
@@ -64,10 +69,10 @@ export function useGetCustomer(customerId, storeId) {
 // useSearchCustomers - Searches for customers based on a query and store ID.
 // The API is expected to accept "query" and "store_id" as query parameters.
 // ----------------------------------------------------------------------
-export function useSearchCustomers(query, storeId) {
+export function useSearchCustomers(query, storeId, queryParams = {}) {
   const key =
     query && storeId
-      ? [endpoints.customers.search, { params: { query, store_id: storeId } }]
+      ? [endpoints.customers.search, { params: { query, q: query, store_id: storeId, ...queryParams } }]
       : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
@@ -76,13 +81,17 @@ export function useSearchCustomers(query, storeId) {
   });
 
   return useMemo(
-    () => ({
-      searchResults: data?.results || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      searchResults: paged.items,
+      searchPagination: paged.pagination,
       searchLoading: isLoading,
       searchError: error,
       searchValidating: isValidating,
-      searchEmpty: !isLoading && (!data || data.results.length === 0),
-    }),
+      searchEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }

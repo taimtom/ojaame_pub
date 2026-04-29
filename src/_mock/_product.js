@@ -51,7 +51,7 @@ export const PRODUCT_STOCK_OPTIONS = [
 ];
 
 export const PRODUCT_PUBLISH_OPTIONS = [
-  { value: 'published', label: 'Published' },
+  { value: 'publish', label: 'Published' },
   { value: 'draft', label: 'Draft' },
 ];
 

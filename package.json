@@ -46,6 +46,7 @@
     "@mui/x-data-grid": "^7.7.0",
     "@mui/x-date-pickers": "^7.7.0",
     "@mui/x-tree-view": "^7.7.0",
+    "@paystack/inline-js": "^2.22.2",
     "@react-oauth/google": "^0.12.1",
     "@react-pdf/renderer": "^3.4.4",
     "@supabase/supabase-js": "^2.43.4",

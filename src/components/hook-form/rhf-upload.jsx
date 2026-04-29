@@ -1,28 +1,68 @@
+import { useState } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 
 import FormHelperText from '@mui/material/FormHelperText';
+
+import { uploadFile } from 'src/actions/upload';
+import { toast } from 'src/components/snackbar';
 
 import { Upload, UploadBox, UploadAvatar } from '../upload';
 
 // ----------------------------------------------------------------------
 
-export function RHFUploadAvatar({ name, ...other }) {
-  const { control, setValue } = useFormContext();
+export function RHFUploadAvatar({
+  name,
+  uploadImmediately = false,
+  getUploadName,
+  onUploadingChange,
+  ...other
+}) {
+  const { control, setValue, getValues } = useFormContext();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const setBusy = (v) => {
+    setUploadingAvatar(v);
+    onUploadingChange?.(v);
+  };
 
   return (
     <Controller
       name={name}
       control={control}
       render={({ field, fieldState: { error } }) => {
-        const onDrop = (acceptedFiles) => {
-          const value = acceptedFiles[0];
+        const onDrop = async (acceptedFiles) => {
+          const file = acceptedFiles[0];
+          if (!file) return;
 
-          setValue(name, value, { shouldValidate: true });
+          if (uploadImmediately) {
+            setBusy(true);
+            try {
+              const label =
+                getUploadName?.() ??
+                getValues('storeName') ??
+                getValues('companyName') ??
+                'upload';
+              const url = await uploadFile(file, label);
+              setValue(name, url, { shouldValidate: true, shouldDirty: true });
+            } catch (e) {
+              toast.error(e?.message || 'Upload failed');
+            } finally {
+              setBusy(false);
+            }
+          } else {
+            setValue(name, file, { shouldValidate: true });
+          }
         };
 
         return (
           <div>
-            <UploadAvatar value={field.value} error={!!error} onDrop={onDrop} {...other} />
+            <UploadAvatar
+              value={field.value}
+              error={!!error}
+              onDrop={onDrop}
+              disabled={other.disabled || uploadingAvatar}
+              {...other}
+            />
 
             {!!error && (
               <FormHelperText error sx={{ px: 2, textAlign: 'center' }}>

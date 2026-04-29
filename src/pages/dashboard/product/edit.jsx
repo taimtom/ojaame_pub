@@ -25,7 +25,7 @@ export default function Page() {
   // Parse the product_id to ensure it's an integer (or null if missing)
   const productId = id? parseInt(id, 10) : null;
 
-  const { product } = useGetProduct(productId, numericStoreId);
+  const { product, mutateProduct } = useGetProduct(productId, numericStoreId);
 
   const pageTitle = `Edit ${productTerm} | Dashboard - ${CONFIG.site.name}`;
 
@@ -38,6 +38,7 @@ export default function Page() {
       </Helmet>
       <ProductEditView
         product={product}
+        mutateProduct={mutateProduct}
         storeSlug={currentStoreSlug}       // For routing (keeps the friendly slug)
         storeNameSlug={storeNameSlug}        // For display in breadcrumbs
         storeId={numericStoreId}             // For API operations

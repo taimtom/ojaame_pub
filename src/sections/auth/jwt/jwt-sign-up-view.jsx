@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isValidPhoneNumber } from 'react-phone-number-input/input';
@@ -26,6 +26,7 @@ import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
 import { signUp } from 'src/auth/context/jwt';
 import { useAuthContext } from 'src/auth/hooks';
+import { getGoogleAuthRedirectUrl, getGoogleClientId } from 'src/utils/google-auth-env';
 
 // ----------------------------------------------------------------------
 
@@ -46,6 +47,7 @@ export const SignUpSchema = zod
       .regex(/(?=.*\d)/, { message: 'Password must contain at least one number!' })
       .regex(/(?=.*[!@#$%^&*(),.?":{}|<>])/, { message: 'Password must contain at least one special character!' }),
     re_password: zod.string().min(1, { message: 'Re-entering your password is required!' }),
+    referral_code_used: zod.string().optional(),
   })
   .refine(data => data.password === data.re_password, {
     message: 'Passwords must match!',
@@ -61,6 +63,8 @@ export function JwtSignUpView() {
   const rePasswordToggle = useBoolean();
   const [errorMsg, setErrorMsg] = useState('');
 
+  const storedReferralCode = localStorage.getItem('referral_agent_code') || '';
+
   const methods = useForm({
     resolver: zodResolver(SignUpSchema),
     defaultValues: {
@@ -70,8 +74,17 @@ export function JwtSignUpView() {
       phoneNumber: '',
       password: '',
       re_password: '',
+      referral_code_used: storedReferralCode,
     },
   });
+
+  // Clear stored referral code after it's been picked up by the form
+  useEffect(() => {
+    if (storedReferralCode) {
+      localStorage.removeItem('referral_agent_code');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { handleSubmit, watch, formState: { isSubmitting } } = methods;
   const passwordValue = watch('password') || '';
@@ -93,6 +106,7 @@ export function JwtSignUpView() {
         lastName: errData.lastName,
         phoneNumber: errData.phoneNumber,
         re_password: errData.re_password,
+        referral_code_used: errData.referral_code_used || undefined,
       });
 
       await checkUserSession();
@@ -194,6 +208,14 @@ export function JwtSignUpView() {
             ) }}
           />
 
+          <Field.Text
+            name="referral_code_used"
+            label="Referral Code (optional)"
+            placeholder="e.g. emma2345"
+            InputLabelProps={{ shrink: true }}
+            helperText="If someone referred you, enter their code here"
+          />
+
           <LoadingButton fullWidth color="inherit" size="large" type="submit" variant="contained" loading={isSubmitting} loadingIndicator="Create account...">
             Create account
           </LoadingButton>
@@ -205,11 +227,18 @@ export function JwtSignUpView() {
           fullWidth
           variant="outlined"
           onClick={() => {
-            const GOOGLE_CLIENT_ID = '181864963042-iu9uubcbthf2tncerkarlnp4ehepk7cr.apps.googleusercontent.com';
-            const redirectUri = encodeURIComponent('http://localhost:3030/auth/google');
+            const clientId = getGoogleClientId();
+            const redirectUrl = getGoogleAuthRedirectUrl();
+            if (!clientId || !redirectUrl) {
+              toast.error(
+                'Google sign-up is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URL in your .env file.'
+              );
+              return;
+            }
+            const redirectUri = encodeURIComponent(redirectUrl);
             const scope = encodeURIComponent('openid email profile');
             const nonce = Math.random().toString(36).substring(2);
-            window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+            window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
           }}
           startIcon={<Iconify icon="logos:google-icon" width={20} height={20} />}
           sx={{ textTransform: 'none', py: 1.5, borderRadius: 3, fontWeight: 600, boxShadow: 1, borderColor: 'grey.300', bgcolor: 'background.paper', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { boxShadow: 4, transform: 'translateY(-2px)', bgcolor: 'grey.50' } }}
@@ -217,6 +246,25 @@ export function JwtSignUpView() {
 
         <Typography component="div" sx={{ mt: 3, textAlign: 'center', typography: 'caption', color: 'text.secondary' }}>
           By signing up, I agree to <Link underline="always" color="text.primary">Terms of service</Link> and <Link underline="always" color="text.primary">Privacy policy</Link>.
+        </Typography>
+
+        <Typography
+          variant="caption"
+          align="center"
+          display="block"
+          mt={2}
+          color="text.disabled"
+        >
+          Joining as a referral agent?{' '}
+          <Link
+            component={RouterLink}
+            to="/agent/signup"
+            variant="caption"
+            color="text.secondary"
+            underline="hover"
+          >
+            Agent sign up
+          </Link>
         </Typography>
       </Stack>
     </>

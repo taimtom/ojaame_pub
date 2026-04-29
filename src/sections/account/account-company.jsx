@@ -16,7 +16,6 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
 
 import { fData } from 'src/utils/format-number';
 
@@ -42,7 +41,6 @@ export const UpdateCompanySchema = zod.object({
 });
 
 export function AccountCompany() {
-  const router = useRouter();
   const { user } = useAuthContext();
   // Skip fetching if user has no company_id
   const skipFetch = user?.company_id == null;
@@ -55,6 +53,7 @@ export function AccountCompany() {
   } = useCompany({ skip: skipFetch });
 
   const [companyLogoUrlInput, setCompanyLogoUrlInput] = useState('');
+  const [companyLogoUploading, setCompanyLogoUploading] = useState(false);
   const isInitialLoad = useRef(true);
 
   const methods = useForm({
@@ -296,7 +295,12 @@ export function AccountCompany() {
             </Box>
 
             <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              <LoadingButton
+                type="submit"
+                variant="contained"
+                loading={isSubmitting || companyLogoUploading}
+                disabled={companyLogoUploading}
+              >
                 {company && company.id ? 'Update Company' : 'Create Company'}
               </LoadingButton>
             </Stack>

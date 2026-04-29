@@ -7,6 +7,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AuthGuard } from 'src/auth/guard';
+import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 
 
 // ----------------------------------------------------------------------
@@ -15,6 +16,7 @@ import { AuthGuard } from 'src/auth/guard';
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
 const OverviewEcommercePage = lazy(() => import('src/pages/dashboard/ecommerce'));
 const OverviewAnalyticsPage = lazy(() => import('src/pages/dashboard/analytics'));
@@ -34,6 +36,8 @@ const ProductListPage = lazy(() => import('src/pages/dashboard/product/list'));
 const ProductCreatePage = lazy(() => import('src/pages/dashboard/product/new'));
 const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const ProductAddQuantityPage = lazy(() => import('src/pages/dashboard/product/addqty'));
+const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/adjust'));
+const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/change-price'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
 
@@ -58,6 +62,7 @@ const PaymentMethodEditPage = lazy(() => import('src/pages/dashboard/payment-met
 const ServiceListPage = lazy(() => import('src/pages/dashboard/service/list'));
 const ServiceCreatePage = lazy(() => import('src/pages/dashboard/service/new'));
 const ServiceEditPage = lazy(() => import('src/pages/dashboard/service/edit'));
+const ServiceDetailsPage = lazy(() => import('src/pages/dashboard/service/details'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
@@ -149,13 +154,28 @@ const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 // Store website settings
 const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/website'));
 
+// Notifications
+const NotificationsPage = lazy(() => import('src/pages/dashboard/notifications'));
+const HelpSupportPage = lazy(() => import('src/pages/dashboard/help-support'));
+
+// Reports
+const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/store-general'));
+const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
+const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
+const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
+const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
+const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
+const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
+
 // ----------------------------------------------------------------------
 
 const layoutContent = (
   <DashboardLayout>
-    <Suspense fallback={<LoadingScreen />}>
-      <Outlet />
-    </Suspense>
+    <SubscriptionGuard>
+      <Suspense fallback={<LoadingScreen />}>
+        <Outlet />
+      </Suspense>
+    </SubscriptionGuard>
   </DashboardLayout>
 );
 
@@ -166,6 +186,9 @@ export const dashboardRoutes = [
     children: [
       { path: 'analytics', element: <OverviewAnalyticsPage /> },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'usage-dashboard', element: <UsageDashboardPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'help-support', element: <HelpSupportPage /> },
 
       { index: true, element: <DashboardRootRedirect /> },
       {
@@ -185,6 +208,8 @@ export const dashboardRoutes = [
             { path: 'new', element: <ProductCreatePage /> },
             { path: ':id/edit', element: <ProductEditPage /> },
             { path: ':id/addqty', element: <ProductAddQuantityPage /> },
+            { path: ':id/adjust', element: <ProductAdjustStockPage /> },
+            { path: ':id/change-price', element: <ProductChangePricePage /> },
           ],
         },
         {
@@ -201,6 +226,7 @@ export const dashboardRoutes = [
             { index: true, element: <ServiceListPage /> },
             { path: 'list', element: <ServiceListPage /> },
             { path: 'new', element: <ServiceCreatePage /> },
+            { path: ':id', element: <ServiceDetailsPage /> },
             { path: ':id/edit', element: <ServiceEditPage /> },
           ],
         },
@@ -253,6 +279,18 @@ export const dashboardRoutes = [
             { path: 'list', element: <PaymentMethodListPage /> },
             { path: 'new', element: <PaymentMethodCreatePage /> },
             { path: ':id/edit', element: <PaymentMethodEditPage /> },
+          ],
+        },
+        {
+          path: 'reports',
+          children: [
+            { index: true, element: <StoreGeneralReportPage /> },
+            { path: 'general', element: <StoreGeneralReportPage /> },
+            { path: 'inventory', element: <StoreInventoryReportPage /> },
+            { path: 'financial', element: <StoreFinancialReportPage /> },
+            { path: 'profit-loss', element: <StoreProfitLossReportPage /> },
+            { path: 'sales-trends', element: <StoreSalesTrendsReportPage /> },
+            { path: 'end-of-day', element: <EndOfDayReportPage /> },
           ],
         },
       ],
@@ -389,6 +427,7 @@ export const dashboardRoutes = [
               { path: ':id/edit', element: <TourEditPage /> },
             ],
           },
+          { path: 'company-reports', element: <CompanyReportsPage /> },
           { path: 'file-manager', element: <FileManagerPage /> },
           { path: 'mail', element: <MailPage /> },
           { path: 'chat', element: <ChatPage /> },

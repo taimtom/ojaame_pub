@@ -31,12 +31,19 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
 
   const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
 
+  // The owner (merchant) account is protected — cannot be deleted
+  const isOwner = row.role === 'merchant';
+
   return (
     <>
       <TableRow hover selected={selected} aria-checked={selected} tabIndex={-1}>
         <TableCell padding="checkbox">
-          {/* Convert row.user_id to string */}
-          <Checkbox id={`${row.user_id}`} checked={selected} onClick={onSelectRow} />
+          <Checkbox
+            id={`${row.user_id}`}
+            checked={selected}
+            onClick={onSelectRow}
+            disabled={isOwner}
+          />
         </TableCell>
 
         <TableCell>
@@ -103,16 +110,18 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          <MenuItem
-            onClick={() => {
-              confirm.onTrue();
-              popover.onClose();
-            }}
-            sx={{ color: 'error.main' }}
-          >
-            <Iconify icon="solar:trash-bin-trash-bold" />
-            Delete
-          </MenuItem>
+          {!isOwner && (
+            <MenuItem
+              onClick={() => {
+                confirm.onTrue();
+                popover.onClose();
+              }}
+              sx={{ color: 'error.main' }}
+            >
+              <Iconify icon="solar:trash-bin-trash-bold" />
+              Delete
+            </MenuItem>
+          )}
 
           <MenuItem
             onClick={() => {

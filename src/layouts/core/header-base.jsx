@@ -143,7 +143,7 @@ export function HeaderBase({
 
               {/* -- Notifications popover -- */}
               {notifications && (
-                <NotificationsDrawer data-slot="notifications" data={data?.notifications} />
+                <NotificationsDrawer data-slot="notifications" />
               )}
 
               {/* -- Contacts popover -- */}

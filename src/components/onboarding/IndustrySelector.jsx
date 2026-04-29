@@ -14,16 +14,16 @@ import {
   Chip,
   Stack
 } from '@mui/material';
-import {
-  School as EducationIcon,
-  Restaurant as RestaurantIcon,
-  Store as RetailIcon,
-  LocalHospital as HealthcareIcon,
-  Build as ServicesIcon,
-  Inventory as WholesaleIcon,
-  AccountBalance as FinanceIcon,
-  FitnessCenter as FitnessIcon
-} from '@mui/icons-material';
+import { Iconify } from 'src/components/iconify';
+
+const EducationIcon = () => <Iconify icon="solar:book-bold" width={24} />;
+const RestaurantIcon = () => <Iconify icon="solar:chef-hat-bold" width={24} />;
+const RetailIcon = () => <Iconify icon="solar:shop-bold" width={24} />;
+const HealthcareIcon = () => <Iconify icon="solar:hospital-bold" width={24} />;
+const ServicesIcon = () => <Iconify icon="solar:settings-bold" width={24} />;
+const WholesaleIcon = () => <Iconify icon="solar:box-bold" width={24} />;
+const FinanceIcon = () => <Iconify icon="solar:bank-bold" width={24} />;
+const FitnessIcon = () => <Iconify icon="solar:dumbbell-bold" width={24} />;
 
 const INDUSTRY_TEMPLATES = [
   {
