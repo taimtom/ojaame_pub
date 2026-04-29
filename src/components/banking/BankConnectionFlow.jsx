@@ -20,14 +20,16 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import {
-  AccountBalance as BankIcon,
-  Public as InternationalIcon,
-  LocationOn as AfricaIcon,
-  CheckCircle as SuccessIcon
-} from '@mui/icons-material';
 import { usePlaidLink } from 'react-plaid-link';
+
 import axios from '../../utils/axios';
+
+import { Iconify } from 'src/components/iconify';
+
+const BankIcon = (props) => <Iconify icon="solar:bank-bold" width={20} {...props} />;
+const InternationalIcon = (props) => <Iconify icon="solar:global-bold" width={20} {...props} />;
+const AfricaIcon = (props) => <Iconify icon="solar:map-point-bold" width={20} {...props} />;
+const SuccessIcon = (props) => <Iconify icon="solar:check-circle-bold" width={20} {...props} />;
 
 const BankConnectionFlow = ({ open, onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState(0); // 0: International, 1: African

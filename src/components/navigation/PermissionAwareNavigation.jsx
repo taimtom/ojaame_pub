@@ -19,18 +19,18 @@ import {
   Typography,
   Collapse
 } from '@mui/material';
-import {
-  Dashboard as DashboardIcon,
-  PointOfSale as POSIcon,
-  Inventory as InventoryIcon,
-  People as PeopleIcon,
-  AccountBalance as BankIcon,
-  Assessment as ReportsIcon,
-  Settings as SettingsIcon,
-  Store as StoreIcon,
-  ExpandLess,
-  ExpandMore
-} from '@mui/icons-material';
+import { Iconify } from 'src/components/iconify';
+
+const DashboardIcon = (props) => <Iconify icon="solar:widget-bold" width={20} {...props} />;
+const POSIcon = (props) => <Iconify icon="solar:point-of-sale-bold" width={20} {...props} />;
+const InventoryIcon = (props) => <Iconify icon="solar:box-bold" width={20} {...props} />;
+const PeopleIcon = (props) => <Iconify icon="solar:users-group-rounded-bold" width={20} {...props} />;
+const BankIcon = (props) => <Iconify icon="solar:bank-bold" width={20} {...props} />;
+const ReportsIcon = (props) => <Iconify icon="solar:chart-bold" width={20} {...props} />;
+const SettingsIcon = (props) => <Iconify icon="solar:settings-bold" width={20} {...props} />;
+const StoreIcon = (props) => <Iconify icon="solar:shop-bold" width={20} {...props} />;
+const ExpandLess = (props) => <Iconify icon="solar:alt-arrow-up-bold" width={20} {...props} />;
+const ExpandMore = (props) => <Iconify icon="solar:alt-arrow-down-bold" width={20} {...props} />;
 
 const NAVIGATION_ITEMS = [
   {

@@ -171,6 +171,24 @@ export async function editProduct(productId, productData) {
   }
 }
 
+/**
+ * publishProduct - Updates only the publish status of a product.
+ *
+ * @param {number|string} productId - The ID of the product.
+ * @param {string} publish - Either 'publish' or 'draft'.
+ * @returns {Promise<Object>}
+ */
+export async function publishProduct(productId, publish) {
+  try {
+    const url = `${endpoints.product.publish}/${productId}`;
+    const response = await axiosInstance.patch(url, { publish });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating product publish status:', error);
+    throw error;
+  }
+}
+
 export async function changeProductPrice(productId, priceData) {
   try {
     const url = `${endpoints.product.changePrice}/${productId}`;

@@ -17,7 +17,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Iconify } from 'src/components/iconify';
 import ReactApexChart from 'react-apexcharts';
 import { agentApi } from 'src/lib/agentApi';
 
@@ -56,7 +56,7 @@ export default function AgentBusinessDetailPage() {
   return (
     <Box>
       <Button
-        startIcon={<ArrowBackIcon fontSize="small" />}
+        startIcon={<Iconify icon="solar:arrow-left-bold" width={20} />}
         onClick={() => navigate('/agent/businesses')}
         sx={{ mb: 2 }}
       >

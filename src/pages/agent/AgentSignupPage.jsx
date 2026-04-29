@@ -14,8 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Iconify } from 'src/components/iconify';
 import { useAgentAuth } from 'src/contexts/AgentAuthContext';
 
 export default function AgentSignupPage() {
@@ -137,7 +136,7 @@ export default function AgentSignupPage() {
                         edge="end"
                         size="small"
                       >
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        {showPassword ? <Iconify icon="solar:eye-closed-bold" width={20} /> : <Iconify icon="solar:eye-bold" width={20} />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -161,7 +160,7 @@ export default function AgentSignupPage() {
                         edge="end"
                         size="small"
                       >
-                        {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        {showConfirmPassword ? <Iconify icon="solar:eye-closed-bold" width={20} /> : <Iconify icon="solar:eye-bold" width={20} />}
                       </IconButton>
                     </InputAdornment>
                   ),

@@ -18,7 +18,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { Iconify } from 'src/components/iconify';
 import { agentApi } from 'src/lib/agentApi';
 
 function StatCard({ title, value, subtitle, color }) {
@@ -128,8 +128,8 @@ export default function AgentDashboardPage() {
               {referralLink}
             </Typography>
             <Tooltip title={copied ? 'Copied!' : 'Copy link'}>
-              <IconButton onClick={handleCopy} size="small" color={copied ? 'success' : 'default'}>
-                <ContentCopyIcon fontSize="small" />
+                <IconButton onClick={handleCopy} size="small" color={copied ? 'success' : 'default'}>
+                <Iconify icon="solar:copy-bold" width={18} />
               </IconButton>
             </Tooltip>
           </Stack>

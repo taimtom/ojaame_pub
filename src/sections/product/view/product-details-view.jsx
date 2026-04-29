@@ -28,7 +28,7 @@ import { Chart, useChart } from 'src/components/chart';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
-import { useGetProductMovements, useGetProductSalesHistory } from 'src/actions/product';
+import { useGetProductMovements, useGetProductSalesHistory, publishProduct } from 'src/actions/product';
 
 import { ProductDetailsSkeleton } from '../product-skeleton';
 import { ProductDetailsToolbar } from '../product-details-toolbar';
@@ -172,9 +172,17 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
     if (product) setPublish(product?.publish);
   }, [product]);
 
-  const handleChangePublish = useCallback((newValue) => {
-    setPublish(newValue);
-  }, []);
+  const handleChangePublish = useCallback(
+    async (newValue) => {
+      try {
+        await publishProduct(product?.id, newValue);
+        setPublish(newValue);
+      } catch (err) {
+        console.error('Failed to update publish status:', err);
+      }
+    },
+    [product?.id]
+  );
 
   const PURCHASE_STATUSES = ['received', 'adjust', 'stock edited'];
 

@@ -17,7 +17,7 @@ import { Iconify } from 'src/components/iconify';
 const PRICING_COMPONENTS = [
   {
     title: 'Base subscription',
-    price: '₦1,000',
+    price: '₦3,000',
     period: 'per month',
     description: 'Core monthly company subscription.',
     features: [
@@ -27,12 +27,12 @@ const PRICING_COMPONENTS = [
   },
   {
     title: 'Additional store',
-    price: '₦1,000',
+    price: '₦3,000',
     period: 'per month',
     description: 'Charged for each store after your first store.',
     features: [
       'First store has no store fee',
-      'Each extra store adds ₦1,000/month',
+      'Each extra store adds ₦3,000/month',
     ],
   },
   {
@@ -51,14 +51,14 @@ const EXAMPLES = [
   {
     name: 'Example A',
     details: '1 store, 1 seat in that store',
-    total: '₦1,000/month',
-    formula: 'Base ₦1,000 + Store fees ₦0 + Extra seats ₦0',
+    total: '₦3,000/month',
+    formula: 'Base ₦3,000 + Store fees ₦0 + Extra seats ₦0',
   },
   {
     name: 'Example B',
     details: '2 stores, 2 seats in first store, 1 seat in second store',
-    total: '₦3,000/month',
-    formula: 'Base ₦1,000 + 1 extra store ₦1,000 + 1 extra seat ₦1,000',
+    total: '₦7,000/month',
+    formula: 'Base ₦3,000 + 1 extra store ₦3,000 + 1 extra seat ₦1,000',
   },
 ];
 

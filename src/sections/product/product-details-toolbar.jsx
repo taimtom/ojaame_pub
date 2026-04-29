@@ -42,7 +42,7 @@ export function ProductDetailsToolbar({
 
         <Box sx={{ flexGrow: 1 }} />
 
-        {publish === 'published' && (
+        {publish === 'publish' && (
           <Tooltip title="Go Live">
             <IconButton component={RouterLink} href={liveLink}>
               <Iconify icon="eva:external-link-fill" />
@@ -120,7 +120,7 @@ export function ProductDetailsToolbar({
                 onChangePublish(option.value);
               }}
             >
-              {option.value === 'published' && <Iconify icon="eva:cloud-upload-fill" />}
+              {option.value === 'publish' && <Iconify icon="eva:cloud-upload-fill" />}
               {option.value === 'draft' && <Iconify icon="solar:file-text-bold" />}
               {option.label}
             </MenuItem>

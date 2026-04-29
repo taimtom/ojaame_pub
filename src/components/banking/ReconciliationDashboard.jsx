@@ -27,15 +27,17 @@ import {
   ListItemText,
   Divider
 } from '@mui/material';
-import {
-  AutoFixHigh as AutoIcon,
-  Link as LinkIcon,
-  CheckCircle as MatchedIcon,
-  Warning as UnmatchedIcon
-} from '@mui/icons-material';
-import { useCurrency } from '../../contexts/CurrencyContext';
-import axios from '../../utils/axios';
 import { format } from 'date-fns';
+
+import axios from '../../utils/axios';
+import { useCurrency } from '../../contexts/CurrencyContext';
+
+import { Iconify } from 'src/components/iconify';
+
+const AutoIcon = (props) => <Iconify icon="solar:magic-stick-bold" width={20} {...props} />;
+const LinkIcon = (props) => <Iconify icon="solar:link-bold" width={20} {...props} />;
+const MatchedIcon = (props) => <Iconify icon="solar:check-circle-bold" width={20} {...props} />;
+const UnmatchedIcon = (props) => <Iconify icon="solar:danger-triangle-bold" width={20} {...props} />;
 
 const ReconciliationDashboard = () => {
   const [loading, setLoading] = useState(false);

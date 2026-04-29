@@ -123,6 +123,7 @@ export const endpoints = {
     movement: '/api/product/movement',
     salesHistory: '/api/product/sales-history',
     usage: '/api/product/usage',
+    publish: '/api/product/publish',
   },
   shop: {
     list: '/api/product/list',

@@ -21,10 +21,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Iconify } from 'src/components/iconify';
 import { agentApi } from 'src/lib/agentApi';
 import { useAgentAuth } from 'src/contexts/AgentAuthContext';
 
@@ -119,7 +116,7 @@ export default function AgentSettingsPage() {
               Bank Accounts
             </Typography>
             <Button
-              startIcon={<AddIcon fontSize="small" />}
+              startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
               size="small"
               variant="outlined"
               onClick={() => setDialogOpen(true)}
@@ -160,9 +157,9 @@ export default function AgentSettingsPage() {
                     <TableCell>{a.account_name}</TableCell>
                     <TableCell>
                       {a.is_default ? (
-                        <StarIcon fontSize="small" sx={{ color: 'warning.main' }} />
+                        <Iconify icon="solar:star-bold" width={20} sx={{ color: 'warning.main' }} />
                       ) : (
-                        <StarBorderIcon fontSize="small" sx={{ color: 'action.disabled' }} />
+                        <Iconify icon="solar:star-outline" width={20} sx={{ color: 'action.disabled' }} />
                       )}
                     </TableCell>
                     <TableCell>
@@ -172,7 +169,7 @@ export default function AgentSettingsPage() {
                           color="error"
                           onClick={() => handleDelete(a.id)}
                         >
-                          <DeleteIcon fontSize="small" />
+                          <Iconify icon="solar:trash-bin-trash-bold" width={20} />
                         </IconButton>
                       </Tooltip>
                     </TableCell>

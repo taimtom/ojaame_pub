@@ -11,21 +11,17 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import BusinessIcon from '@mui/icons-material/Business';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import SettingsIcon from '@mui/icons-material/Settings';
+import { Iconify } from 'src/components/iconify';
 import { useAgentAuth } from 'src/contexts/AgentAuthContext';
 
 const DRAWER_WIDTH = 240;
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/agent/dashboard', icon: <DashboardIcon /> },
-  { label: 'Businesses', path: '/agent/businesses', icon: <BusinessIcon /> },
-  { label: 'Earnings', path: '/agent/earnings', icon: <AttachMoneyIcon /> },
-  { label: 'Withdrawals', path: '/agent/withdrawals', icon: <AccountBalanceWalletIcon /> },
-  { label: 'Settings', path: '/agent/settings', icon: <SettingsIcon /> },
+  { label: 'Dashboard', path: '/agent/dashboard', icon: 'solar:widget-bold' },
+  { label: 'Businesses', path: '/agent/businesses', icon: 'solar:buildings-bold' },
+  { label: 'Earnings', path: '/agent/earnings', icon: 'solar:dollar-minimalistic-bold' },
+  { label: 'Withdrawals', path: '/agent/withdrawals', icon: 'solar:wallet-bold' },
+  { label: 'Settings', path: '/agent/settings', icon: 'solar:settings-bold' },
 ];
 
 export default function AgentLayout() {
@@ -77,7 +73,7 @@ export default function AgentLayout() {
                   '&.active': { bgcolor: 'primary.lighter', color: 'primary.main' },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 36 }}><Iconify icon={item.icon} width={20} /></ListItemIcon>
                 <ListItemText primary={item.label} />
               </ListItemButton>
             ))}

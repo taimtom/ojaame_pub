@@ -26,7 +26,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import { Iconify } from 'src/components/iconify';
 import { agentApi } from 'src/lib/agentApi';
 
 function formatNaira(v) {
@@ -107,7 +107,7 @@ export default function AgentWithdrawalsPage() {
         </Typography>
         <Button
           variant="contained"
-          startIcon={<AccountBalanceWalletIcon fontSize="small" />}
+          startIcon={<Iconify icon="solar:wallet-bold" width={20} />}
           onClick={() => setDialogOpen(true)}
           disabled={wData.balance <= 0}
         >
