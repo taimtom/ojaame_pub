@@ -24,7 +24,17 @@ export default defineConfig({
       },
     }),
   ],
+  optimizeDeps: {
+    include: [
+      '@emotion/react',
+      '@emotion/styled',
+      '@mui/material',
+      '@mui/system',
+      '@mui/system/createTheme',
+    ],
+  },
   resolve: {
+    dedupe: ['@mui/material', '@mui/system', '@emotion/react', '@emotion/styled'],
     alias: [
       {
         find: /^~(.+)/,

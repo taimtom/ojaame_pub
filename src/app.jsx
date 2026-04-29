@@ -23,6 +23,7 @@ import { CheckoutProvider } from 'src/sections/checkout/context';
 
 import { BusinessTypeProvider } from 'src/contexts/business-type-context';
 import { CurrencyProvider } from 'src/contexts/CurrencyContext';
+import { AgentAuthProvider } from 'src/contexts/AgentAuthContext';
 
 import { AuthProvider as JwtAuthProvider } from 'src/auth/context/jwt';
 import { AuthProvider as Auth0AuthProvider } from 'src/auth/context/auth0';
@@ -46,6 +47,7 @@ export default function App() {
     <GoogleOAuthProvider clientId={getGoogleClientId()}>
       <I18nProvider>
         <LocalizationProvider>
+          <AgentAuthProvider>
           <AuthProvider>
             <CurrencyProvider>
             <BusinessTypeProvider>
@@ -64,6 +66,7 @@ export default function App() {
             </BusinessTypeProvider>
             </CurrencyProvider>
           </AuthProvider>
+          </AgentAuthProvider>
         </LocalizationProvider>
       </I18nProvider>
     </GoogleOAuthProvider>

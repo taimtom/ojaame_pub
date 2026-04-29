@@ -237,6 +237,25 @@ export function JwtSignInView() {
 
       {/* Google Sign In Button */}
       {renderGoogleSignIn}
+
+      <Typography
+        variant="caption"
+        align="center"
+        display="block"
+        mt={3}
+        color="text.disabled"
+      >
+        Are you a referral agent?{' '}
+        <Link
+          component={RouterLink}
+          to="/agent/login"
+          variant="caption"
+          color="text.secondary"
+          underline="hover"
+        >
+          Agent sign in
+        </Link>
+      </Typography>
     </>
   );
 }

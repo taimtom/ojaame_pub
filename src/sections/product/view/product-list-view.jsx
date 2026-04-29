@@ -91,9 +91,20 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
   const productTerm = t('product');
 
 
-  const { products, productsLoading } = useGetProducts(numericStoreId);
-
   const filters = useSetState({ publish: [], stock: [] });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [sortModel, setSortModel] = useState([{ field: 'createdAt', sort: 'desc' }]);
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] });
+  const quickSearch = (filterModel.quickFilterValues || []).join(' ').trim();
+  const { products, productsLoading, productsPagination } = useGetProducts(numericStoreId, {
+    skip: paginationModel.page * paginationModel.pageSize,
+    limit: paginationModel.pageSize,
+    q: quickSearch || undefined,
+    publish: filters?.state?.publish?.[0],
+    inventory_type: filters?.state?.stock?.[0],
+    sort_by: sortModel[0]?.field || 'createdAt',
+    sort_dir: sortModel[0]?.sort || 'desc',
+  });
 
   const [tableData, setTableData] = useState([]);
 
@@ -104,14 +115,12 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
   const [columnVisibilityModel, setColumnVisibilityModel] = useState(HIDE_COLUMNS);
 
   useEffect(() => {
-    if (products.length) {
-      setTableData(products);
-    }
+    setTableData(products || []);
   }, [products]);
 
   const canReset = filters.state.publish.length > 0 || filters.state.stock.length > 0;
 
-  const dataFiltered = applyFilter({ inputData: tableData, filters: filters.state });
+  const dataFiltered = tableData;
 
   const handleDeleteRow = useCallback(
     (id) => {
@@ -328,8 +337,18 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
             rows={dataFiltered}
             columns={columns}
             loading={productsLoading}
+            paginationMode="server"
+            sortingMode="server"
+            filterMode="server"
+            rowCount={productsPagination?.total || 0}
             getRowHeight={() => 'auto'}
             pageSizeOptions={[5, 10, 25]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            filterModel={filterModel}
+            onFilterModelChange={setFilterModel}
             initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
             onRowSelectionModelChange={(newSelectionModel) => setSelectedRowIds(newSelectionModel)}
             columnVisibilityModel={columnVisibilityModel}

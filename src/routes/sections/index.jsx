@@ -13,6 +13,9 @@ import { mainRoutes } from './main';
 import { authDemoRoutes } from './auth-demo';
 import { dashboardRoutes } from './dashboard';
 import { componentsRoutes } from './components';
+import { agentRoutes } from './agent';
+
+const ReferralRedirectPage = lazy(() => import('src/pages/ReferralRedirectPage'));
 
 // ----------------------------------------------------------------------
 
@@ -48,11 +51,24 @@ export function Router() {
     // App routes
     ...appRoutes,
 
+    // Agent portal
+    ...agentRoutes,
+
     // Main
     ...mainRoutes,
 
     // Components
     ...componentsRoutes,
+
+    // Referral agent link redirect
+    {
+      path: 'ref/:agentCode',
+      element: (
+        <Suspense fallback={<SplashScreen />}>
+          <ReferralRedirectPage />
+        </Suspense>
+      ),
+    },
 
     // No match
     { path: '*', element: <Navigate to="/404" replace /> },

@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance,{ fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 
@@ -19,8 +20,10 @@ const swrOptions = {
  */
 
 // ----------------------------------------------------------------------
-export function useGetProducts(storeId) {
-  const key = storeId ? [endpoints.product.list, { params: { store_id: storeId } }] : null;
+export function useGetProducts(storeId, queryParams = {}) {
+  const key = storeId
+    ? [endpoints.product.list, { params: { store_id: storeId, ...queryParams } }]
+    : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
     ...swrOptions,
@@ -28,13 +31,17 @@ export function useGetProducts(storeId) {
   });
 
   const memoizedValue = useMemo(
-    () => ({
-      products: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      products: paged.items,
+      productsPagination: paged.pagination,
       productsLoading: isLoading,
       productsError: error,
       productsValidating: isValidating,
-      productsEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      productsEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 
@@ -105,20 +112,26 @@ export function useSearchProducts(query, storeId) {
  * The URL is built using only the store_id parameter:
  *   /api/product/history?store_id=STORE_ID
  */
-export function useGetProductHistories(storeId) {
+export function useGetProductHistories(storeId, queryParams = {}) {
   // const key = storeId ? `/api/product/history?store_id=${storeId}` : null;
-  const key = storeId ? [endpoints.product.history, { params: { store_id: storeId } }] : null;
+  const key = storeId
+    ? [endpoints.product.history, { params: { store_id: storeId, ...queryParams } }]
+    : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      productHistories: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      productHistories: paged.items,
+      productHistoriesPagination: paged.pagination,
       productHistoriesLoading: isLoading,
       productHistoriesError: error,
       productHistoriesValidating: isValidating,
-      productHistoriesEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      productHistoriesEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }
@@ -235,42 +248,50 @@ export async function recordProductUsage(productId, { store_id, quantity, descri
  * @param {string | number} productId - The ID of the product.
  * @returns {object} - An object containing the product movement list and loading/error states.
  */
-export function useGetProductSalesHistory(storeId, productId) {
+export function useGetProductSalesHistory(storeId, productId, queryParams = {}) {
   const key =
     storeId && productId
-      ? [endpoints.product.salesHistory, { params: { store_id: storeId, product_id: productId } }]
+      ? [endpoints.product.salesHistory, { params: { store_id: storeId, product_id: productId, ...queryParams } }]
       : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      productSalesHistory: Array.isArray(data) ? data : [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      productSalesHistory: paged.items,
+      productSalesHistoryPagination: paged.pagination,
       productSalesHistoryLoading: isLoading,
       productSalesHistoryError: error,
       productSalesHistoryValidating: isValidating,
-    }),
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }
 
-export function useGetProductMovements(storeId, productId) {
+export function useGetProductMovements(storeId, productId, queryParams = {}) {
   // Build the SWR key only if both storeId and productId are provided.
   const key =
     storeId && productId
-      ? [endpoints.product.movement, { params: { store_id: storeId, product_id: productId } }]
+      ? [endpoints.product.movement, { params: { store_id: storeId, product_id: productId, ...queryParams } }]
       : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      productMovements: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      productMovements: paged.items,
+      productMovementsPagination: paged.pagination,
       productMovementsLoading: isLoading,
       productMovementsError: error,
       productMovementsValidating: isValidating,
-      productMovementsEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      productMovementsEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }

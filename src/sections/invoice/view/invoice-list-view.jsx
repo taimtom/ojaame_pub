@@ -101,8 +101,6 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
   const storeSlug = getStoreSlug(propStoreSlug, storeParam);
   const numericStoreId = storeSlug.split('-').pop();
 
-  const { sales, salesLoading, salesError, salesEmpty } = useGetSales(numericStoreId);
-
   const table = useTable({ defaultOrderBy: 'create_date', defaultOrder: 'desc' });
 
   const confirm = useBoolean();
@@ -119,20 +117,26 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
 
   const dateError = fIsAfter(filters.state.startDate, filters.state.endDate);
 
+  const { sales, salesLoading, salesPagination } = useGetSales(numericStoreId, {
+    skip: table.page * table.rowsPerPage,
+    limit: table.rowsPerPage,
+    q: filters.state.name || undefined,
+    status_filter: filters.state.status !== 'all' ? filters.state.status : undefined,
+    start_date: filters.state.startDate || undefined,
+    end_date: filters.state.endDate || undefined,
+    sort_by: table.orderBy || 'create_date',
+    sort_dir: table.order || 'desc',
+  });
+
   useEffect(() => {
     if (sales) {
       setTableData(sales);
     }
   }, [sales]);
 
-  const dataFiltered = applyFilter({
-    inputData: tableData,
-    comparator: getComparator(table.order, table.orderBy),
-    filters: filters.state,
-    dateError,
-  });
+  const dataFiltered = tableData;
 
-  const dataInPage = rowInPage(dataFiltered, table.page, table.rowsPerPage);
+  const dataInPage = dataFiltered;
 
   const canReset =
     !!filters.state.name ||
@@ -457,12 +461,7 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
                 />
 
                 <TableBody>
-                  {dataFiltered
-                    .slice(
-                      table.page * table.rowsPerPage,
-                      table.page * table.rowsPerPage + table.rowsPerPage
-                    )
-                    .map((row) => (
+                  {dataFiltered.map((row) => (
                       <InvoiceTableRow
                         key={row.id}
                         row={row}
@@ -490,7 +489,7 @@ export function InvoiceListView({ storeSlug: propStoreSlug }) {
           <TablePaginationCustom
             page={table.page}
             dense={table.dense}
-            count={dataFiltered.length}
+            count={salesPagination?.total || dataFiltered.length}
             rowsPerPage={table.rowsPerPage}
             onPageChange={table.onChangePage}
             onChangeDense={table.onChangeDense}

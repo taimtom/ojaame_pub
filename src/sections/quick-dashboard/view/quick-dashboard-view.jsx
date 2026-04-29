@@ -7,6 +7,10 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Badge from '@mui/material/Badge';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -29,6 +33,7 @@ import Collapse from '@mui/material/Collapse';
 import Autocomplete from '@mui/material/Autocomplete';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import { Html5Qrcode } from 'html5-qrcode';
 
 import { fCurrency } from 'src/utils/format-number';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -65,7 +70,12 @@ function loadSearchCache() {
 
 function filterCacheByQuery(cachedResults, q) {
   const lower = q.toLowerCase();
-  return cachedResults.filter((r) => r.name?.toLowerCase().includes(lower));
+  return cachedResults.filter(
+    (r) =>
+      r.name?.toLowerCase().includes(lower) ||
+      r.sku?.toLowerCase().includes(lower) ||
+      r.code?.toLowerCase().includes(lower)
+  );
 }
 
 // ----------------------------------------------------------------------
@@ -517,6 +527,130 @@ function CartRow({
 // Main view
 // ----------------------------------------------------------------------
 
+// ----------------------------------------------------------------------
+// Barcode / QR Scanner Dialog
+// ----------------------------------------------------------------------
+
+const SCANNER_ELEMENT_ID = 'qs-barcode-scanner-region';
+
+function BarcodeScannerDialog({ open, onScan, onClose }) {
+  const scannerRef = useRef(null);
+  const [cameraError, setCameraError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    let scanner;
+    setCameraError('');
+
+    const start = async () => {
+      try {
+        // Request permission explicitly first so the browser shows its native prompt
+        await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (err) {
+        const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+        setCameraError(
+          isDenied
+            ? 'Camera access was denied. Go to Chrome Settings → Privacy & Security → Site Settings → Camera and set localhost:3030 to Allow, then try again.'
+            : `Camera unavailable: ${err?.message || err?.name || 'unknown error'}`
+        );
+        return;
+      }
+
+      try {
+        scanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
+        scannerRef.current = scanner;
+
+        // Get available cameras and pick the best one
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) {
+          setCameraError('No camera found on this device.');
+          return;
+        }
+        // Prefer rear camera on mobile; fall back to first available (e.g. MacBook webcam)
+        const rearCamera = cameras.find(
+          (c) => c.label?.toLowerCase().includes('back') || c.label?.toLowerCase().includes('rear') || c.label?.toLowerCase().includes('environment')
+        );
+        const cameraId = rearCamera ? rearCamera.id : cameras[0].id;
+
+        await scanner.start(
+          cameraId,
+          { fps: 10, qrbox: { width: 250, height: 150 } },
+          (decodedText) => {
+            onScan(decodedText);
+          },
+          () => {}
+        );
+      } catch (err) {
+        setCameraError(
+          `Failed to start scanner: ${err?.message || err?.name || 'unknown error'}`
+        );
+      }
+    };
+
+    start();
+
+    return () => {
+      if (scannerRef.current?.isScanning) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, [open, onScan, retryKey]);
+
+  const handleClose = async () => {
+    if (scannerRef.current?.isScanning) {
+      await scannerRef.current.stop().catch(() => {});
+    }
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Iconify icon="solar:qr-code-bold" width={22} />
+          <span>Scan Barcode / QR Code</span>
+        </Stack>
+      </DialogTitle>
+
+      <DialogContent>
+        {cameraError ? (
+          <Stack spacing={2}>
+            <Alert severity="error">{cameraError}</Alert>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setCameraError('');
+                setRetryKey((k) => k + 1);
+              }}
+            >
+              Retry
+            </Button>
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Point the camera at a barcode or QR code. It will be detected automatically.
+          </Typography>
+        )}
+        <Box
+          id={SCANNER_ELEMENT_ID}
+          sx={{ width: '100%', minHeight: cameraError ? 0 : 200, borderRadius: 1, overflow: 'hidden' }}
+        />
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={handleClose} color="inherit">
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ----------------------------------------------------------------------
+
 export function QuickDashboardView() {
   const { currencySymbol } = useCurrencyFormat();
   const searchRef = useRef(null);
@@ -567,6 +701,9 @@ export function QuickDashboardView() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+
+  // Barcode / QR scanner
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Cart
   const [cart, setCart] = useState([]);
@@ -951,6 +1088,64 @@ export function QuickDashboardView() {
     );
   }, []);
 
+  // ── Immediate search (barcode scanner + physical scanner Enter key) ──
+
+  const handleImmediateSearch = useCallback(async (value) => {
+    const trimmed = value.trim();
+    if (!trimmed || !storeId) return;
+
+    if (!isOnline) {
+      const cached = loadSearchCache();
+      const filtered = filterCacheByQuery(cached, trimmed);
+      const normalized = filtered.map(normalizeQuickSearchProduct);
+      setSearchResults(normalized);
+      if (normalized.length === 1) {
+        const item = normalized[0];
+        const isExact =
+          item.code?.toLowerCase() === trimmed.toLowerCase() ||
+          item.sku?.toLowerCase() === trimmed.toLowerCase();
+        if (isExact) addToCart(item);
+      }
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const res = await axiosInstance.get('/api/quick-dashboard/search', {
+        params: { query: trimmed, store_id: storeId, limit: 20 },
+      });
+      const raw = res.data?.results || [];
+      const normalized = raw.map(normalizeQuickSearchProduct);
+      const existingCache = loadSearchCache();
+      const existingMap = new Map(existingCache.map((r) => [`${r.type}-${r.id}`, r]));
+      raw.forEach((r) => existingMap.set(`${r.type}-${r.id}`, r));
+      saveSearchCache(Array.from(existingMap.values()));
+      setSearchResults(normalized);
+
+      if (normalized.length === 1) {
+        const item = normalized[0];
+        const isExact =
+          item.code?.toLowerCase() === trimmed.toLowerCase() ||
+          item.sku?.toLowerCase() === trimmed.toLowerCase();
+        if (isExact) addToCart(item);
+      }
+    } catch {
+      const cached = loadSearchCache();
+      const filtered = filterCacheByQuery(cached, trimmed);
+      setSearchResults(filtered.map(normalizeQuickSearchProduct));
+    } finally {
+      setSearching(false);
+    }
+  }, [storeId, isOnline, addToCart]);
+
+  const handleScanResult = useCallback((scannedValue) => {
+    setScannerOpen(false);
+    setQuery(scannedValue);
+    handleImmediateSearch(scannedValue);
+  }, [handleImmediateSearch]);
+
+  // ── Cart totals ────────────────────────────────────────────────
+
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
 
   const cartHasInvalidVariablePrice = cart.some((c) => {
@@ -1283,9 +1478,14 @@ export function QuickDashboardView() {
                 inputRef={searchRef}
                 fullWidth
                 size="small"
-                placeholder="Type name or SKU…"
+                placeholder="Type name, SKU or barcode…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && query.trim()) {
+                    handleImmediateSearch(query);
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -1295,14 +1495,27 @@ export function QuickDashboardView() {
                       }
                     </InputAdornment>
                   ),
-                  endAdornment: query ? (
+                  endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => { setQuery(''); setSearchResults([]); }}>
-                        <Iconify icon="eva:close-fill" width={16} />
-                      </IconButton>
+                      {query && (
+                        <IconButton size="small" onClick={() => { setQuery(''); setSearchResults([]); }}>
+                          <Iconify icon="eva:close-fill" width={16} />
+                        </IconButton>
+                      )}
+                      <Tooltip title="Scan barcode / QR code">
+                        <IconButton size="small" onClick={() => setScannerOpen(true)}>
+                          <Iconify icon="solar:qr-code-bold" width={20} />
+                        </IconButton>
+                      </Tooltip>
                     </InputAdornment>
-                  ) : null,
+                  ),
                 }}
+              />
+
+              <BarcodeScannerDialog
+                open={scannerOpen}
+                onScan={handleScanResult}
+                onClose={() => setScannerOpen(false)}
               />
             </Box>
 

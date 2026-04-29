@@ -57,6 +57,7 @@ export const signUp = async ({
   firstName,
   lastName,
   phoneNumber,
+  referral_code_used,
 }) => {
   const params = {
     email,
@@ -65,6 +66,7 @@ export const signUp = async ({
     firstName,
     lastName,
     phoneNumber,
+    ...(referral_code_used ? { referral_code_used } : {}),
   };
 
   try {

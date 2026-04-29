@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR Options
@@ -14,20 +15,24 @@ const swrOptions = {
 };
 // ----------------------------------------------------------------------
 // useGetPaymentMethods - Fetches a list of payment methods for a given store.
-export function useGetPaymentMethods(storeId) {
+export function useGetPaymentMethods(storeId, queryParams = {}) {
   const key = storeId
-    ? [endpoints.paymentMethod.list, { params: { store_id: storeId } }]
+    ? [endpoints.paymentMethod.list, { params: { store_id: storeId, ...queryParams } }]
     : null;
   const { data, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      paymentMethods: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      paymentMethods: paged.items,
+      paymentMethodsPagination: paged.pagination,
       paymentMethodsLoading: !error && !data,
       paymentMethodsError: error,
       paymentMethodsValidating: isValidating,
-      paymentMethodsEmpty: !data || data.length === 0,
-    }),
+      paymentMethodsEmpty: paged.items.length === 0,
+    };
+    },
     [data, error, isValidating]
   );
 }
