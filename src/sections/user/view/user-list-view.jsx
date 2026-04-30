@@ -15,11 +15,12 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { usePermissions } from 'src/hooks/use-permissions';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import { varAlpha } from 'src/theme/styles';
-import { useGetUsers, resendInvitation } from 'src/actions/user';
 import { useGetRoles } from 'src/actions/role';
+import { useGetUsers, resendInvitation } from 'src/actions/user';
 import { USER_STATUS_OPTIONS } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 
@@ -91,6 +92,8 @@ export function UserListView() {
   }, [usersError]);
 
   const { roles } = useGetRoles();
+  const { hasPermission } = usePermissions();
+  const canInviteUser = hasPermission('users.create');
 
   const filters = useSetState({ name: '', role: [], status: 'all' });
 
@@ -174,14 +177,16 @@ export function UserListView() {
             { name: 'List' },
           ]}
           action={
-            <Button
-              component={RouterLink}
-              href={paths.dashboard.user.invite}
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-            >
-              Invite user
-            </Button>
+            canInviteUser ? (
+              <Button
+                component={RouterLink}
+                href={paths.dashboard.user.invite}
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+              >
+                Invite user
+              </Button>
+            ) : null
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

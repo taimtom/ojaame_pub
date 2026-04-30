@@ -189,6 +189,16 @@ export async function publishProduct(productId, publish) {
   }
 }
 
+export async function bulkRestockProducts(payload) {
+  try {
+    const response = await axiosInstance.post(endpoints.product.bulkRestock, payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting bulk restock:', error);
+    throw error;
+  }
+}
+
 export async function changeProductPrice(productId, priceData) {
   try {
     const url = `${endpoints.product.changePrice}/${productId}`;

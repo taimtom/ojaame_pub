@@ -142,7 +142,7 @@ export default function AgentBusinessesPage() {
                 page={page}
                 onPageChange={(_, v) => setPage(v)}
                 rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value)); setPage(0); }}
+                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
                 rowsPerPageOptions={[10, 20, 50]}
               />
             </>

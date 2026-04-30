@@ -222,6 +222,7 @@ export const useNavData = () => {
         icon: ICONS.dashboard,
       },
       { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: 'Quick Restock', path: paths.dashboard.quickRestock, icon: ICONS.product },
       { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
       { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
     ],
@@ -327,7 +328,7 @@ export const useNavData = () => {
           { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
           { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
           { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
-          { title: 'End of day', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
+          { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
         ],
       },
       {

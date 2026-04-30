@@ -49,6 +49,56 @@ function statusColor(status) {
   return 'error';
 }
 
+function startOfWeek(dateObj) {
+  const d = new Date(dateObj);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // monday start
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function toIsoDate(dateObj) {
+  return new Date(dateObj).toISOString().slice(0, 10);
+}
+
+function getPeriodBounds(periodType, periodValue, quarter, yearValue) {
+  const now = new Date();
+  switch (periodType) {
+    case 'weekly': {
+      const ref = periodValue ? new Date(periodValue) : now;
+      const start = startOfWeek(ref);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { period_start: toIsoDate(start), period_end: toIsoDate(end) };
+    }
+    case 'monthly': {
+      const [y, m] = (periodValue || toIsoDate(now).slice(0, 7)).split('-').map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0);
+      return { period_start: toIsoDate(start), period_end: toIsoDate(end) };
+    }
+    case 'quarterly': {
+      const y = Number(yearValue || now.getFullYear());
+      const q = Number(quarter || 1);
+      const startMonth = (q - 1) * 3;
+      const start = new Date(y, startMonth, 1);
+      const end = new Date(y, startMonth + 3, 0);
+      return { period_start: toIsoDate(start), period_end: toIsoDate(end) };
+    }
+    case 'yearly': {
+      const y = Number(yearValue || now.getFullYear());
+      const start = new Date(y, 0, 1);
+      const end = new Date(y, 11, 31);
+      return { period_start: toIsoDate(start), period_end: toIsoDate(end) };
+    }
+    case 'daily':
+    default: {
+      const d = periodValue || toIsoDate(now);
+      return { period_start: d, period_end: d };
+    }
+  }
+}
+
 // ----------------------------------------------------------------------
 
 export default function EndOfDayReportPage() {
@@ -63,7 +113,10 @@ export default function EndOfDayReportPage() {
   const [preview, setPreview] = useState(null);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const [reportDate, setReportDate] = useState(today);
+  const [periodType, setPeriodType] = useState('daily');
+  const [periodValue, setPeriodValue] = useState(today);
+  const [quarter, setQuarter] = useState('1');
+  const [yearValue, setYearValue] = useState(String(new Date().getFullYear()));
   const [cashBalance, setCashBalance] = useState('');
   const [initialOpening, setInitialOpening] = useState('');
   const [notes, setNotes] = useState('');
@@ -94,21 +147,32 @@ export default function EndOfDayReportPage() {
       });
       setList(Array.isArray(res.data) ? res.data : []);
     } catch {
-      toast.error('Could not load end-of-day history.');
+      toast.error('Could not load end-of-period history.');
+    }
+  }, [storeId]);
+
+  const fetchPeriodType = useCallback(async () => {
+    if (!storeId) return;
+    try {
+      const { data } = await axiosInstance.get(`/api/end-of-day/stores/${storeId}/settings/period-type`);
+      setPeriodType(data?.period_type || 'daily');
+    } catch {
+      setPeriodType('daily');
     }
   }, [storeId]);
 
   const fetchPreview = useCallback(async () => {
-    if (!storeId || !reportDate) return;
+    if (!storeId) return;
+    const bounds = getPeriodBounds(periodType, periodValue, quarter, yearValue);
     try {
       const res = await axiosInstance.get(`/api/end-of-day/stores/${storeId}/preview`, {
-        params: { date: reportDate },
+        params: bounds,
       });
       setPreview(res.data);
     } catch {
       setPreview(null);
     }
-  }, [storeId, reportDate]);
+  }, [storeId, periodType, periodValue, quarter, yearValue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +185,10 @@ export default function EndOfDayReportPage() {
       cancelled = true;
     };
   }, [fetchAccounts]);
+
+  useEffect(() => {
+    fetchPeriodType();
+  }, [fetchPeriodType]);
 
   useEffect(() => {
     fetchList();
@@ -161,7 +229,7 @@ export default function EndOfDayReportPage() {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('name', `eod-statement-${reportDate}-${idx}`);
+    formData.append('name', `eop-statement-${periodValue}-${idx}`);
     try {
       const res = await axiosInstance.post('/api/uploads', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -202,8 +270,11 @@ export default function EndOfDayReportPage() {
     }
     const bank_lines = buildBankLines();
 
+    const bounds = getPeriodBounds(periodType, periodValue, quarter, yearValue);
     const payload = {
-      report_date: reportDate,
+      period_start: bounds.period_start,
+      period_end: bounds.period_end,
+      period_type: periodType,
       cash_balance: cash,
       bank_lines,
       notes: notes || null,
@@ -211,7 +282,7 @@ export default function EndOfDayReportPage() {
     if (preview?.requires_initial_opening) {
       const io = parseFloat(initialOpening, 10);
       if (Number.isNaN(io)) {
-        throw new Error('Initial opening total is required for the first end-of-day.');
+        throw new Error('Initial opening total is required for the first end-of-period.');
       }
       payload.initial_opening_total = io;
     }
@@ -237,7 +308,15 @@ export default function EndOfDayReportPage() {
         `/api/end-of-day/stores/${storeId}/reports/${reportId}`
       );
       setEditingId(reportId);
-      setReportDate(data.report_date);
+      const nextPeriodType = data.period_type || periodType;
+      const nextPeriodStart = data.period_start || data.report_date;
+      setPeriodType(nextPeriodType);
+      setPeriodValue(nextPeriodStart);
+      if (nextPeriodStart) {
+        const d = new Date(nextPeriodStart);
+        setYearValue(String(d.getFullYear()));
+        setQuarter(String(Math.floor(d.getMonth() / 3) + 1));
+      }
       setCashBalance(String(data.cash_balance));
       setNotes(data.notes || '');
       setInitialOpening('');
@@ -260,7 +339,7 @@ export default function EndOfDayReportPage() {
 
   const clearEdit = () => {
     setEditingId(null);
-    setReportDate(today);
+    setPeriodValue(today);
     setCashBalance('');
     setNotes('');
     setInitialOpening('');
@@ -282,11 +361,11 @@ export default function EndOfDayReportPage() {
       setSaving(true);
       if (editingId) {
         await axiosInstance.patch(`/api/end-of-day/stores/${storeId}/reports/${editingId}`, payload);
-        toast.success('End-of-day updated.');
+        toast.success('End-of-period updated.');
         clearEdit();
       } else {
         await axiosInstance.post(`/api/end-of-day/stores/${storeId}/reports`, payload);
-        toast.success('End-of-day saved.');
+        toast.success('End-of-period saved.');
         setNotes('');
       }
       fetchList();
@@ -302,7 +381,7 @@ export default function EndOfDayReportPage() {
   if (!storeId) {
     return (
       <DashboardContent>
-        <Alert severity="warning">Select a store workspace to use end-of-day reports.</Alert>
+        <Alert severity="warning">Select a store workspace to use end-of-period reports.</Alert>
       </DashboardContent>
     );
   }
@@ -310,12 +389,12 @@ export default function EndOfDayReportPage() {
   return (
     <>
       <Helmet>
-        <title>End of day report</title>
+        <title>End of period report</title>
       </Helmet>
       <DashboardContent maxWidth="lg">
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
           <Iconify icon="solar:wallet-money-bold-duotone" width={32} />
-          <Typography variant="h4">End of day report</Typography>
+          <Typography variant="h4">End of period report</Typography>
         </Stack>
 
         {loading ? (
@@ -336,7 +415,7 @@ export default function EndOfDayReportPage() {
                 </Button>
               }
             >
-              Closing cash and bank balances are compared to sales and expenses for the day. Bank
+              Closing cash and bank balances are compared to sales and expenses for the selected period. Bank
               accounts must be added under <strong>Account → Finance</strong> first.
             </Alert>
 
@@ -352,15 +431,88 @@ export default function EndOfDayReportPage() {
               <Box component="form" onSubmit={handleSubmit}>
                 <Stack spacing={2}>
                   <TextField
-                    type="date"
-                    label="Report date"
-                    value={reportDate}
-                    onChange={(e) => setReportDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    select
+                    label="Period type"
+                    value={periodType}
+                    onChange={(e) => setPeriodType(e.target.value)}
                     fullWidth
                     disabled={Boolean(editingId)}
-                    helperText={editingId ? 'Date cannot be changed. Use cancel and create a new report if needed.' : ''}
-                  />
+                  >
+                    <MenuItem value="daily">Daily</MenuItem>
+                    <MenuItem value="weekly">Weekly</MenuItem>
+                    <MenuItem value="monthly">Monthly</MenuItem>
+                    <MenuItem value="quarterly">Quarterly</MenuItem>
+                    <MenuItem value="yearly">Yearly</MenuItem>
+                  </TextField>
+
+                  {periodType === 'daily' && (
+                    <TextField
+                      type="date"
+                      label="Day"
+                      value={periodValue}
+                      onChange={(e) => setPeriodValue(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                      disabled={Boolean(editingId)}
+                    />
+                  )}
+                  {periodType === 'weekly' && (
+                    <TextField
+                      type="date"
+                      label="Week reference date"
+                      value={periodValue}
+                      onChange={(e) => setPeriodValue(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                      disabled={Boolean(editingId)}
+                    />
+                  )}
+                  {periodType === 'monthly' && (
+                    <TextField
+                      type="month"
+                      label="Month"
+                      value={periodValue?.slice(0, 7) || ''}
+                      onChange={(e) => setPeriodValue(`${e.target.value}-01`)}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                      disabled={Boolean(editingId)}
+                    />
+                  )}
+                  {periodType === 'quarterly' && (
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <TextField
+                        select
+                        label="Quarter"
+                        value={quarter}
+                        onChange={(e) => setQuarter(e.target.value)}
+                        fullWidth
+                        disabled={Boolean(editingId)}
+                      >
+                        <MenuItem value="1">Q1</MenuItem>
+                        <MenuItem value="2">Q2</MenuItem>
+                        <MenuItem value="3">Q3</MenuItem>
+                        <MenuItem value="4">Q4</MenuItem>
+                      </TextField>
+                      <TextField
+                        type="number"
+                        label="Year"
+                        value={yearValue}
+                        onChange={(e) => setYearValue(e.target.value)}
+                        fullWidth
+                        disabled={Boolean(editingId)}
+                      />
+                    </Stack>
+                  )}
+                  {periodType === 'yearly' && (
+                    <TextField
+                      type="number"
+                      label="Year"
+                      value={yearValue}
+                      onChange={(e) => setYearValue(e.target.value)}
+                      fullWidth
+                      disabled={Boolean(editingId)}
+                    />
+                  )}
 
                   {preview && (
                     <Card variant="outlined" sx={{ p: 2, bgcolor: 'background.neutral' }}>
@@ -369,22 +521,22 @@ export default function EndOfDayReportPage() {
                       </Typography>
                       <Stack spacing={0.5}>
                         <Typography variant="body2">
-                          Opening total (from previous EOD):{' '}
+                          Opening total (from previous period):{' '}
                           <strong>{fCurrency(preview.opening_total)}</strong>
                         </Typography>
                         <Typography variant="body2">
-                          Revenue (day): <strong>{fCurrency(preview.revenue_day)}</strong>
+                          Revenue (period): <strong>{fCurrency(preview.revenue_day)}</strong>
                         </Typography>
                         <Typography variant="body2">
-                          Expenses (day): <strong>{fCurrency(preview.expenses_day)}</strong>
+                          Expenses (period): <strong>{fCurrency(preview.expenses_day)}</strong>
                         </Typography>
                         <Typography variant="body2">
                           Net operations: <strong>{fCurrency(preview.net_operations)}</strong>
                         </Typography>
                         {preview.requires_initial_opening && (
                           <Alert severity="warning" sx={{ mt: 1 }}>
-                            First end-of-day for this store: enter the opening total (cash + all
-                            banks at start of day).
+                            First end-of-period for this store: enter the opening total (cash + all
+                            banks at the start of the period).
                           </Alert>
                         )}
                       </Stack>
@@ -502,7 +654,7 @@ export default function EndOfDayReportPage() {
                   />
 
                   <Button type="submit" variant="contained" size="large" disabled={saving}>
-                    {saving ? 'Saving…' : editingId ? 'Update end of day' : 'Save end of day'}
+                    {saving ? 'Saving…' : editingId ? 'Update end of period' : 'Save end of period'}
                   </Button>
                 </Stack>
               </Box>
@@ -518,7 +670,7 @@ export default function EndOfDayReportPage() {
                 <Table size="small">
                     <TableHead>
                     <TableRow>
-                      <TableCell>Date</TableCell>
+                      <TableCell>Period</TableCell>
                       <TableCell align="right">Closing</TableCell>
                       <TableCell align="right">Variance</TableCell>
                       <TableCell>Status</TableCell>
@@ -528,7 +680,7 @@ export default function EndOfDayReportPage() {
                   <TableBody>
                     {list.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell>{row.report_date}</TableCell>
+                        <TableCell>{`${row.period_start || row.report_date} to ${row.period_end || row.report_date}`}</TableCell>
                         <TableCell align="right">{fCurrency(row.closing_total_snapshot)}</TableCell>
                         <TableCell align="right">{fCurrency(row.variance_amount)}</TableCell>
                         <TableCell>

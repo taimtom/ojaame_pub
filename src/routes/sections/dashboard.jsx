@@ -6,7 +6,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 
 import { LoadingScreen } from 'src/components/loading-screen';
 
-import { AuthGuard } from 'src/auth/guard';
+import { AuthGuard, PermissionGuard } from 'src/auth/guard';
 import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 
 
@@ -16,6 +16,7 @@ import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
 const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
 const OverviewEcommercePage = lazy(() => import('src/pages/dashboard/ecommerce'));
@@ -184,9 +185,24 @@ export const dashboardRoutes = [
     path: 'app',
     element: CONFIG.auth.skip ? <>{layoutContent}</> : <AuthGuard>{layoutContent}</AuthGuard>,
     children: [
-      { path: 'analytics', element: <OverviewAnalyticsPage /> },
+      {
+        path: 'analytics',
+        element: (
+          <PermissionGuard anyOf={['reports.read', 'stores.read', 'stores.update']}>
+            <OverviewAnalyticsPage />
+          </PermissionGuard>
+        ),
+      },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
-      { path: 'usage-dashboard', element: <UsageDashboardPage /> },
+      { path: 'quick-restock', element: <QuickRestockPage /> },
+      {
+        path: 'usage-dashboard',
+        element: (
+          <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+            <UsageDashboardPage />
+          </PermissionGuard>
+        ),
+      },
       { path: 'notifications', element: <NotificationsPage /> },
       { path: 'help-support', element: <HelpSupportPage /> },
 
@@ -268,8 +284,22 @@ export const dashboardRoutes = [
             { index: true, element: <ExpenseListPage /> },
             { path: 'list', element: <ExpenseListPage /> },
             { path: ':id', element: <ExpenseDetailsPage /> },
-            { path: 'new', element: <ExpenseCreatePage /> },
-            { path: ':id/edit', element: <ExpenseEditPage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['expenses.create']}>
+                  <ExpenseCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['expenses.update']}>
+                  <ExpenseEditPage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
         {
@@ -277,8 +307,22 @@ export const dashboardRoutes = [
           children: [
             { index: true, element: <PaymentMethodListPage /> },
             { path: 'list', element: <PaymentMethodListPage /> },
-            { path: 'new', element: <PaymentMethodCreatePage /> },
-            { path: ':id/edit', element: <PaymentMethodEditPage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['payment_methods.create']}>
+                  <PaymentMethodCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['payment_methods.update']}>
+                  <PaymentMethodEditPage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
         {
@@ -287,10 +331,38 @@ export const dashboardRoutes = [
             { index: true, element: <StoreGeneralReportPage /> },
             { path: 'general', element: <StoreGeneralReportPage /> },
             { path: 'inventory', element: <StoreInventoryReportPage /> },
-            { path: 'financial', element: <StoreFinancialReportPage /> },
-            { path: 'profit-loss', element: <StoreProfitLossReportPage /> },
-            { path: 'sales-trends', element: <StoreSalesTrendsReportPage /> },
-            { path: 'end-of-day', element: <EndOfDayReportPage /> },
+            {
+              path: 'financial',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreFinancialReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'profit-loss',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreProfitLossReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'sales-trends',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreSalesTrendsReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'end-of-day',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <EndOfDayReportPage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
       ],
@@ -324,7 +396,14 @@ export const dashboardRoutes = [
               { path: 'profile', element: <UserProfilePage /> },
               { path: 'cards', element: <UserCardsPage /> },
               { path: 'list', element: <UserListPage /> },
-              { path: 'invite', element: <UserCreatePage /> },
+              {
+                path: 'invite',
+                element: (
+                  <PermissionGuard anyOf={['users.create']}>
+                    <UserCreatePage />
+                  </PermissionGuard>
+                ),
+              },
               { path: ':id/edit', element: <UserEditPage /> },
               { path: 'account', element: <UserAccountPage /> },
             ],
@@ -427,7 +506,14 @@ export const dashboardRoutes = [
               { path: ':id/edit', element: <TourEditPage /> },
             ],
           },
-          { path: 'company-reports', element: <CompanyReportsPage /> },
+          {
+            path: 'company-reports',
+            element: (
+              <PermissionGuard anyOf={['reports.create', 'reports.update']}>
+                <CompanyReportsPage />
+              </PermissionGuard>
+            ),
+          },
           { path: 'file-manager', element: <FileManagerPage /> },
           { path: 'mail', element: <MailPage /> },
           { path: 'chat', element: <ChatPage /> },

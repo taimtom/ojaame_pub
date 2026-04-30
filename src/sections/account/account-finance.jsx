@@ -38,6 +38,102 @@ const connectionStatusColor = (status) => {
   return 'warning';
 };
 
+function getActiveStoreId() {
+  try {
+    const raw = localStorage.getItem('activeWorkspace');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function ReportPeriodTypeSection() {
+  const [storeId, setStoreId] = useState(() => getActiveStoreId());
+  const [periodType, setPeriodType] = useState('daily');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setStoreId(getActiveStoreId());
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
+
+  const loadPeriodType = useCallback(async () => {
+    if (!storeId) return;
+    try {
+      setLoading(true);
+      const { data } = await axiosInstance.get(`/api/end-of-day/stores/${storeId}/settings/period-type`);
+      setPeriodType(data?.period_type || 'daily');
+    } catch {
+      toast.error('Could not load report period type.');
+    } finally {
+      setLoading(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    loadPeriodType();
+  }, [loadPeriodType]);
+
+  const handleSave = async () => {
+    if (!storeId) {
+      toast.error('Select a store first.');
+      return;
+    }
+    try {
+      setSaving(true);
+      await axiosInstance.patch(`/api/end-of-day/stores/${storeId}/settings/period-type`, {
+        period_type: periodType,
+      });
+      toast.success('Report period type updated.');
+    } catch {
+      toast.error('Failed to update period type.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <Iconify icon="solar:calendar-mark-bold-duotone" width={24} />
+        <Typography variant="h6">End of Period Setting</Typography>
+      </Stack>
+      {!storeId ? (
+        <Alert severity="info">Select an active store workspace to set period type.</Alert>
+      ) : (
+        <Stack spacing={2}>
+          {loading ? <LinearProgress /> : null}
+          <TextField
+            select
+            label="Report period type"
+            value={periodType}
+            onChange={(e) => setPeriodType(e.target.value)}
+            helperText="This controls how End of Period ranges are auto-generated."
+          >
+            <MenuItem value="daily">Daily</MenuItem>
+            <MenuItem value="weekly">Weekly</MenuItem>
+            <MenuItem value="monthly">Monthly</MenuItem>
+            <MenuItem value="quarterly">Quarterly</MenuItem>
+            <MenuItem value="yearly">Yearly</MenuItem>
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={saving || loading}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            Save period type
+          </Button>
+        </Stack>
+      )}
+    </Card>
+  );
+}
+
 // ----------------------------------------------------------------------
 // Currency Section
 // ----------------------------------------------------------------------
@@ -977,6 +1073,8 @@ function ConnectBankDialog({ open, onClose, onSuccess }) {
 export function AccountFinance() {
   return (
     <Stack spacing={4}>
+      <ReportPeriodTypeSection />
+      <Divider />
       <CurrencySection />
       <Divider />
       <BankAccountsSection />

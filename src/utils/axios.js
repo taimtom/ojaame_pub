@@ -124,6 +124,7 @@ export const endpoints = {
     salesHistory: '/api/product/sales-history',
     usage: '/api/product/usage',
     publish: '/api/product/publish',
+    bulkRestock: '/api/product/bulk-restock',
   },
   shop: {
     list: '/api/product/list',

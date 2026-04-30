@@ -108,6 +108,7 @@ export const paths = {
   dashboard: {
     root: ROOTS.DASHBOARD,
     quickDashboard: `${ROOTS.DASHBOARD}/quick-dashboard`,
+    quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
     usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,
     mail: `${ROOTS.DASHBOARD}/mail`,
     chat: `${ROOTS.DASHBOARD}/chat`,
