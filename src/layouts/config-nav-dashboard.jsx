@@ -185,8 +185,10 @@ export const useNavData = () => {
     }
     return items
       .map((item) => {
-        // Check if item is visible based on permissions
-        const itemVisible = isItemVisible(userPermissions, item.title);
+        // Use permissionKey (stable) when available, otherwise fall back to the
+        // display title. This keeps permission checks working when the title is
+        // rendered dynamically via the business-type registry.
+        const itemVisible = isItemVisible(userPermissions, item.permissionKey || item.title);
         if (!itemVisible) {
           return null;
         }
@@ -221,8 +223,8 @@ export const useNavData = () => {
         path: storeBasePath || paths.dashboard.store.list,
         icon: ICONS.dashboard,
       },
-      { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
-      { title: 'Quick Restock', path: paths.dashboard.quickRestock, icon: ICONS.product },
+      { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
       { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
       { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
     ],
@@ -231,18 +233,21 @@ export const useNavData = () => {
    * Sales & Orders
    */
   {
-    subheader: 'Sales & Orders',
+    sectionPermKey: 'Sales & Orders',
+    subheader: getNavLabel('salesAndOrdersSection'),
     items: [
       {
         title: getNavLabel('pointOfSales'),
         path: callIfFunction(paths.dashboard.pos.root, currentStore),
         icon: ICONS.pos,
+        permissionKey: 'Point of Sales',
         children: [{ title: `Add ${t('sale')}`, path: callIfFunction(paths.dashboard.pos.root, currentStore) }],
       },
       {
         title: getNavLabel('salesInvoice'),
         path: callIfFunction(paths.dashboard.invoice.root, currentStore),
         icon: ICONS.invoice,
+        permissionKey: 'Sales Invoice',
         children: [
           { title: `${t('sale')} Report`, path: callIfFunction(paths.dashboard.invoice.root, currentStore  ) },
           { title: `${t('sale')} History`, path: callIfFunction(paths.dashboard.invoice.history, currentStore  ) },
@@ -254,21 +259,24 @@ export const useNavData = () => {
    * Inventory
    */
   {
-    subheader: 'Inventory',
+    sectionPermKey: 'Inventory',
+    subheader: getNavLabel('inventorySection'),
     items: [
       {
-        title: 'Category',
+        title: t('category'),
         path: callIfFunction(paths.dashboard.category.root, currentStore),
         icon: ICONS.category,
+        permissionKey: 'Category',
         children: [
-          { title: 'Add Category', path: callIfFunction(paths.dashboard.category.new, currentStore) },
-          { title: 'Category Report', path: callIfFunction(paths.dashboard.category.root, currentStore )},
+          { title: `Add ${t('category')}`, path: callIfFunction(paths.dashboard.category.new, currentStore) },
+          { title: `${t('category')} Report`, path: callIfFunction(paths.dashboard.category.root, currentStore )},
         ],
       },
       {
         title: getNavLabel('productManagement'),
         path: callIfFunction(paths.dashboard.product.root, currentStore),
         icon: ICONS.product,
+        permissionKey: 'Product Management',
         children: [
           { title: `Add ${t('product')}`, path: callIfFunction(paths.dashboard.product.new, currentStore) },
           { title: `${t('product')} Report`, path: callIfFunction(paths.dashboard.product.root, currentStore) },
@@ -279,6 +287,7 @@ export const useNavData = () => {
         title: getNavLabel('serviceManagement'),
         path: callIfFunction(paths.dashboard.service.root, currentStore),
         icon: ICONS.service,
+        permissionKey: 'Service Management',
         children: [
           { title: `Add ${t('service')}`, path: callIfFunction(paths.dashboard.service.new, currentStore) },
           { title: `${t('service')} Report`, path: callIfFunction(paths.dashboard.service.root, currentStore) },
@@ -351,6 +360,7 @@ export const useNavData = () => {
         title: `Manage ${t('customer')}`,
         path: callIfFunction(paths.dashboard.customer.root, currentStore),
         icon: ICONS.customer,
+        permissionKey: 'Manage Customer',
         children: [
           { title: `Add ${t('customer')}`, path: callIfFunction(paths.dashboard.customer.new, currentStore  ) },
           { title: `${t('customer')} List`, path: callIfFunction(paths.dashboard.customer.root, currentStore  ) },
@@ -415,8 +425,13 @@ export const useNavData = () => {
   // 6. Filter navigation data based on permissions
   const filteredNavData = navData
     .map((section) => {
-      // Check if section is visible
-      const sectionVisible = isSectionVisible(userPermissions, section.subheader);
+      // Use sectionPermKey (stable) when available, otherwise fall back to the
+      // display subheader. This keeps permission checks working when the subheader
+      // is rendered dynamically via the business-type registry.
+      const sectionVisible = isSectionVisible(
+        userPermissions,
+        section.sectionPermKey || section.subheader
+      );
       if (!sectionVisible) {
         return null;
       }

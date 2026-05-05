@@ -30,6 +30,7 @@ import { Iconify } from 'src/components/iconify';
 import { WelcomeGuidePopup } from 'src/components/onboarding/welcome-guide-popup';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useBusinessType } from 'src/hooks/use-business-type';
 
 import { AppWelcome } from '../app-welcome';
 import { AppFeatured } from '../app-featured';
@@ -70,6 +71,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export function OverviewAppView({ storeId }) {
   const { user } = useAuthContext();
+  const { t } = useBusinessType();
   const theme = useTheme();
 
   // ── Shared period state (syncs Expenses + Top Products together) ───
@@ -259,7 +261,7 @@ export function OverviewAppView({ storeId }) {
         <Grid xs={12} container spacing={3} id="overview-tour-kpi">
         <Grid xs={12} md={4}>
           <AppWidgetSummary
-            title="Today's Sales"
+            title={`Today's ${t('sale')}s`}
             percent={dailySales.change_percentage}
             total={dailySales.total_sales}
             loading={dailySalesLoading}
@@ -269,7 +271,7 @@ export function OverviewAppView({ storeId }) {
 
         <Grid xs={12} md={4}>
           <AppWidgetSummary
-            title="Total Weekly Sales"
+            title={`Total Weekly ${t('sale')}s`}
             percent={weeklyPct}
             total={weeklyTotal}
             loading={weeklySalesLoading}
@@ -279,7 +281,7 @@ export function OverviewAppView({ storeId }) {
 
         <Grid xs={12} md={4}>
           <AppWidgetSummary
-            title="Total Monthly Sales"
+            title={`Total Monthly ${t('sale')}s`}
             percent={monthlyPct}
             total={monthlyTotal}
             loading={monthlySalesLoading}
@@ -295,8 +297,8 @@ export function OverviewAppView({ storeId }) {
         {/* Payment method donut + Expense categories (share the `period` selector) */}
         <Grid xs={12} md={6} id="overview-tour-payment-method">
           <AppCurrentDownload
-            title="Sales by Payment Method"
-            subheader="Point-of-Sale Transactions"
+            title={`${t('sale')}s by Payment Method`}
+            subheader={`${t('pos')} Transactions`}
             period={paymentPeriod}
             onPeriodChange={setPaymentPeriod}
             chart={{
@@ -329,7 +331,7 @@ export function OverviewAppView({ storeId }) {
         {/* Yearly income vs expenses area chart */}
         <Grid xs={12} id="overview-tour-yearly">
           <AppYearlySales
-            title="Yearly Sales"
+            title={`Yearly ${t('sale')}s`}
             subheader={yearlySalesSubheader}
             storeId={storeId}
           />
@@ -361,11 +363,11 @@ export function OverviewAppView({ storeId }) {
         {/* Recent invoices + top products (both driven by shared `period`) */}
         <Grid xs={12} lg={6} id="overview-tour-invoices">
           <AppNewInvoice
-            title="Recent Invoices"
+            title={`Recent ${t('invoice')}s`}
             subheader="Filter by status"
             storeId={storeId}
             headLabel={[
-              { id: 'invoiceNumber', label: 'Invoice #' },
+              { id: 'invoiceNumber', label: `${t('invoice')} #` },
               { id: 'category',     label: 'Category'  },
               { id: 'price',        label: 'Amount'    },
               { id: 'status',       label: 'Status'    },
@@ -380,8 +382,8 @@ export function OverviewAppView({ storeId }) {
 
         <Grid xs={12} lg={6} id="overview-tour-products">
           <AppNewProduct
-            title="Top Selling Products"
-            subheader="Point-of-Sale Top Products"
+            title={`Top Selling ${t('product')}s`}
+            subheader={`${t('pos')} Top ${t('product')}s`}
             headLabel={[
               { id: 'invoiceNumber', label: 'Product'      },
               { id: 'category',     label: 'Qty Sold'     },

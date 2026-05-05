@@ -11,6 +11,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useBusinessType } from 'src/hooks/use-business-type';
 
 import { allLangs } from 'src/locales';
 import { useGetStores } from 'src/actions/store';
@@ -44,6 +45,7 @@ import { LayoutSection } from '../core/layout-section';
 export function DashboardLayout({ sx, children, data }) {
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useBusinessType();
 
   const mobileNavOpen = useBoolean();
 
@@ -147,7 +149,7 @@ export function DashboardLayout({ sx, children, data }) {
               rightAreaStart: (
                 <>
                   {/* Full button on sm+ screens */}
-                  <Tooltip title="Quick Sale ⚡">
+                  <Tooltip title={`Quick ${t('sale')} ⚡`}>
                     <Button
                       size="small"
                       variant="contained"
@@ -163,12 +165,12 @@ export function DashboardLayout({ sx, children, data }) {
                         display: { xs: 'none', sm: 'inline-flex' },
                       }}
                     >
-                      Quick Sale
+                      Quick {t('sale')}
                     </Button>
                   </Tooltip>
 
                   {/* Icon-only button on mobile */}
-                  <Tooltip title="Quick Sale ⚡">
+                  <Tooltip title={`Quick ${t('sale')} ⚡`}>
                     <IconButton
                       size="small"
                       color="primary"

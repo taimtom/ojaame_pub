@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+import { CONFIG } from 'src/config-global';
+
 export const AGENT_TOKEN_KEY = 'agent_access_token';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || '';
+const baseURL = CONFIG.site.serverUrl;
 
 export const agentApi = axios.create({
   baseURL,

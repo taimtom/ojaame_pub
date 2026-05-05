@@ -119,13 +119,20 @@ export function getItemPermissions(itemTitle) {
 }
 
 /**
- * Check if a section should be visible based on permissions
+ * Check if a section should be visible based on permissions.
+ * Accepts either the display subheader or a stable sectionPermKey (preferred when
+ * the subheader is rendered dynamically via the business-type registry).
  * @param {string[]} userPermissions - User's permissions
- * @param {string} sectionSubheader - The subheader/title of the section
+ * @param {string} sectionSubheaderOrKey - The subheader or sectionPermKey of the section
  * @returns {boolean} True if section should be visible
  */
-export function isSectionVisible(userPermissions, sectionSubheader) {
-  const required = getSectionPermissions(sectionSubheader);
+export function isSectionVisible(userPermissions, sectionSubheaderOrKey) {
+  const sectionConfig = NAV_PERMISSIONS.sections[sectionSubheaderOrKey];
+  // Unknown key (e.g. a dynamic business-type label) — item-level permissions govern
+  if (!sectionConfig) {
+    return true;
+  }
+  const required = sectionConfig.required;
   if (required.length === 0) {
     return true; // No requirements means always visible
   }
@@ -134,13 +141,15 @@ export function isSectionVisible(userPermissions, sectionSubheader) {
 }
 
 /**
- * Check if an item should be visible based on permissions
+ * Check if an item should be visible based on permissions.
+ * Accepts either the display title or a stable permissionKey (preferred when the
+ * title is rendered dynamically via the business-type registry).
  * @param {string[]} userPermissions - User's permissions
- * @param {string} itemTitle - The title of the navigation item
+ * @param {string} itemTitleOrKey - The title or permissionKey of the navigation item
  * @returns {boolean} True if item should be visible
  */
-export function isItemVisible(userPermissions, itemTitle) {
-  const required = getItemPermissions(itemTitle);
+export function isItemVisible(userPermissions, itemTitleOrKey) {
+  const required = getItemPermissions(itemTitleOrKey);
   if (required.length === 0) {
     return true; // No requirements means always visible
   }
