@@ -109,7 +109,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
   const currentStock = currentProduct?.quantity ?? 0;
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '', addAsExpense: true }),
+    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '', addAsExpense: false }),
     [currentProduct]
   );
 
@@ -237,7 +237,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
               InputLabelProps={{ shrink: true }}
             />
 
-            <Field.Switch name="addAsExpense" label="Record as expense" />
+            <Field.Switch name="addAsExpense" label="Book loss value as expense (P&L)" />
 
             {addAsExpense && Number(currentProduct?.costPrice || 0) > 0 && deductQty > 0 && (
               <ReadonlyInfo
@@ -279,7 +279,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
   const currentPacks     = Math.floor(currentUnits / quantityPerPack);
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: true }),
+    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: false }),
     [currentProduct]
   );
 
@@ -434,7 +434,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
               InputLabelProps={{ shrink: true }}
             />
 
-            <Field.Switch name="addAsExpense" label="Record as expense" />
+            <Field.Switch name="addAsExpense" label="Book loss value as expense (P&L)" />
 
             {addAsExpense && totalCost != null && unitsToDeduct > 0 && (
               <ReadonlyInfo

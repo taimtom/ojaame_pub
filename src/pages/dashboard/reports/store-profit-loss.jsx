@@ -14,6 +14,7 @@ import Table from '@mui/material/Table';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TableBody from '@mui/material/TableBody';
+import Alert from '@mui/material/Alert';
 
 import { fCurrency } from 'src/utils/format-number';
 import { paramCase } from 'src/utils/change-case';
@@ -154,13 +155,20 @@ export default function StoreProfitLossReportPage() {
 
         {/* Summary chips */}
         {profitLoss && (
-          <Stack direction="row" spacing={1.5} mb={3} flexWrap="wrap">
-            <Chip label={`Net Sales ${fCurrency(profitLoss.net_sales)}`} color="info" variant="outlined" />
-            <Chip label={`COGS ${fCurrency(profitLoss.cost_of_goods_sold)}`} color="warning" variant="outlined" />
-            <Chip
-              label={`Net Profit ${fCurrency(profitLoss.net_profit)} (${profitLoss.net_profit_margin?.toFixed(1)}%)`}
-              color={isProfit ? 'success' : 'error'}
-            />
+          <Stack spacing={1.5} mb={3}>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+              <Chip label={`Net Sales ${fCurrency(profitLoss.net_sales)}`} color="info" variant="outlined" />
+              <Chip label={`COGS ${fCurrency(profitLoss.cost_of_goods_sold)}`} color="warning" variant="outlined" />
+              <Chip
+                label={`Net Profit ${fCurrency(profitLoss.net_profit)} (${profitLoss.net_profit_margin?.toFixed(1)}%)`}
+                color={isProfit ? 'success' : 'error'}
+              />
+            </Stack>
+            {profitLoss.costing_mode === 'purchase_expensed' && (
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                Inventory purchases are included in operating expenses; sale COGS is excluded from totals to avoid double counting.
+              </Alert>
+            )}
           </Stack>
         )}
 

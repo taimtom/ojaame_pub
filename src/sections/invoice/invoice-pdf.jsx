@@ -84,6 +84,36 @@ function lineItemTotal(item) {
   return 0;
 }
 
+function resolveInvoiceContactEmail(invoice) {
+  if (!invoice) return 'N/A';
+
+  const candidates = [
+    invoice.store_email,
+    invoice.storeEmail,
+    invoice.store_email_address,
+    invoice.store_email_contact,
+    invoice.store?.email,
+    invoice.store?.storeEmail,
+    invoice.company_email,
+    invoice.companyEmail,
+    invoice.company?.email,
+    invoice.company?.companyEmail,
+    invoice.owner_email,
+    invoice.ownerEmail,
+    invoice.owner?.email,
+    invoice.owner?.ownerEmail,
+    invoice.user_email,
+    invoice.userEmail,
+  ];
+
+  const found = candidates.find((value) => typeof value === 'string' && value.trim() !== '');
+
+  return (
+    found ||
+    'N/A'
+  );
+}
+
 export function InvoicePDF({ invoice, currentStatus }) {
   // Destructure keys using the keys from your provided data.
   const {
@@ -111,6 +141,7 @@ export function InvoicePDF({ invoice, currentStatus }) {
     fulldue_date,
     user_fullname,
   } = invoice;
+  const contactEmail = resolveInvoiceContactEmail(invoice);
 
   const styles = useStyles();
 
@@ -136,7 +167,7 @@ export function InvoicePDF({ invoice, currentStatus }) {
       </View>
       <View style={{ width: '25%', textAlign: 'right' }}>
         <Text style={styles.subtitle2}>Have a question?</Text>
-        <Text>support@abcapp.com</Text>
+        <Text>{contactEmail}</Text>
       </View>
     </View>
   );

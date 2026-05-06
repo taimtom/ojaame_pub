@@ -44,6 +44,19 @@ function getStoreIdFromStorage() {
   return null;
 }
 
+function normalizeQuickSearchProduct(item) {
+  if (!item || item.type !== 'product') return item;
+  const isPack = Boolean(item.is_pack ?? item.isPack);
+  const quantityPerPack = Number(item.quantity_per_pack ?? item.quantityPerPack ?? 0) || null;
+  const costPricePerPack = item.cost_price_per_pack ?? item.costPricePerPack ?? null;
+  return {
+    ...item,
+    is_pack: isPack,
+    quantity_per_pack: quantityPerPack,
+    cost_price_per_pack: costPricePerPack != null ? Number(costPricePerPack) : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 
 export function QuickRestockView() {
@@ -54,7 +67,7 @@ export function QuickRestockView() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
-  // restock cart: [{ productId, name, currentStock, qty, costPerUnit, addAsExpense }]
+  // restock cart supports both single-item and pack products
   const [restockCart, setRestockCart] = useState([]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -90,7 +103,9 @@ export function QuickRestockView() {
           });
           // API returns { results: [...] } where each item has a `type` field
           const all = res.data?.results || [];
-          setSearchResults(all.filter((r) => r.type === 'product'));
+          setSearchResults(
+            all.filter((r) => r.type === 'product').map((item) => normalizeQuickSearchProduct(item))
+          );
         } catch (err) {
           console.error('Search error:', err);
         } finally {
@@ -112,8 +127,24 @@ export function QuickRestockView() {
           productId: product.id,
           name: product.name,
           currentStock: product.stock ?? product.quantity ?? 0,
-          qty: 1,
-          costPerUnit: product.cost_price ?? 0,
+          isPack: Boolean(product.is_pack),
+          quantityPerPack: Number(product.quantity_per_pack ?? 0) || null,
+          packsToAdd: product.is_pack ? 1 : null,
+          qty: product.is_pack
+            ? Number(product.quantity_per_pack ?? 0) || 1
+            : 1,
+          costPerPack: product.is_pack
+            ? Number(
+                product.cost_price_per_pack ??
+                  (Number(product.cost_price ?? 0) * (Number(product.quantity_per_pack ?? 0) || 1))
+              ) || 0
+            : null,
+          costPerUnit: product.is_pack
+            ? ((Number(product.cost_price_per_pack ?? 0) || 0) /
+                (Number(product.quantity_per_pack ?? 0) || 1)) ||
+              Number(product.cost_price ?? 0) ||
+              0
+            : Number(product.cost_price ?? 0) || 0,
           addAsExpense: true,
         },
       ];
@@ -317,10 +348,10 @@ export function QuickRestockView() {
                           <TableRow>
                             <TableCell>Product</TableCell>
                             <TableCell align="center" sx={{ minWidth: 90 }}>
-                              Qty
+                              Qty / Packs
                             </TableCell>
                             <TableCell align="center" sx={{ minWidth: 110 }}>
-                              Cost / Unit (₦)
+                              Cost (₦)
                             </TableCell>
                             <TableCell align="right" sx={{ minWidth: 90 }}>
                               Total
@@ -340,40 +371,87 @@ export function QuickRestockView() {
                                 <Typography variant="caption" color="text.secondary">
                                   Current: {row.currentStock}
                                 </Typography>
+                                {row.isPack && row.quantityPerPack ? (
+                                  <Typography variant="caption" color="info.main" display="block">
+                                    Pack x{row.quantityPerPack} units
+                                  </Typography>
+                                ) : null}
                               </TableCell>
 
                               <TableCell align="center">
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  inputProps={{ min: 1, style: { textAlign: 'center' } }}
-                                  value={row.qty}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.productId,
-                                      'qty',
-                                      Math.max(0, Number(e.target.value))
-                                    )
-                                  }
-                                  sx={{ width: 80 }}
-                                />
+                                {row.isPack ? (
+                                  <>
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                                      value={row.packsToAdd ?? 0}
+                                      onChange={(e) => {
+                                        const packsToAdd = Math.max(0, Number(e.target.value));
+                                        const quantityPerPack = row.quantityPerPack || 1;
+                                        updateRow(row.productId, 'packsToAdd', packsToAdd);
+                                        updateRow(row.productId, 'qty', packsToAdd * quantityPerPack);
+                                      }}
+                                      sx={{ width: 90 }}
+                                    />
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      {row.qty} units
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    inputProps={{ min: 1, style: { textAlign: 'center' } }}
+                                    value={row.qty}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        row.productId,
+                                        'qty',
+                                        Math.max(0, Number(e.target.value))
+                                      )
+                                    }
+                                    sx={{ width: 80 }}
+                                  />
+                                )}
                               </TableCell>
 
                               <TableCell align="center">
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  inputProps={{ min: 0, style: { textAlign: 'right' } }}
-                                  value={row.costPerUnit}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.productId,
-                                      'costPerUnit',
-                                      Math.max(0, Number(e.target.value))
-                                    )
-                                  }
-                                  sx={{ width: 100 }}
-                                />
+                                {row.isPack ? (
+                                  <>
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      inputProps={{ min: 0, style: { textAlign: 'right' } }}
+                                      value={row.costPerPack ?? 0}
+                                      onChange={(e) => {
+                                        const costPerPack = Math.max(0, Number(e.target.value));
+                                        const quantityPerPack = row.quantityPerPack || 1;
+                                        updateRow(row.productId, 'costPerPack', costPerPack);
+                                        updateRow(row.productId, 'costPerUnit', costPerPack / quantityPerPack);
+                                      }}
+                                      sx={{ width: 110 }}
+                                    />
+                                    <Typography variant="caption" color="text.secondary" display="block">
+                                      {fCurrency(row.costPerUnit)}/unit
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    inputProps={{ min: 0, style: { textAlign: 'right' } }}
+                                    value={row.costPerUnit}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        row.productId,
+                                        'costPerUnit',
+                                        Math.max(0, Number(e.target.value))
+                                      )
+                                    }
+                                    sx={{ width: 100 }}
+                                  />
+                                )}
                               </TableCell>
 
                               <TableCell align="right">

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -43,7 +43,40 @@ function lineItemTotal(item) {
   return 0;
 }
 
+function resolveInvoiceContactEmail(invoice) {
+  if (!invoice) return 'N/A';
+
+  const candidates = [
+    invoice.store_email,
+    invoice.storeEmail,
+    invoice.store_email_address,
+    invoice.store_email_contact,
+    invoice.store?.email,
+    invoice.store?.storeEmail,
+    invoice.company_email,
+    invoice.companyEmail,
+    invoice.company?.email,
+    invoice.company?.companyEmail,
+    invoice.owner_email,
+    invoice.ownerEmail,
+    invoice.owner?.email,
+    invoice.owner?.ownerEmail,
+    invoice.user_email,
+    invoice.userEmail,
+  ];
+
+  const found = candidates.find((value) => typeof value === 'string' && value.trim() !== '');
+
+  return (
+    found ||
+    'N/A'
+  );
+}
+
 export function InvoiceDetails({ invoice }) {
+  const invoiceCaptureRef = useRef(null);
+  const contactEmail = resolveInvoiceContactEmail(invoice);
+
   const computedSubtotal = useMemo(
     () => invoice?.items?.reduce((acc, item) => acc + lineItemTotal(item), 0) || 0,
     [invoice?.items]
@@ -117,7 +150,7 @@ export function InvoiceDetails({ invoice }) {
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
           Have a question?
         </Typography>
-        <Typography variant="body2">support@minimals.cc</Typography>
+        <Typography variant="body2">{contactEmail}</Typography>
       </Box>
     </Box>
   );
@@ -179,9 +212,10 @@ export function InvoiceDetails({ invoice }) {
         currentStatus={currentStatus || ''}
         onChangeStatus={handleChangeStatus}
         statusOptions={INVOICE_STATUS_OPTIONS}
+        shareCaptureRef={invoiceCaptureRef}
       />
 
-      <Card sx={{ pt: 5, px: 5 }}>
+      <Card ref={invoiceCaptureRef} sx={{ pt: 5, px: 5 }}>
         <Box
           rowGap={5}
           display="grid"
