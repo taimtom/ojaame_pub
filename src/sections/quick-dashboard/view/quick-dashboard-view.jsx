@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { pdf } from '@react-pdf/renderer';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -43,6 +44,10 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/utils/axios';
 import { enqueueSale } from 'src/utils/offlineQueue';
+import { markSaleAsPaid } from 'src/actions/sale';
+import { addCustomer } from 'src/actions/customer';
+import { ThermalReceiptPDF } from 'src/sections/pos/receipt-thermal';
+import { A4ReceiptPDF } from 'src/sections/pos/receipt-a4';
 
 // ── Offline product search cache (localStorage) ────────────────────────────
 const SEARCH_CACHE_KEY = 'qs_search_cache';
@@ -138,6 +143,42 @@ function fDateShort(isoString) {
 }
 
 const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'pos'];
+const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
+
+function getPreferredReceiptFormat() {
+  if (typeof window === 'undefined') return 'thermal';
+  const raw = window.localStorage.getItem(RECEIPT_FORMAT_STORAGE_KEY);
+  return raw === 'a4' ? 'a4' : 'thermal';
+}
+
+function buildQuickReceiptFallback(sale, items = []) {
+  return {
+    ...sale,
+    items: items.map((item) => ({
+      ...item,
+      // Keep renderer field compatibility
+      description: item.description || item.name,
+      product_name: item.product_name || item.name,
+      total: item.total != null ? Number(item.total) : Number(item.price || 0) * Number(item.quantity || 0),
+    })),
+    subtotal: Number(sale.subtotal ?? sale.total_amount ?? 0),
+    total_amount: Number(sale.total_amount ?? 0),
+    taxes: Number(sale.taxes ?? 0),
+    discount: Number(sale.discount ?? 0),
+    shipping: Number(sale.shipping ?? 0),
+    create_date: sale.create_date,
+    due_date: sale.due_date || sale.create_date,
+    payments: Array.isArray(sale.payments) ? sale.payments : [],
+  };
+}
+
+function saleStatusColor(status) {
+  const lowered = String(status || '').toLowerCase();
+  if (lowered === 'paid' || lowered === 'completed') return 'success';
+  if (lowered === 'credit' || lowered === 'pending') return 'warning';
+  if (lowered === 'draft') return 'default';
+  return 'default';
+}
 
 // ----------------------------------------------------------------------
 // Stat Card
@@ -696,6 +737,9 @@ export function QuickDashboardView() {
   const [expandedSaleId, setExpandedSaleId] = useState(null);
   const [saleItemsCache, setSaleItemsCache] = useState({});
   const [loadingSaleId, setLoadingSaleId] = useState(null);
+  const [sharingSaleId, setSharingSaleId] = useState(null);
+  const [markingPaidSaleId, setMarkingPaidSaleId] = useState(null);
+  const [printingSaleId, setPrintingSaleId] = useState(null);
 
   // Search
   const [query, setQuery] = useState('');
@@ -720,6 +764,10 @@ export function QuickDashboardView() {
   const [customerInput, setCustomerInput] = useState('');
   const [customerOptions, setCustomerOptions] = useState([]);
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────
 
@@ -770,6 +818,146 @@ export function QuickDashboardView() {
       setLoadingSaleId(null);
     }
   }, [expandedSaleId, saleItemsCache]);
+
+  const downloadBlob = useCallback((blob, fileName) => {
+    const blobUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(blobUrl);
+  }, []);
+
+  const handleShareSale = useCallback(
+    async (sale) => {
+      if (!sale?.id || sharingSaleId != null) return;
+      setSharingSaleId(sale.id);
+
+      try {
+        let receipt = null;
+
+        try {
+          const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${sale.id}/`);
+          receipt = detailRes.data;
+        } catch {
+          let fallbackItems = saleItemsCache[sale.id];
+          if (!fallbackItems) {
+            const itemRes = await axiosInstance.get(`/api/quick-dashboard/sale/${sale.id}/items`);
+            fallbackItems = itemRes.data?.items || [];
+            setSaleItemsCache((prev) => ({ ...prev, [sale.id]: fallbackItems }));
+          }
+          receipt = buildQuickReceiptFallback(sale, fallbackItems || []);
+        }
+
+        const receiptFormat = getPreferredReceiptFormat();
+        const receiptDoc =
+          receiptFormat === 'a4' ? (
+            <A4ReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
+          ) : (
+            <ThermalReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
+          );
+
+        const blob = await pdf(receiptDoc).toBlob();
+        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
+        const shareFile = new File([blob], fileName, { type: 'application/pdf' });
+
+        if (navigator.share && navigator.canShare?.({ files: [shareFile] })) {
+          await navigator.share({
+            title: receipt?.invoice_number || sale.invoice_number || 'Sales Receipt',
+            text: 'Sales receipt',
+            files: [shareFile],
+          });
+        } else {
+          downloadBlob(blob, fileName);
+          toast.info('Native share is unavailable here. Receipt PDF downloaded.');
+        }
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          toast.error('Could not prepare receipt for sharing.');
+        }
+      } finally {
+        setSharingSaleId(null);
+      }
+    },
+    [downloadBlob, saleItemsCache, sharingSaleId, storeId]
+  );
+
+  const handleMarkAsPaid = useCallback(
+    async (sale) => {
+      if (!sale?.id || markingPaidSaleId != null) return;
+      const lowered = String(sale.status || '').toLowerCase();
+      if (lowered !== 'credit') return;
+
+      try {
+        setMarkingPaidSaleId(sale.id);
+        await markSaleAsPaid(sale.id);
+        setRecentSales((prev) =>
+          prev.map((item) => (item.id === sale.id ? { ...item, status: 'paid' } : item))
+        );
+        toast.success('Sale marked as paid.');
+        await Promise.all([fetchStats(), fetchRecent()]);
+      } catch (error) {
+        toast.error(error?.response?.data?.detail || 'Failed to mark this sale as paid.');
+      } finally {
+        setMarkingPaidSaleId(null);
+      }
+    },
+    [fetchRecent, fetchStats, markingPaidSaleId]
+  );
+
+  const handlePrintSale = useCallback(
+    async (sale) => {
+      if (!sale?.id || printingSaleId != null) return;
+      setPrintingSaleId(sale.id);
+
+      try {
+        let receipt = null;
+
+        try {
+          const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${sale.id}/`);
+          receipt = detailRes.data;
+        } catch {
+          let fallbackItems = saleItemsCache[sale.id];
+          if (!fallbackItems) {
+            const itemRes = await axiosInstance.get(`/api/quick-dashboard/sale/${sale.id}/items`);
+            fallbackItems = itemRes.data?.items || [];
+            setSaleItemsCache((prev) => ({ ...prev, [sale.id]: fallbackItems }));
+          }
+          receipt = buildQuickReceiptFallback(sale, fallbackItems || []);
+        }
+
+        const receiptFormat = getPreferredReceiptFormat();
+        const receiptDoc =
+          receiptFormat === 'a4' ? (
+            <A4ReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
+          ) : (
+            <ThermalReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
+          );
+        const blob = await pdf(receiptDoc).toBlob();
+        const blobUrl = URL.createObjectURL(blob);
+        const printWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+
+        if (!printWindow) {
+          URL.revokeObjectURL(blobUrl);
+          toast.error('Unable to open print preview. Please allow popups and try again.');
+          return;
+        }
+
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+        }, 300);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      } catch (error) {
+        toast.error('Could not prepare receipt for printing.');
+      } finally {
+        setPrintingSaleId(null);
+      }
+    },
+    [printingSaleId, saleItemsCache, storeId]
+  );
 
   useEffect(() => {
     fetchStats();
@@ -1287,6 +1475,58 @@ export function QuickDashboardView() {
     }
   };
 
+  const handleCreateCustomer = async () => {
+    const name = newCustomerName.trim();
+    const phone = newCustomerPhone.trim();
+
+    if (!name || !phone) {
+      toast.error('Enter both customer name and phone number.');
+      return;
+    }
+    if (!storeId) {
+      toast.error('No active store selected.');
+      return;
+    }
+
+    try {
+      setCreatingCustomer(true);
+      const payload = {
+        name,
+        phone_number: phone,
+        // Required by backend schema for create; use neutral placeholders.
+        address: 'N/A',
+        city: 'N/A',
+        state: 'N/A',
+        country: 'Nigeria',
+        zip_code: '000000',
+        primary: 1,
+        address_type: 'Home',
+        store_id: Number(storeId),
+      };
+      const created = await addCustomer(payload);
+      const option = {
+        id: created.id,
+        name: created.name || name,
+        phone_number: created.phone_number || phone,
+      };
+
+      setCustomerOptions((prev) => {
+        const exists = prev.some((item) => item.id === option.id);
+        return exists ? prev : [option, ...prev];
+      });
+      setSelectedCustomer(option);
+      setCustomerInput(`${option.name}${option.phone_number ? ` · ${option.phone_number}` : ''}`);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
+      setNewCustomerOpen(false);
+      toast.success('Customer added successfully.');
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Could not add customer.');
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
   // ── No store guard ─────────────────────────────────────────────
 
   if (!storeId) {
@@ -1669,6 +1909,15 @@ export function QuickDashboardView() {
                   />
                 )}
               />
+              <Button
+                size="small"
+                variant="text"
+                sx={{ mb: 1.25, px: 0, minWidth: 0, justifyContent: 'flex-start' }}
+                startIcon={<Iconify icon="eva:plus-fill" width={16} />}
+                onClick={() => setNewCustomerOpen(true)}
+              >
+                Add new customer
+              </Button>
 
               {/* Payment method */}
               <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
@@ -1861,9 +2110,73 @@ export function QuickDashboardView() {
                         <Chip
                           size="small"
                           label={sale.status}
-                          color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}
+                          color={saleStatusColor(sale.status)}
                           sx={{ height: 18, fontSize: 10 }}
                         />
+                        <Stack direction="row" spacing={0.25}>
+                          <Tooltip title="Print receipt">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handlePrintSale(sale);
+                                }}
+                                disabled={printingSaleId === sale.id}
+                                sx={{ p: 0.35 }}
+                              >
+                                {printingSaleId === sale.id ? (
+                                  <CircularProgress size={13} color="inherit" />
+                                ) : (
+                                  <Iconify icon="solar:printer-minimalistic-bold" width={13} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          <Tooltip title="Share receipt">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleShareSale(sale);
+                                }}
+                                disabled={sharingSaleId === sale.id}
+                                sx={{ p: 0.35 }}
+                              >
+                                {sharingSaleId === sale.id ? (
+                                  <CircularProgress size={13} color="inherit" />
+                                ) : (
+                                  <Iconify icon="solar:share-bold" width={13} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          {String(sale.status || '').toLowerCase() === 'credit' && (
+                            <Tooltip title="Mark as paid">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleMarkAsPaid(sale);
+                                  }}
+                                  disabled={markingPaidSaleId === sale.id}
+                                  sx={{ p: 0.35 }}
+                                >
+                                  {markingPaidSaleId === sale.id ? (
+                                    <CircularProgress size={13} color="inherit" />
+                                  ) : (
+                                    <Iconify icon="solar:check-circle-bold" width={13} />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </Stack>
                       </Stack>
                     </Stack>
 
@@ -1909,6 +2222,43 @@ export function QuickDashboardView() {
         </Grid>
 
       </Grid>
+
+      <Dialog open={newCustomerOpen} onClose={() => !creatingCustomer && setNewCustomerOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Add New Customer</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Customer Name"
+              value={newCustomerName}
+              onChange={(e) => setNewCustomerName(e.target.value)}
+              fullWidth
+              size="small"
+              autoFocus
+            />
+            <TextField
+              label="Phone Number"
+              value={newCustomerPhone}
+              onChange={(e) => setNewCustomerPhone(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="inherit"
+            onClick={() => {
+              if (creatingCustomer) return;
+              setNewCustomerOpen(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={handleCreateCustomer} disabled={creatingCustomer}>
+            {creatingCustomer ? 'Adding...' : 'Add Customer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </DashboardContent>
   );
 }
