@@ -28,6 +28,12 @@ import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 
 import { InvoicePDF } from './invoice-pdf';
+import { ThermalReceiptPDF } from '../pos/receipt-thermal';
+import { A4ReceiptPDF } from '../pos/receipt-a4';
+
+function invoiceFileLabel(invoice) {
+  return invoice?.invoice_number || invoice?.invoiceNumber || invoice?.id || 'invoice';
+}
 
 function dataUrlToBlob(dataUrl) {
   const [header, base64] = dataUrl.split(',');
@@ -106,6 +112,10 @@ export function InvoiceToolbar({
   onChangeStatus,
   shareCaptureRef,
   storeSlug: propStoreSlug,
+  /** 'thermal' | 'a4' — default A4 for dashboard invoice list; POS receipt passes thermal by default. */
+  receiptFormat = 'a4',
+  /** 'pos' uses A4ReceiptPDF for A4; 'invoice' keeps classic InvoicePDF for A4. */
+  pdfFlavor = 'invoice',
 }) {
   const router = useRouter();
   const { storeParam } = useParams();
@@ -131,6 +141,21 @@ export function InvoiceToolbar({
     setReadyShareFile(null);
   }, []);
 
+  const getReceiptPdfDocument = useCallback(() => {
+    if (!invoice) return null;
+    if (receiptFormat === 'thermal') {
+      return <ThermalReceiptPDF receipt={invoice} currentStatus={currentStatus} />;
+    }
+    if (pdfFlavor === 'pos') {
+      return <A4ReceiptPDF receipt={invoice} currentStatus={currentStatus} />;
+    }
+    return <InvoicePDF invoice={invoice} currentStatus={currentStatus} />;
+  }, [invoice, currentStatus, receiptFormat, pdfFlavor]);
+
+  useEffect(() => {
+    setReadyShareFile(null);
+  }, [invoice?.id, receiptFormat]);
+
   const handleEdit = useCallback(() => {
     // Use the computed storeSlug and invoice id to navigate to the edit page
     router.push(paths.dashboard.pos.edit(storeSlug, invoice?.id));
@@ -143,7 +168,11 @@ export function InvoiceToolbar({
     }
 
     try {
-      const invoiceDocument = <InvoicePDF invoice={invoice} currentStatus={currentStatus} />;
+      const invoiceDocument = getReceiptPdfDocument();
+      if (!invoiceDocument) {
+        toast.error('No invoice data available to print.');
+        return;
+      }
       const blob = await pdf(invoiceDocument).toBlob();
       const blobUrl = URL.createObjectURL(blob);
       const printWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
@@ -164,7 +193,7 @@ export function InvoiceToolbar({
     } catch (error) {
       toast.error('Failed to prepare invoice for printing.');
     }
-  }, [invoice, currentStatus]);
+  }, [invoice, getReceiptPdfDocument]);
 
   const handleShareNow = useCallback(async () => {
     if (!readyShareFile) return;
@@ -172,8 +201,8 @@ export function InvoiceToolbar({
     try {
       if (navigator.share && navigator.canShare?.({ files: [readyShareFile] })) {
         await navigator.share({
-          title: readyShareFile.name.replace(/\.png$/i, ''),
-          text: 'Invoice',
+          title: readyShareFile.name.replace(/\.(png|pdf)$/i, ''),
+          text: receiptFormat === 'thermal' ? 'Receipt' : 'Invoice',
           files: [readyShareFile],
         });
         closeSharePreview();
@@ -188,16 +217,16 @@ export function InvoiceToolbar({
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(downloadUrl);
-      toast.info('Direct image sharing is unavailable on this browser. Invoice image downloaded.');
+      toast.info('Direct sharing is unavailable on this browser. File downloaded.');
       closeSharePreview();
     } catch (error) {
       if (error?.name !== 'AbortError') {
         // eslint-disable-next-line no-console
-        console.error('Invoice share-as-image failed:', error);
+        console.error('Share file failed:', error);
         toast.error('Sharing was blocked by the browser. Try again.');
       }
     }
-  }, [closeSharePreview, readyShareFile]);
+  }, [closeSharePreview, readyShareFile, receiptFormat]);
 
   const handleShare = useCallback(async () => {
     if (shareLoading) return;
@@ -213,19 +242,53 @@ export function InvoiceToolbar({
       return;
     }
 
-    const captureElement = shareCaptureRef?.current;
-    if (!captureElement) {
-      toast.error('Invoice preview not ready for sharing.');
-      return;
-    }
-
-    const invoiceLabel = invoice?.invoice_number || invoice?.invoiceNumber || 'invoice';
+    const invoiceLabel = invoiceFileLabel(invoice);
 
     try {
       setShareLoading(true);
+
+      // Prefer PDF (thermal or A4): full line items, prices, and totals on mobile share targets.
+      try {
+        const pdfDoc = getReceiptPdfDocument();
+        if (pdfDoc) {
+          const pdfBlob = await pdf(pdfDoc).toBlob();
+          const pdfFile = new File([pdfBlob], `${invoiceLabel}.pdf`, { type: 'application/pdf' });
+
+          if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
+            setReadyShareFile(pdfFile);
+            setSharePreviewOpen(true);
+            return;
+          }
+
+          const downloadUrl = URL.createObjectURL(pdfBlob);
+          const anchor = document.createElement('a');
+          anchor.href = downloadUrl;
+          anchor.download = `${invoiceLabel}.pdf`;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(downloadUrl);
+          toast.info('PDF downloaded — attach it from your files if share is not supported.');
+          return;
+        }
+      } catch (pdfError) {
+        // eslint-disable-next-line no-console
+        console.error('Share PDF generation failed, falling back to image:', pdfError);
+      }
+
+      const captureElement = shareCaptureRef?.current;
+      if (!captureElement) {
+        toast.error('Invoice preview not ready for sharing.');
+        return;
+      }
+
       await waitForCaptureAssets(captureElement);
 
-      const canvas = await html2canvas(captureElement, {
+      const el = captureElement;
+      const fullWidth = Math.max(el.scrollWidth, el.offsetWidth);
+      const fullHeight = Math.max(el.scrollHeight, el.offsetHeight);
+
+      const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
@@ -234,6 +297,10 @@ export function InvoiceToolbar({
         scrollY: -window.scrollY,
         backgroundColor: '#ffffff',
         imageTimeout: 15000,
+        width: fullWidth,
+        height: fullHeight,
+        windowWidth: fullWidth,
+        windowHeight: fullHeight,
       });
 
       const blobFromToBlob = await new Promise((resolve) => {
@@ -282,13 +349,13 @@ export function InvoiceToolbar({
     } finally {
       setShareLoading(false);
     }
-  }, [invoice, readyShareFile, shareCaptureRef, shareLoading]);
+  }, [invoice, readyShareFile, shareCaptureRef, shareLoading, getReceiptPdfDocument]);
 
   const renderDownload = (
     <NoSsr>
       <PDFDownloadLink
-        document={invoice ? <InvoicePDF invoice={invoice} currentStatus={currentStatus} /> : <span />}
-        fileName={invoice?.invoiceNumber}
+        document={invoice ? getReceiptPdfDocument() : <span />}
+        fileName={`${receiptFormat}-${invoiceFileLabel(invoice)}.pdf`}
         style={{ textDecoration: 'none' }}
       >
         {({ loading }) => (
@@ -376,28 +443,44 @@ export function InvoiceToolbar({
 
           <Box sx={{ flexGrow: 1, height: 1, overflow: 'hidden' }}>
             <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
-              {invoice && <InvoicePDF invoice={invoice} currentStatus={currentStatus} />}
+              {invoice && getReceiptPdfDocument()}
             </PDFViewer>
           </Box>
         </Box>
       </Dialog>
 
       <Dialog open={sharePreviewOpen} onClose={closeSharePreview} maxWidth="sm" fullWidth>
-        <DialogTitle>Share invoice image</DialogTitle>
+        <DialogTitle>
+          {readyShareFile?.type === 'application/pdf' ? 'Share receipt PDF' : 'Share invoice image'}
+        </DialogTitle>
 
         <DialogContent sx={{ pt: 2 }}>
           {sharePreviewUrl ? (
-            <Box
-              component="img"
-              alt="Invoice preview"
-              src={sharePreviewUrl}
-              sx={{
-                width: 1,
-                height: 'auto',
-                borderRadius: 1,
-                border: (theme) => `1px solid ${theme.palette.divider}`,
-              }}
-            />
+            readyShareFile?.type === 'application/pdf' ? (
+              <Box
+                component="iframe"
+                title="Receipt PDF preview"
+                src={sharePreviewUrl}
+                sx={{
+                  width: 1,
+                  height: { xs: 360, sm: 480 },
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1,
+                }}
+              />
+            ) : (
+              <Box
+                component="img"
+                alt="Invoice preview"
+                src={sharePreviewUrl}
+                sx={{
+                  width: 1,
+                  height: 'auto',
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                }}
+              />
+            )
           ) : (
             <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
               Preview not available

@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import MenuItem from '@mui/material/MenuItem';
+import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -27,6 +29,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { uploadFile } from 'src/actions/upload';
+import { searchCatalogProducts } from 'src/actions/catalog';
 import { useGetCategories } from 'src/actions/category';
 import { addProduct, editProduct, useGetProducts } from 'src/actions/product';
 import {
@@ -185,6 +188,9 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
   const [productType, setProductType] = useState(
     currentProduct?.is_pack ? 'pack' : 'single'
   );
+  const [catalogOptions, setCatalogOptions] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState(null);
 
   const [isPublish, setIsPublish] = useState(
     currentProduct?.publish === 'publish'
@@ -276,6 +282,67 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
     control: methods.control,
     name: 'sub_items',
   });
+
+  const handleCatalogSearch = useCallback(async (query) => {
+    const searchValue = (query || '').trim();
+    setCatalogLoading(true);
+    try {
+      const items = await searchCatalogProducts(searchValue, null, 12);
+      setCatalogOptions(items);
+    } catch (error) {
+      setCatalogOptions([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  const applyCatalogProduct = useCallback(
+    (catalogProduct) => {
+      if (!catalogProduct) return;
+
+      const metadata = catalogProduct.metadata || {};
+      const getNumeric = (val) => {
+        if (val === null || val === undefined || val === '') return null;
+        const num = Number(val);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      setValue('name', catalogProduct.name || '', { shouldValidate: true, shouldDirty: true });
+      setValue('description', catalogProduct.description || '', { shouldDirty: true });
+      setValue('taxes', Number(catalogProduct.default_tax_percent ?? 0), { shouldDirty: true });
+      setValue('code', catalogProduct.barcode || '', { shouldDirty: true });
+
+      if (catalogProduct.image_url && !values.coverUrl) {
+        setValue('coverUrl', catalogProduct.image_url, { shouldDirty: true });
+      }
+
+      const categoryById = categories.find((cat) => cat.id === catalogProduct.category_id);
+      const categoryByName = categories.find(
+        (cat) =>
+          catalogProduct.category_name &&
+          cat.name?.trim().toLowerCase() === catalogProduct.category_name.trim().toLowerCase()
+      );
+      const matchedCategory = categoryById || categoryByName;
+      if (matchedCategory) {
+        setValue('category_id', matchedCategory.id, { shouldValidate: true, shouldDirty: true });
+      }
+
+      const costCandidate = getNumeric(
+        metadata.default_cost_price ?? metadata.cost_price ?? metadata.costPrice
+      );
+      if (costCandidate !== null) {
+        setValue('costPrice', costCandidate, { shouldDirty: true });
+      }
+
+      const priceCandidate = getNumeric(
+        metadata.default_selling_price ?? metadata.selling_price ?? metadata.price
+      );
+      if (priceCandidate !== null) {
+        setValue('price', priceCandidate, { shouldValidate: true, shouldDirty: true });
+      }
+    },
+    [categories, setValue, values.coverUrl]
+  );
 
   useEffect(() => {
     if (values.product_kind === 'production_input') {
@@ -474,6 +541,46 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       <CardHeader title="Details" subheader="Title, short description, image..." sx={{ mb: 3 }} />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
+        <Stack spacing={1}>
+          <Typography variant="subtitle2">Autofill from catalog</Typography>
+          <Autocomplete
+            size="medium"
+            value={selectedCatalogProduct}
+            options={catalogOptions}
+            loading={catalogLoading}
+            getOptionLabel={(option) => option.name || ''}
+            onOpen={() => {
+              if (!catalogOptions.length) {
+                handleCatalogSearch('');
+              }
+            }}
+            onInputChange={(_, inputValue) => {
+              handleCatalogSearch(inputValue);
+            }}
+            onChange={(_, selected) => {
+              setSelectedCatalogProduct(selected);
+              applyCatalogProduct(selected);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search catalog product"
+                placeholder="Type item name or barcode"
+                helperText="Selecting a catalog item auto-fills name, description, tax, category, and common defaults."
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {catalogLoading ? <CircularProgress size={18} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+          />
+        </Stack>
+
         <Field.Text name="name" label={`${getLabel('product', 'name')} *`} />
 
         <Stack spacing={1}>

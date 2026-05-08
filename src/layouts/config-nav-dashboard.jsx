@@ -279,6 +279,8 @@ export const useNavData = () => {
         permissionKey: 'Product Management',
         children: [
           { title: `Add ${t('product')}`, path: callIfFunction(paths.dashboard.product.new, currentStore) },
+          // Temporarily hidden from nav while refining UX; route still works at .../product/bulk-add
+          // { title: `Bulk add ${t('product')}`, path: callIfFunction(paths.dashboard.product.bulkAdd, currentStore) },
           { title: `${t('product')} Report`, path: callIfFunction(paths.dashboard.product.root, currentStore) },
           { title: `${t('product')} History`, path: callIfFunction(paths.dashboard.product.history, currentStore) },
         ],

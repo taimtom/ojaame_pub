@@ -199,6 +199,16 @@ export async function bulkRestockProducts(payload) {
   }
 }
 
+export async function bulkOnboardProducts(payload) {
+  try {
+    const response = await axiosInstance.post(endpoints.product.bulkOnboard, payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting bulk onboarding:', error);
+    throw error;
+  }
+}
+
 export async function changeProductPrice(productId, priceData) {
   try {
     const url = `${endpoints.product.changePrice}/${productId}`;

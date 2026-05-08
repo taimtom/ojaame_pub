@@ -14,6 +14,22 @@ Font.register({
   ],
 });
 
+/** Match invoice-details line totals (fractional qty, persisted total). */
+function lineItemTotal(item) {
+  if (item?.total != null && item.total !== '') {
+    const t = Number(item.total);
+    if (!Number.isNaN(t)) return t;
+  }
+  const p = Number(item?.price);
+  const q = Number(item?.quantity);
+  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
+  return 0;
+}
+
+// 80 mm roll width in points (1 mm ≈ 2.83465 pt); A4 height for multi-page thermal strips.
+const THERMAL_WIDTH_PT = 80 * 2.83465;
+const THERMAL_PAGE_HEIGHT_PT = 841.89;
+
 const useStyles = () =>
   useMemo(
     () =>
@@ -265,7 +281,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
           </Text>
           <Text style={styles.itemQty}>{item.quantity}</Text>
           <Text style={styles.itemPrice}>{fCurrency(item.price)}</Text>
-          <Text style={styles.itemTotal}>{fCurrency(item.quantity * item.price)}</Text>
+          <Text style={styles.itemTotal}>{fCurrency(lineItemTotal(item))}</Text>
         </View>
       ))}
       <View style={styles.divider} />
@@ -356,7 +372,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
 
   return (
     <Document>
-      <Page size="A7" style={styles.page}>
+      <Page size={[THERMAL_WIDTH_PT, THERMAL_PAGE_HEIGHT_PT]} style={styles.page} wrap>
         {renderHeader}
         {renderReceiptInfo}
         {renderItems}

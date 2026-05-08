@@ -15,3 +15,5 @@ export * from './product-add-quantity-view';
 export * from './product-adjust-stock-view';
 
 export * from './product-change-price-view';
+
+export * from './product-bulk-onboard-view';

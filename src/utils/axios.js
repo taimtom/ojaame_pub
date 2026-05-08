@@ -125,6 +125,12 @@ export const endpoints = {
     usage: '/api/product/usage',
     publish: '/api/product/publish',
     bulkRestock: '/api/product/bulk-restock',
+    bulkOnboard: '/api/product/bulk-onboard',
+  },
+  catalog: {
+    searchProducts: '/api/catalog/products/search',
+    details: '/api/catalog/products',
+    categories: '/api/catalog/categories',
   },
   shop: {
     list: '/api/product/list',

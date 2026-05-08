@@ -33,10 +33,19 @@ import { InvoiceDetails } from '../../invoice/invoice-details';
 
 // ----------------------------------------------------------------------
 
+const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
+
+function readStoredReceiptFormat() {
+  if (typeof window === 'undefined') return 'thermal';
+  const v = window.localStorage.getItem(RECEIPT_FORMAT_STORAGE_KEY);
+  if (v === 'thermal' || v === 'a4') return v;
+  return 'thermal';
+}
+
 export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, storeNameSlug, storeId }) {
   const router = useRouter();
   const view = useBoolean();
-  const [receiptFormat, setReceiptFormat] = useState('a4'); // 'a4' or 'thermal'
+  const [receiptFormat, setReceiptFormat] = useState(() => readStoredReceiptFormat());
 
   const handleBackToSales = useCallback(() => {
     router.push(paths.dashboard.pos.root(storeSlug));
@@ -49,6 +58,11 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
   const handleFormatChange = (event, newFormat) => {
     if (newFormat !== null) {
       setReceiptFormat(newFormat);
+      try {
+        localStorage.setItem(RECEIPT_FORMAT_STORAGE_KEY, newFormat);
+      } catch {
+        /* quota / private mode */
+      }
     }
   };
 
@@ -172,7 +186,7 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Receipt Format:
+                  Receipt format (print, download, share):
                 </Typography>
                 <ToggleButtonGroup
                   value={receiptFormat}
@@ -180,16 +194,16 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
                   onChange={handleFormatChange}
                   size="small"
                 >
-                  <ToggleButton value="a4">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="mdi:file-pdf-box" />
-                      <span>A4 Paper</span>
-                    </Stack>
-                  </ToggleButton>
                   <ToggleButton value="thermal">
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Iconify icon="mdi:receipt" />
                       <span>80mm Thermal</span>
+                    </Stack>
+                  </ToggleButton>
+                  <ToggleButton value="a4">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Iconify icon="mdi:file-pdf-box" />
+                      <span>A4 Paper</span>
                     </Stack>
                   </ToggleButton>
                 </ToggleButtonGroup>
@@ -238,7 +252,7 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
         </Card>
 
         {/* Receipt Details */}
-        <InvoiceDetails invoice={receipt} />
+        <InvoiceDetails invoice={receipt} receiptFormat={receiptFormat} pdfFlavor="pos" />
       </DashboardContent>
 
       {/* PDF Preview Dialog */}

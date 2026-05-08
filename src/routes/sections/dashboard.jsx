@@ -39,6 +39,7 @@ const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const ProductAddQuantityPage = lazy(() => import('src/pages/dashboard/product/addqty'));
 const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/adjust'));
 const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/change-price'));
+const ProductBulkAddPage = lazy(() => import('src/pages/dashboard/product/bulk-add'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
 
@@ -222,6 +223,7 @@ export const dashboardRoutes = [
             { path: ':id', element: <ProductDetailsPage /> },
             { path: ':id/movement', element: <ProductHistoryMovementPage /> },
             { path: 'new', element: <ProductCreatePage /> },
+            { path: 'bulk-add', element: <ProductBulkAddPage /> },
             { path: ':id/edit', element: <ProductEditPage /> },
             { path: ':id/addqty', element: <ProductAddQuantityPage /> },
             { path: ':id/adjust', element: <ProductAdjustStockPage /> },

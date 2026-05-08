@@ -73,7 +73,7 @@ function resolveInvoiceContactEmail(invoice) {
   );
 }
 
-export function InvoiceDetails({ invoice }) {
+export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'invoice' }) {
   const invoiceCaptureRef = useRef(null);
   const contactEmail = resolveInvoiceContactEmail(invoice);
 
@@ -213,6 +213,8 @@ export function InvoiceDetails({ invoice }) {
         onChangeStatus={handleChangeStatus}
         statusOptions={INVOICE_STATUS_OPTIONS}
         shareCaptureRef={invoiceCaptureRef}
+        receiptFormat={receiptFormat}
+        pdfFlavor={pdfFlavor}
       />
 
       <Card ref={invoiceCaptureRef} sx={{ pt: 5, px: 5 }}>

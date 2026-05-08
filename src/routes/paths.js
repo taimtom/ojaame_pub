@@ -182,6 +182,7 @@ export const paths = {
       // history: `${ROOTS.DASHBOARD}/product/history`,
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product`,
       new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/new`,
+      bulkAdd: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/bulk-add`,
       details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}`,
       movement: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/movement`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/edit`,
