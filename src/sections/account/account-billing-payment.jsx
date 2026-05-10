@@ -10,6 +10,8 @@ import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -23,6 +25,7 @@ import {
   useGetSubscriptionStatus,
   getSubscriptionManageLink,
 } from 'src/actions/billing';
+import { setPaymentPreference } from 'src/actions/wallet';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -30,6 +33,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { SIGNUP_PENDING_PAYMENT_METHOD_KEY } from 'src/auth/signup-constants';
+import { AccountBillingWallet } from './account-billing-wallet';
 
 // ----------------------------------------------------------------------
 
@@ -47,9 +51,24 @@ export function AccountBillingPayment() {
   const router = useRouter();
   const { user } = useAuthContext();
   const { cards, cardsLoading, mutateCards } = useGetBillingCards();
-  const { hasPaystackSubscription, mutateStatus } = useGetSubscriptionStatus();
+  const { hasPaystackSubscription, paymentPreference, mutateStatus } = useGetSubscriptionStatus();
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [prefLoading, setPrefLoading] = useState(false);
+
+  const handlePreferenceChange = async (_e, newPref) => {
+    if (!newPref || newPref === paymentPreference) return;
+    setPrefLoading(true);
+    try {
+      await setPaymentPreference(newPref);
+      await mutateStatus?.();
+      toast.success(`Payment method switched to ${newPref === 'wallet' ? 'Wallet' : 'Card'}.`);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to update preference.');
+    } finally {
+      setPrefLoading(false);
+    }
+  };
 
   const handleAddCard = () => {
     if (!PAYSTACK_PUBLIC_KEY) {
@@ -147,134 +166,163 @@ export function AccountBillingPayment() {
 
   return (
     <Card sx={{ p: 3 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+      {/* Payment preference toggle */}
+      <Stack spacing={0.5} sx={{ mb: 3 }}>
         <Typography variant="overline" sx={{ color: 'text.secondary' }}>
           Payment method
         </Typography>
-        <Button
+        <ToggleButtonGroup
+          exclusive
           size="small"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-          onClick={handleAddCard}
+          value={paymentPreference}
+          onChange={handlePreferenceChange}
+          disabled={prefLoading}
+          sx={{ width: 'fit-content' }}
         >
-          New Card
-        </Button>
+          <ToggleButton value="card" sx={{ px: 2, gap: 0.75 }}>
+            <Iconify icon="solar:card-bold" width={16} />
+            Card
+          </ToggleButton>
+          <ToggleButton value="wallet" sx={{ px: 2, gap: 0.75 }}>
+            <Iconify icon="solar:wallet-bold" width={16} />
+            Wallet
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Stack>
 
-      <Stack spacing={2}>
-        {cardsLoading && (
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Loading payment methods...
-          </Typography>
-        )}
+      {/* Wallet mode */}
+      {paymentPreference === 'wallet' && (
+        <AccountBillingWallet />
+      )}
 
-        {!cardsLoading && cards.length === 0 && (
-          <Box
-            sx={{
-              py: 4,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 1,
-              color: 'text.secondary',
-            }}
-          >
-            <Iconify icon="solar:card-bold" width={40} sx={{ opacity: 0.4 }} />
-            <Typography variant="body2">
-              No payment methods saved.
-            </Typography>
-            <Typography variant="caption">
-              Add a card to enable automatic monthly billing.
-            </Typography>
-          </Box>
-        )}
-
-        {cards.map((card) => (
-          <Stack
-            key={card.id}
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{
-              p: 2,
-              borderRadius: 1,
-              border: (theme) =>
-                `1px solid ${card.is_default ? theme.palette.primary.main : theme.palette.divider}`,
-              bgcolor: card.is_default ? 'primary.lighter' : 'background.neutral',
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Iconify
-                icon={CARD_BRAND_ICONS[card.card_type?.toLowerCase()] || 'mdi:credit-card'}
-                width={36}
-              />
-              <Box>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography variant="subtitle2">
-                    •••• •••• •••• {card.last4}
-                  </Typography>
-                  {card.is_default && (
-                    <Chip label="Default" size="small" color="primary" variant="outlined" />
-                  )}
-                </Stack>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {card.bank} · Expires {card.exp_month}/{card.exp_year}
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Stack direction="row" spacing={0.5}>
-              {!card.is_default && (
-                <Tooltip title="Set as default">
-                  <IconButton
-                    size="small"
-                    disabled={actionLoading === `default-${card.id}`}
-                    onClick={() => handleSetDefault(card.id)}
-                  >
-                    <Iconify icon="eva:star-outline" />
-                  </IconButton>
-                </Tooltip>
-              )}
-              <Tooltip title="Remove card">
-                <IconButton
-                  size="small"
-                  color="error"
-                  disabled={actionLoading === `remove-${card.id}`}
-                  onClick={() => handleRemove(card.id)}
-                >
-                  <Iconify icon="solar:trash-bin-trash-bold" />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </Stack>
-        ))}
-      </Stack>
-
-      {cards.length > 0 && (
+      {/* Card mode */}
+      {paymentPreference === 'card' && (
         <>
-          <Divider sx={{ my: 2 }} />
-          <Stack direction="row" justifyContent="space-between">
-            <Tooltip
-              title={
-                !hasPaystackSubscription
-                  ? 'Available after your first billing cycle is set up'
-                  : ''
-              }
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+            <Button
+              size="small"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={handleAddCard}
             >
-              <span>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={handleManageLink}
-                  disabled={!hasPaystackSubscription}
-                >
-                  Manage via Paystack
-                </Button>
-              </span>
-            </Tooltip>
-            <Button size="small" color="error" onClick={() => setClearConfirmOpen(true)}>
-              Clear all
+              New Card
             </Button>
           </Stack>
+
+          <Stack spacing={2}>
+            {cardsLoading && (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Loading payment methods...
+              </Typography>
+            )}
+
+            {!cardsLoading && cards.length === 0 && (
+              <Box
+                sx={{
+                  py: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  color: 'text.secondary',
+                }}
+              >
+                <Iconify icon="solar:card-bold" width={40} sx={{ opacity: 0.4 }} />
+                <Typography variant="body2">No payment methods saved.</Typography>
+                <Typography variant="caption">
+                  Add a card to enable automatic monthly billing.
+                </Typography>
+              </Box>
+            )}
+
+            {cards.map((card) => (
+              <Stack
+                key={card.id}
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{
+                  p: 2,
+                  borderRadius: 1,
+                  border: (theme) =>
+                    `1px solid ${card.is_default ? theme.palette.primary.main : theme.palette.divider}`,
+                  bgcolor: card.is_default ? 'primary.lighter' : 'background.neutral',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Iconify
+                    icon={CARD_BRAND_ICONS[card.card_type?.toLowerCase()] || 'mdi:credit-card'}
+                    width={36}
+                  />
+                  <Box>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="subtitle2">
+                        •••• •••• •••• {card.last4}
+                      </Typography>
+                      {card.is_default && (
+                        <Chip label="Default" size="small" color="primary" variant="outlined" />
+                      )}
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {card.bank} · Expires {card.exp_month}/{card.exp_year}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Stack direction="row" spacing={0.5}>
+                  {!card.is_default && (
+                    <Tooltip title="Set as default">
+                      <IconButton
+                        size="small"
+                        disabled={actionLoading === `default-${card.id}`}
+                        onClick={() => handleSetDefault(card.id)}
+                      >
+                        <Iconify icon="eva:star-outline" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip title="Remove card">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={actionLoading === `remove-${card.id}`}
+                      onClick={() => handleRemove(card.id)}
+                    >
+                      <Iconify icon="solar:trash-bin-trash-bold" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Stack>
+            ))}
+          </Stack>
+
+          {cards.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Stack direction="row" justifyContent="space-between">
+                <Tooltip
+                  title={
+                    !hasPaystackSubscription
+                      ? 'Available after your first billing cycle is set up'
+                      : ''
+                  }
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleManageLink}
+                      disabled={!hasPaystackSubscription}
+                    >
+                      Manage via Paystack
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Button size="small" color="error" onClick={() => setClearConfirmOpen(true)}>
+                  Clear all
+                </Button>
+              </Stack>
+            </>
+          )}
         </>
       )}
 

@@ -308,6 +308,15 @@ export const endpoints = {
     status:      '/api/subscription/status',
   },
 
+  wallet: {
+    details:       '/api/billing/wallet',
+    create:        '/api/billing/wallet/create',
+    transactions:  '/api/billing/wallet/transactions',
+    preference:    '/api/billing/wallet/preference',
+    topupInitiate: '/api/billing/wallet/topup/initiate',
+    topupVerify:   '/api/billing/wallet/topup/verify',
+  },
+
   support: {
     tickets: '/api/support/tickets',
     ticketComments: (id) => `/api/support/tickets/${id}/comments`,

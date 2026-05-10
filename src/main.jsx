@@ -2,6 +2,7 @@ import ReactDOM from 'react-dom/client';
 import { Suspense, StrictMode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import { registerSW } from 'virtual:pwa-register';
 
 import App from './app';
 import { CONFIG } from './config-global';
@@ -21,3 +22,12 @@ root.render(
     </HelmetProvider>
   </StrictMode>
 );
+
+registerSW({
+  onNeedRefresh() {
+    console.log('[PWA] New content available, auto-updating...');
+  },
+  onOfflineReady() {
+    console.log('[PWA] App is ready for offline use');
+  },
+});

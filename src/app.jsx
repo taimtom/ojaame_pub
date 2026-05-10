@@ -18,6 +18,8 @@ import { Snackbar } from 'src/components/snackbar';
 import { ProgressBar } from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
+import { OfflineBanner } from 'src/components/pwa/offline-banner';
+import { PwaInstallBanner } from 'src/components/pwa/pwa-install-banner';
 
 import { CheckoutProvider } from 'src/sections/checkout/context';
 
@@ -55,6 +57,8 @@ export default function App() {
                 <ThemeProvider>
                   <MotionLazy>
                     <CheckoutProvider>
+                      <OfflineBanner />
+                      <PwaInstallBanner />
                       <Snackbar />
                       <ProgressBar />
                       <SettingsDrawer />

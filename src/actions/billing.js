@@ -27,6 +27,9 @@ export function useGetSubscriptionStatus() {
     isOwner: data?.is_owner ?? false,
     hasPaymentMethod: data?.has_payment_method ?? false,
     hasPaystackSubscription: data?.has_paystack_subscription ?? false,
+    hasWallet: data?.has_wallet ?? false,
+    walletBalance: data?.wallet_balance ?? 0,
+    paymentPreference: data?.payment_preference ?? 'card',
     statusLoading: isLoading,
     mutateStatus: mutate,
   };
