@@ -165,7 +165,7 @@ export function HomeHero() {
                   boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.5)}`,
                 }}
               >
-                Start Free Today
+                Get Started Today
               </Button>
               <Button
                 component={RouterLink}

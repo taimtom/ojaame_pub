@@ -7,7 +7,7 @@ import { HomeView } from 'src/sections/home/view';
 const metadata = {
   title: 'Ojaame POS — All-in-One Point of Sale for African Businesses',
   description:
-    'Ojaame is the fastest, easiest POS system for retail shops, service providers and restaurants. Manage sales, inventory, invoices, credit customers and business analytics — all in one place. Start free today.',
+    'Ojaame is the fastest, easiest POS system for retail shops, service providers and restaurants. Manage sales, inventory, invoices, credit customers and business analytics — all in one place. Get started today.',
 };
 
 export default function Page() {
