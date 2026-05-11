@@ -40,7 +40,12 @@ export function AccountBillingWallet() {
     walletLoading, mutateWallet,
   } = useGetWallet();
   const { transactions, txLoading } = useGetWalletTransactions(1, 5);
-  const { walletBalance: statusBalance } = useGetSubscriptionStatus();
+  const {
+    walletBalance: statusBalance,
+    hasPaidInvoice,
+    subscriptionTotal,
+    nextBillingDate,
+  } = useGetSubscriptionStatus();
 
   const [creating, setCreating] = useState(false);
   const [fundAmount, setFundAmount] = useState('');
@@ -144,8 +149,54 @@ export function AccountBillingWallet() {
     );
   }
 
+  // Alert 1 — first activation: wallet configured but balance not yet enough to trigger the first charge
+  const totalDue = subscriptionTotal || statusBalance || 3000;
+  const shortfall = Math.max(0, totalDue - walletBalance);
+  const showActivationAlert = walletExists && !hasPaidInvoice && walletBalance < totalDue;
+
+  // Alert 2 — upcoming renewal: balance won't cover next charge within 10 days
+  const daysUntilBilling = nextBillingDate
+    ? Math.ceil((new Date(nextBillingDate) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showRenewalAlert =
+    walletExists &&
+    hasPaidInvoice &&
+    daysUntilBilling !== null &&
+    daysUntilBilling <= 10 &&
+    daysUntilBilling >= 0 &&
+    walletBalance < totalDue;
+
   return (
     <Stack spacing={2.5}>
+      {/* Activation alert — balance too low for first charge */}
+      {showActivationAlert && (
+        <Alert
+          severity="warning"
+          icon={<Iconify icon="solar:wallet-money-bold" width={20} />}
+        >
+          <strong>Subscription not yet active.</strong> Your wallet balance is{' '}
+          <strong>{fCurrency(walletBalance)}</strong>. Top up at least{' '}
+          <strong>{fCurrency(shortfall)}</strong> more to reach the{' '}
+          <strong>{fCurrency(totalDue)}</strong> required to activate your
+          subscription.
+        </Alert>
+      )}
+
+      {/* Renewal alert — upcoming charge, insufficient balance */}
+      {showRenewalAlert && (
+        <Alert
+          severity="error"
+          icon={<Iconify icon="solar:bell-bing-bold" width={20} />}
+        >
+          <strong>Wallet balance will be insufficient for upcoming renewal.</strong>{' '}
+          Your next charge of <strong>{fCurrency(totalDue)}</strong> is due in{' '}
+          <strong>{daysUntilBilling} day{daysUntilBilling !== 1 ? 's' : ''}</strong>.
+          Current balance is <strong>{fCurrency(walletBalance)}</strong> — top up
+          at least <strong>{fCurrency(shortfall)}</strong> to avoid a service
+          interruption.
+        </Alert>
+      )}
+
       {/* Balance */}
       <Box
         sx={{
@@ -161,7 +212,7 @@ export function AccountBillingWallet() {
         <Typography variant="h4" sx={{ mt: 0.5, fontWeight: 700 }}>
           {fCurrency(walletBalance)}
         </Typography>
-        {walletBalance < (statusBalance ?? 3000) && walletBalance >= 0 && (
+        {!showActivationAlert && !showRenewalAlert && walletBalance < totalDue && walletBalance >= 0 && (
           <Chip
             label="Low balance — top up before next billing"
             size="small"

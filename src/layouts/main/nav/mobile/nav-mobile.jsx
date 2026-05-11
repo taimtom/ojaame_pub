@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 
 import { paths } from 'src/routes/paths';
 import { usePathname } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
 import { Logo } from 'src/components/logo';
 import { NavUl } from 'src/components/nav-section';
@@ -62,11 +63,10 @@ export function NavMobile({ data, open, onClose, slots, sx }) {
           <Button
             fullWidth
             variant="contained"
-            rel="noopener"
-            target="_blank"
-            href={paths.minimalStore}
+            component={RouterLink}
+            href={paths.auth.jwt.signUp}
           >
-            Purchase
+            Sign up
           </Button>
         </Box>
       )}

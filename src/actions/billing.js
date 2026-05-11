@@ -30,6 +30,8 @@ export function useGetSubscriptionStatus() {
     hasWallet: data?.has_wallet ?? false,
     walletBalance: data?.wallet_balance ?? 0,
     paymentPreference: data?.payment_preference ?? 'card',
+    hasPaidInvoice: data?.has_paid_invoice ?? false,
+    subscriptionTotal: data?.subscription_total ?? 3000,
     statusLoading: isLoading,
     mutateStatus: mutate,
   };
