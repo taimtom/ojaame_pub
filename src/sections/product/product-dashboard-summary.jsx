@@ -187,14 +187,15 @@ export function ProductDashboardSummary({ product }) {
             value={fCurrency(costPrice)}
           />
         )}
-        {priceSale != null && (
+        {/* Sale price hidden — use variable pricing or on-the-fly discount instead */}
+        {/* {priceSale != null && (
           <InfoRow
             icon="solar:sale-bold"
             label="Sale Price"
             value={fCurrency(priceSale)}
             valueColor={theme.palette.error.main}
           />
-        )}
+        )} */}
         {taxes != null && taxes > 0 && (
           <InfoRow icon="solar:percent-bold" label="Taxes" value={`${taxes}%`} />
         )}

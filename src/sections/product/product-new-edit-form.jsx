@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
@@ -30,7 +30,8 @@ import { useRouter } from 'src/routes/hooks';
 
 import { uploadFile } from 'src/actions/upload';
 import { searchCatalogProducts } from 'src/actions/catalog';
-import { useGetCategories } from 'src/actions/category';
+import { useGetCategories, addCategory } from 'src/actions/category';
+import { CategoryQuickAddDialog } from './category-quick-add-dialog';
 import { addProduct, editProduct, useGetProducts } from 'src/actions/product';
 import {
   _tags,
@@ -198,7 +199,8 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
 
 
 
-  const { categories, categoriesLoading } = useGetCategories(storeId);
+  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { products } = useGetProducts(storeId);
 
   const ingredientOptions = useMemo(
@@ -650,13 +652,67 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
           </Stack>
         )}
 
-        <Field.Select native name="category_id" label={`${t('category')} *`} InputLabelProps={{ shrink: true }}>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </Field.Select>
+        {/* Searchable category select */}
+        <Controller
+          name="category_id"
+          control={methods.control}
+          render={({ field, fieldState }) => (
+            <Autocomplete
+              options={categories}
+              getOptionLabel={(opt) => (typeof opt === 'object' ? opt.name : categories.find((c) => c.id === opt)?.name || '')}
+              isOptionEqualToValue={(opt, val) => opt.id === (typeof val === 'object' ? val?.id : val)}
+              value={categories.find((c) => c.id === field.value) || null}
+              loading={categoriesLoading}
+              onChange={(_e, newVal) => {
+                if (newVal?.__isAddNew) {
+                  setQuickAddOpen(true);
+                } else {
+                  field.onChange(newVal ? newVal.id : '');
+                }
+              }}
+              filterOptions={(opts, state) => {
+                const filtered = opts.filter((o) =>
+                  o.name.toLowerCase().includes(state.inputValue.toLowerCase())
+                );
+                filtered.push({ id: '__add__', name: `+ Add "${state.inputValue || 'new category'}"`, __isAddNew: true });
+                return filtered;
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id} style={option.__isAddNew ? { color: 'var(--palette-primary-main)', fontWeight: 600 } : {}}>
+                  {option.name}
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={`${t('category')} *`}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {categoriesLoading ? <CircularProgress size={16} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          )}
+        />
+
+        <CategoryQuickAddDialog
+          open={quickAddOpen}
+          storeId={storeId}
+          onClose={() => setQuickAddOpen(false)}
+          onCreated={async (newCat) => {
+            await mutateCategories();
+            methods.setValue('category_id', newCat.id, { shouldValidate: true });
+          }}
+        />
         {/* Product Code and SKU side by side */}
         {(isFieldVisible('product', 'code') || isFieldVisible('product', 'sku')) && (
           <Stack direction="row" spacing={2}>
@@ -816,7 +872,8 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
                 }}
               />
             )}
-            <Field.Text
+            {/* Sale price field hidden — use variable pricing or on-the-fly discount instead */}
+            {/* <Field.Text
               name="priceSale"
               label={`Sale ${t('price')}`}
               placeholder="0.00"
@@ -829,7 +886,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
                   </InputAdornment>
                 ),
               }}
-            />
+            /> */}
             <FormControlLabel
               control={
                 <Switch
