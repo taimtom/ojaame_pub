@@ -75,12 +75,23 @@ function loadSearchCache() {
 
 function filterCacheByQuery(cachedResults, q) {
   const lower = q.toLowerCase();
-  return cachedResults.filter(
-    (r) =>
-      r.name?.toLowerCase().includes(lower) ||
-      r.sku?.toLowerCase().includes(lower) ||
-      r.code?.toLowerCase().includes(lower)
-  );
+  const spaceless = lower.replace(/\s+/g, '');        // "5 alive" → "5alive"
+  const tokens = lower.split(/\s+/).filter(Boolean);  // ["5", "alive"]
+
+  return cachedResults.filter((r) => {
+    const name = r.name?.toLowerCase() || '';
+    const sku  = r.sku?.toLowerCase()  || '';
+    const code = r.code?.toLowerCase() || '';
+
+    // Exact phrase match
+    if (name.includes(lower) || sku.includes(lower) || code.includes(lower)) return true;
+    // Spaceless variant: catches "5alive" ↔ "5 alive"
+    const nameSpaceless = name.replace(/\s+/g, '');
+    if (spaceless && nameSpaceless.includes(spaceless)) return true;
+    // All tokens present anywhere in the name (order-independent partial match)
+    if (tokens.length > 1 && tokens.every((t) => name.includes(t))) return true;
+    return false;
+  });
 }
 
 // ----------------------------------------------------------------------
