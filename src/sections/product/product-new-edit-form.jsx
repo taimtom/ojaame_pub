@@ -236,7 +236,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
             : currentProduct.quantity ?? 0
           : 1,
       costPrice: currentProduct?.costPrice || 0,
-      priceSale: currentProduct?.priceSale || 0,
+      priceSale: currentProduct?.priceSale || null,
       tags: currentProduct?.tags || [],
       taxes: currentProduct?.taxes || 0,
       gender: currentProduct?.gender || [],
@@ -353,7 +353,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       setValue('allow_variable_price', false);
       setValue('variable_price_min', null);
       setValue('variable_price_max', null);
-      setValue('priceSale', 0);
+      setValue('priceSale', null);
       setValue('sub_items', []);
     }
   }, [values.product_kind, setValue]);
