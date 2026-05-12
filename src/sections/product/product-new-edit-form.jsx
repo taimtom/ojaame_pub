@@ -65,10 +65,10 @@ export const NewProductSchema = zod
     product_kind: zod.enum(['sellable', 'production_input']).default('sellable'),
     price: zod.number().min(0, { message: 'Invalid price' }),
     category_id: zod.coerce.number().min(1, { message: 'Category is required' }),
-    costPrice: zod.number().optional(),
-    priceSale: zod.number().optional(),
+    costPrice: zod.number().nullable().optional(),
+    priceSale: zod.number().nullable().optional(),
     subDescription: zod.string().optional(),
-    taxes: zod.number().optional(),
+    taxes: zod.number().nullable().optional(),
     publish: zod.string().optional(),
     // Pack fields
     is_pack: zod.boolean().optional(),
@@ -149,16 +149,16 @@ export const NewProductSchema = zod
   })
   .refine((data) => {
     if (data.product_kind !== 'production_input') return true;
-    return data.costPrice !== undefined && data.costPrice >= 0;
+    return data.costPrice != null && data.costPrice >= 0;
   }, {
     message: 'Cost price is required for production input items.',
     path: ['costPrice'],
   })
   .refine((data) => {
     if (data.product_kind === 'production_input') return true;
-    if (data.costPrice !== undefined) {
+    if (data.costPrice != null) {
       if (data.costPrice > data.price) return false;
-      if (data.priceSale !== undefined && data.costPrice > data.priceSale) return false;
+      if (data.priceSale != null && data.costPrice > data.priceSale) return false;
     }
     return true;
   }, {
@@ -366,6 +366,13 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
     }
   }, [currentProduct, defaultValues, reset]);
 
+  // For new products: sync category_id once categories finish loading
+  useEffect(() => {
+    if (!currentProduct && defaultCategory) {
+      setValue('category_id', defaultCategory, { shouldValidate: true });
+    }
+  }, [defaultCategory, currentProduct, setValue]);
+
 
   useEffect(() => {
     if (includeTaxes) {
@@ -520,6 +527,16 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
         message = 'An unknown error occurred';
       }
       toast.error(message);
+    }
+  }, (validationErrors) => {
+    // Scroll to the first invalid field so the user can see what's wrong
+    const firstKey = Object.keys(validationErrors)[0];
+    if (firstKey) {
+      const el = document.querySelector(`[name="${firstKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus?.();
+      }
     }
   });
 

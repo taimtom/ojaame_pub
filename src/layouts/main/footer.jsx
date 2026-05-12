@@ -134,7 +134,7 @@ export function Footer({ layoutQuery, sx }) {
         </Grid>
 
         <Typography variant="body2" sx={{ mt: 10 }}>
-          © All rights reserved.
+          © {new Date().getFullYear()} Taimtom Limited. All rights reserved.
         </Typography>
       </Container>
     </Box>
@@ -158,9 +158,7 @@ export function HomeFooter({ sx }) {
       <Container>
         <Logo />
         <Box sx={{ mt: 1, typography: 'caption' }}>
-          © All rights reserved.
-          <br /> made by
-          <Link href="https://minimals.cc/"> minimals.cc </Link>
+          © {new Date().getFullYear()} Taimtom Limited. All rights reserved.
         </Box>
       </Container>
     </Box>
