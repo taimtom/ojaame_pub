@@ -560,45 +560,47 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       <CardHeader title="Details" subheader="Title, short description, image..." sx={{ mb: 3 }} />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
-        <Stack spacing={1}>
-          <Typography variant="subtitle2">Autofill from suggestions</Typography>
-          <Autocomplete
-            size="medium"
-            value={selectedCatalogProduct}
-            options={catalogOptions}
-            loading={catalogLoading}
-            getOptionLabel={(option) => option.name || ''}
-            onOpen={() => {
-              if (!catalogOptions.length) {
-                handleCatalogSearch('');
-              }
-            }}
-            onInputChange={(_, inputValue) => {
-              handleCatalogSearch(inputValue);
-            }}
-            onChange={(_, selected) => {
-              setSelectedCatalogProduct(selected);
-              applyCatalogProduct(selected);
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Search product name"
-                placeholder="Type item name or barcode"
-                helperText="Selecting a match auto-fills name, description, tax, category, and common defaults."
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {catalogLoading ? <CircularProgress size={18} /> : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-          />
-        </Stack>
+        {!currentProduct && (
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Autofill from suggestions</Typography>
+            <Autocomplete
+              size="medium"
+              value={selectedCatalogProduct}
+              options={catalogOptions}
+              loading={catalogLoading}
+              getOptionLabel={(option) => option.name || ''}
+              onOpen={() => {
+                if (!catalogOptions.length) {
+                  handleCatalogSearch('');
+                }
+              }}
+              onInputChange={(_, inputValue) => {
+                handleCatalogSearch(inputValue);
+              }}
+              onChange={(_, selected) => {
+                setSelectedCatalogProduct(selected);
+                applyCatalogProduct(selected);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search product name"
+                  placeholder="Type item name or barcode"
+                  helperText="Selecting a match auto-fills name, description, tax, category, and common defaults."
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {catalogLoading ? <CircularProgress size={18} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </Stack>
+        )}
 
         <Field.Text name="name" label={`${getLabel('product', 'name')} *`} />
 
