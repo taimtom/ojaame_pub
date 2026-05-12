@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -77,32 +78,68 @@ export default function AgentDashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const unlockThreshold = data.unlock_threshold ?? 5;
+
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={3}>
         Dashboard
       </Typography>
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={3}>
+      <Grid container spacing={2} mb={2}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard title="Businesses Referred" value={data.total_businesses} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
-            title="Total Earned"
+            title="Total Earned (all statuses)"
             value={formatNaira(data.total_earned)}
             color="success.main"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard title="Total Paid Out" value={formatNaira(data.total_paid_out)} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Available Balance"
-            value={formatNaira(data.balance)}
-            color="primary.main"
-          />
+      </Grid>
+
+      <Grid container spacing={2} mb={3}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%', borderLeft: (t) => `4px solid ${t.palette.primary.main}` }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Available
+              </Typography>
+              <Typography variant="h4" fontWeight={700} color="primary.main">
+                {formatNaira(data.balance)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                Ready to withdraw
+              </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => navigate('/agent/withdrawals')}
+              >
+                Withdraw
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%', borderLeft: (t) => `4px solid ${t.palette.warning.main}` }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Pending (Ledger)
+              </Typography>
+              <Typography variant="h4" fontWeight={700} color="warning.dark">
+                {formatNaira(data.ledger_balance ?? 0)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Unlocks after {unlockThreshold} qualifying paid transactions from each referred
+                business
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
@@ -155,13 +192,20 @@ export default function AgentDashboardPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Business</TableCell>
+                  <TableCell>Unlock</TableCell>
                   <TableCell>Setup Complete</TableCell>
                   <TableCell>Active</TableCell>
                   <TableCell>Joined</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.recent_businesses.map((biz) => (
+                {data.recent_businesses.map((biz) => {
+                  const cnt = biz.referral_qualifying_sale_count ?? 0;
+                  const unlocked = biz.referral_commission_unlocked;
+                  const unlockLabel = unlocked
+                    ? `${unlockThreshold}/${unlockThreshold} Unlocked`
+                    : `${Math.min(cnt, unlockThreshold)}/${unlockThreshold}`;
+                  return (
                   <TableRow
                     key={biz.id}
                     hover
@@ -169,6 +213,13 @@ export default function AgentDashboardPage() {
                     sx={{ cursor: 'pointer' }}
                   >
                     <TableCell>{biz.company_name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={unlockLabel}
+                        color={unlocked ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={biz.completed_signup ? 'Yes' : 'No'}
@@ -187,7 +238,8 @@ export default function AgentDashboardPage() {
                       {biz.joined ? new Date(biz.joined).toLocaleDateString() : '—'}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -9,6 +9,7 @@ import {
   Chip,
   CircularProgress,
   Grid,
+  LinearProgress,
   Stack,
   Table,
   TableBody,
@@ -28,7 +29,29 @@ function formatNaira(v) {
 const COMMISSION_COLORS = {
   signup_bonus: 'primary',
   monthly_token: 'success',
+  subscription_renewal: 'success',
 };
+
+function normStatus(s) {
+  if (s === 'credited') return 'available';
+  if (s === 'pending') return 'pending_unlock';
+  return s;
+}
+
+function commissionTypeLabel(t) {
+  if (t === 'signup_bonus') return 'Signup Bonus';
+  if (t === 'monthly_token') return 'Monthly Token';
+  if (t === 'subscription_renewal') return 'Subscription Renewal';
+  return t ? String(t).replace(/_/g, ' ') : '—';
+}
+
+function statusChip(s) {
+  const n = normStatus(s);
+  if (n === 'available') return { label: 'Available', color: 'success' };
+  if (n === 'paid_out') return { label: 'Paid out', color: 'default' };
+  if (n === 'pending_unlock') return { label: 'Pending unlock', color: 'warning' };
+  return { label: s || '—', color: 'default' };
+}
 
 export default function AgentBusinessDetailPage() {
   const { id } = useParams();
@@ -52,6 +75,16 @@ export default function AgentBusinessDetailPage() {
       </Box>
     );
   if (error) return <Alert severity="error">{error}</Alert>;
+
+  const th = data.unlock_threshold ?? 5;
+  const cnt = data.referral_qualifying_sale_count ?? 0;
+  const unlocked = data.referral_commission_unlocked;
+  const commissions = data.commissions ?? [];
+  const totalBooked = commissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const availableFromBiz = commissions.reduce(
+    (sum, c) => sum + (normStatus(c.status) === 'available' ? Number(c.amount) || 0 : 0),
+    0,
+  );
 
   return (
     <Box>
@@ -80,7 +113,7 @@ export default function AgentBusinessDetailPage() {
       </Stack>
 
       <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
@@ -92,7 +125,7 @@ export default function AgentBusinessDetailPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
@@ -104,16 +137,37 @@ export default function AgentBusinessDetailPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
-                Total Commissions
+                Commission unlock
               </Typography>
               <Typography variant="h6" fontWeight={600}>
-                {formatNaira(
-                  data.commissions.reduce((sum, c) => sum + (c.status === 'credited' ? c.amount : 0), 0)
-                )}
+                {unlocked ? `${th}/${th}` : `${Math.min(cnt, th)}/${th}`}
+                {unlocked ? ' Unlocked' : ''}
+              </Typography>
+              {!unlocked && (
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(100, (cnt / th) * 100)}
+                  sx={{ mt: 1, height: 6, borderRadius: 1 }}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary">
+                Commissions (booked)
+              </Typography>
+              <Typography variant="h6" fontWeight={600}>
+                {formatNaira(totalBooked)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                Available: {formatNaira(availableFromBiz)}
               </Typography>
             </CardContent>
           </Card>
@@ -162,7 +216,7 @@ export default function AgentBusinessDetailPage() {
       </Card>
 
       {/* Commissions */}
-      {data.commissions.length > 0 && (
+      {commissions.length > 0 && (
         <Card>
           <CardContent>
             <Typography variant="subtitle1" fontWeight={600} mb={2}>
@@ -179,11 +233,13 @@ export default function AgentBusinessDetailPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.commissions.map((c, i) => (
+                {commissions.map((c, i) => {
+                  const sc = statusChip(c.status);
+                  return (
                   <TableRow key={i}>
                     <TableCell>
                       <Chip
-                        label={c.type === 'signup_bonus' ? 'Signup Bonus' : 'Monthly Token'}
+                        label={commissionTypeLabel(c.type)}
                         color={COMMISSION_COLORS[c.type] || 'default'}
                         size="small"
                       />
@@ -192,15 +248,16 @@ export default function AgentBusinessDetailPage() {
                     <TableCell>{c.month_number ?? '—'}</TableCell>
                     <TableCell>
                       <Chip
-                        label={c.status}
-                        color={c.status === 'credited' ? 'success' : 'warning'}
+                        label={sc.label}
+                        color={sc.color}
                         size="small"
                         sx={{ textTransform: 'capitalize' }}
                       />
                     </TableCell>
                     <TableCell>{new Date(c.date).toLocaleDateString()}</TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

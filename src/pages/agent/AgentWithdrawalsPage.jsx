@@ -41,7 +41,7 @@ const STATUS_COLOR = {
 };
 
 export default function AgentWithdrawalsPage() {
-  const [wData, setWData] = useState({ balance: 0, total: 0, items: [] });
+  const [wData, setWData] = useState({ balance: 0, ledger_balance: 0, total: 0, items: [] });
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -125,7 +125,7 @@ export default function AgentWithdrawalsPage() {
       {/* Balance Card */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Stack direction="row" spacing={4}>
+          <Stack direction="row" spacing={4} flexWrap="wrap" useFlexGap>
             <Box>
               <Typography variant="body2" color="text.secondary">
                 Available Balance
@@ -134,6 +134,19 @@ export default function AgentWithdrawalsPage() {
                 {formatNaira(wData.balance)}
               </Typography>
             </Box>
+            {(wData.ledger_balance ?? 0) > 0 && (
+              <Box>
+                <Typography variant="body2" color="text.secondary">
+                  Pending in ledger
+                </Typography>
+                <Typography variant="h5" fontWeight={600} color="warning.dark">
+                  {formatNaira(wData.ledger_balance ?? 0)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Unlocks after referred businesses complete 5 qualifying paid sales each
+                </Typography>
+              </Box>
+            )}
           </Stack>
           {bankAccounts.length === 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>

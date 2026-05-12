@@ -561,7 +561,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
         <Stack spacing={1}>
-          <Typography variant="subtitle2">Autofill from catalog</Typography>
+          <Typography variant="subtitle2">Autofill from suggestions</Typography>
           <Autocomplete
             size="medium"
             value={selectedCatalogProduct}
@@ -583,9 +583,9 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Search catalog product"
+                label="Search product name"
                 placeholder="Type item name or barcode"
-                helperText="Selecting a catalog item auto-fills name, description, tax, category, and common defaults."
+                helperText="Selecting a match auto-fills name, description, tax, category, and common defaults."
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (

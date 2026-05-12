@@ -24,7 +24,7 @@ import { agentApi } from 'src/lib/agentApi';
 
 export default function AgentBusinessesPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState({ total: 0, items: [] });
+  const [data, setData] = useState({ total: 0, items: [], unlock_threshold: 5 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(0);
@@ -90,50 +90,64 @@ export default function AgentBusinessesPage() {
           ) : (
             <>
               <Table>
-                <TableHead>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Business Name</TableCell>
+                  <TableCell>Unlock progress</TableCell>
+                  <TableCell>Setup Complete</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Joined</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.items.length === 0 ? (
                   <TableRow>
-                    <TableCell>Business Name</TableCell>
-                    <TableCell>Setup Complete</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Joined</TableCell>
+                    <TableCell colSpan={5} align="center">
+                      No businesses found
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data.items.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        No businesses found
+                ) : (
+                  data.items.map((biz) => {
+                    const th = data.unlock_threshold ?? 5;
+                    const cnt = biz.referral_qualifying_sale_count ?? 0;
+                    const unlocked = biz.referral_commission_unlocked;
+                    const progressLabel = unlocked ? `${th}/${th} Unlocked` : `${Math.min(cnt, th)}/${th}`;
+                    return (
+                    <TableRow
+                      key={biz.id}
+                      hover
+                      onClick={() => navigate(`/agent/businesses/${biz.id}`)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      <TableCell>{biz.company_name}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={progressLabel}
+                          color={unlocked ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={biz.completed_signup ? 'Yes' : 'No'}
+                          color={biz.completed_signup ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={biz.is_active ? 'Active' : 'Inactive'}
+                          color={biz.is_active ? 'success' : 'warning'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {biz.joined ? new Date(biz.joined).toLocaleDateString() : '—'}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    data.items.map((biz) => (
-                      <TableRow
-                        key={biz.id}
-                        hover
-                        onClick={() => navigate(`/agent/businesses/${biz.id}`)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell>{biz.company_name}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={biz.completed_signup ? 'Yes' : 'No'}
-                            color={biz.completed_signup ? 'success' : 'default'}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={biz.is_active ? 'Active' : 'Inactive'}
-                            color={biz.is_active ? 'success' : 'warning'}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {biz.joined ? new Date(biz.joined).toLocaleDateString() : '—'}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                    );
+                  })
+                )}
                 </TableBody>
               </Table>
               <TablePagination
