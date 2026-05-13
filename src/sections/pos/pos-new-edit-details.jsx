@@ -314,6 +314,38 @@ export function InvoiceNewEditDetails() {
         itemTypes[index] ||
         (values.items[index]?.product_id ? 'product' : values.items[index]?.service_id ? 'service' : 'none');
 
+      if (currentType === 'service') {
+        const selectedServiceName = values.items[index]?.item;
+        const service = selectedServiceName ? services.find((s) => s.name === selectedServiceName) : null;
+        const originalPrice = Number(values.items[index]?.originalPrice) || 0;
+
+        if (service && service.allow_variable_price) {
+          const min = service.variable_price_min ?? null;
+          const max = service.variable_price_max ?? null;
+          if (min != null && enteredPrice < min) {
+            toast.error(`Price for ${service.name} cannot be less than ${currencySymbol}${min}.`);
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+          if (max != null && enteredPrice > max) {
+            toast.error(`Price for ${service.name} cannot be greater than ${currencySymbol}${max}.`);
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+        } else if (service) {
+          if (enteredPrice !== originalPrice) {
+            toast.error(
+              `Variable pricing is not enabled for ${service.name}. Using default price ${currencySymbol}${originalPrice}.`
+            );
+            setValue(`items[${index}].price`, originalPrice);
+            setValue(`items[${index}].total`, originalPrice * (values.items[index]?.quantity || 1));
+            return;
+          }
+        }
+      }
+
       if (currentType === 'product') {
         const selectedProductName = values.items[index]?.item;
         const product = selectedProductName ? sellableProducts.find((p) => p.name === selectedProductName) : null;
@@ -358,7 +390,7 @@ export function InvoiceNewEditDetails() {
       setValue(`items[${index}].price`, enteredPrice);
       setValue(`items[${index}].total`, enteredPrice * (values.items[index]?.quantity || 1));
     },
-    [setValue, values.items, itemTypes, sellableProducts, currencySymbol]
+    [setValue, values.items, itemTypes, sellableProducts, services, currencySymbol]
   );
 
   const renderTotal = (
@@ -431,6 +463,10 @@ export function InvoiceNewEditDetails() {
             currentType === 'product' && selectedItemName
               ? sellableProducts.find((p) => p.name === selectedItemName)
               : null;
+          const selectedService =
+            currentType === 'service' && selectedItemName
+              ? services.find((s) => s.name === selectedItemName)
+              : null;
           return (
             <Stack key={item.id} alignItems="flex-end" spacing={1.5}>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: 1 }}>
@@ -502,7 +538,7 @@ export function InvoiceNewEditDetails() {
                   type="number"
                   name={`items[${index}].price`}
                   label={
-                    selectedProduct?.allow_variable_price
+                    selectedProduct?.allow_variable_price || selectedService?.allow_variable_price
                       ? `${t('price')} (variable)`
                       : t('price')
                   }
@@ -524,11 +560,15 @@ export function InvoiceNewEditDetails() {
                     ),
                   }}
                   helperText={
-                    selectedProduct?.allow_variable_price &&
-                    selectedProduct.variable_price_min != null &&
-                    selectedProduct.variable_price_max != null
-                      ? `Variable range: ${currencySymbol}${selectedProduct.variable_price_min}–${currencySymbol}${selectedProduct.variable_price_max}`
-                      : undefined
+                    (selectedProduct?.allow_variable_price &&
+                      selectedProduct.variable_price_min != null &&
+                      selectedProduct.variable_price_max != null &&
+                      `Variable range: ${currencySymbol}${selectedProduct.variable_price_min}–${currencySymbol}${selectedProduct.variable_price_max}`) ||
+                    (selectedService?.allow_variable_price &&
+                      selectedService.variable_price_min != null &&
+                      selectedService.variable_price_max != null &&
+                      `Variable range: ${currencySymbol}${selectedService.variable_price_min}–${currencySymbol}${selectedService.variable_price_max}`) ||
+                    undefined
                   }
                   sx={{ maxWidth: { md: 96 } }}
                 />

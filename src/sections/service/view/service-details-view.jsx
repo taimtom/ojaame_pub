@@ -81,7 +81,25 @@ function ServiceDetailsSummaryCard({ service }) {
             <Typography variant="subtitle1" fontWeight="bold">
               {fCurrency(service.price)}
             </Typography>
+            {service.allow_variable_price && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                Default / suggested price; adjustable within range at sale.
+              </Typography>
+            )}
           </Box>
+
+          {service.allow_variable_price && (
+            <Box sx={{ gridColumn: { xs: 'span 2', sm: 'auto' } }}>
+              <Typography variant="caption" color="text.secondary">
+                Variable price range
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="medium">
+                {service.variable_price_min != null && service.variable_price_max != null
+                  ? `${fCurrency(service.variable_price_min)} – ${fCurrency(service.variable_price_max)}`
+                  : '—'}
+              </Typography>
+            </Box>
+          )}
 
           {service.price_sale != null && (
             <Box>
