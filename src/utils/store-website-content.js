@@ -1,4 +1,4 @@
-import { getTemplateConfig } from 'store-site/theme/templateConfigs';
+import { getTemplateConfig } from 'src/config/store-website-template-configs';
 
 export { getTemplateConfig };
 
