@@ -32,6 +32,8 @@ export function useGetSubscriptionStatus() {
     paymentPreference: data?.payment_preference ?? 'card',
     hasPaidInvoice: data?.has_paid_invoice ?? false,
     subscriptionTotal: data?.subscription_total ?? 3000,
+    inTrial: data?.in_trial ?? false,
+    trialDaysRemaining: data?.trial_days_remaining ?? 0,
     statusLoading: isLoading,
     mutateStatus: mutate,
   };

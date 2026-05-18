@@ -44,7 +44,7 @@ function BillingRow({ label, value, secondary }) {
 
 export function AccountBillingPlan() {
   const { summary, summaryLoading, summaryError, mutate } = useGetSubscriptionSummary();
-  const { nextBillingDate } = useGetSubscriptionStatus();
+  const { nextBillingDate, inTrial, trialDaysRemaining } = useGetSubscriptionStatus();
   const [adjusting, setAdjusting] = useState(null);
 
   // Prefer summary date (most up-to-date), fall back to status endpoint date
@@ -121,6 +121,15 @@ export function AccountBillingPlan() {
           />
         }
       />
+
+      {inTrial && (
+        <Alert severity="info" sx={{ mx: 2, mb: 0, borderRadius: 1 }}>
+          <strong>Free trial.</strong> Your first billing date is{' '}
+          {billingDate ? fDate(billingDate) : '—'} ({trialDaysRemaining} day
+          {trialDaysRemaining !== 1 ? 's' : ''} left). You can use the app without paying
+          until then.
+        </Alert>
+      )}
 
       {/* Payment failed / attention banner */}
       {isAttention && (

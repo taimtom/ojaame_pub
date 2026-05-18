@@ -59,6 +59,7 @@ export const NAV_PERMISSIONS = {
     Category: ['categories.read'],
     'Product Management': ['products.read'],
     'Service Management': ['services.read'],
+    'Digital Product': ['digital_products.read', 'products.read', 'services.read'],
     
     // Accounting items
     'Manage Store Payment': ['payment_methods.read'],

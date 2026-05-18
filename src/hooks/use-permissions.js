@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 
-import { hasPermission, hasAnyPermission, hasAllPermissions, hasCategoryPermission } from 'src/utils/permissions';
+import {
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  hasCategoryPermission,
+  expandImpliedPermissions,
+} from 'src/utils/permissions';
 
 import { useUser } from 'src/actions/user';
 
@@ -16,15 +22,13 @@ export function usePermissions() {
 
   // Get permissions from API user (preferred) or auth context
   const userPermissions = useMemo(() => {
-    // Prefer API user permissions as they're more complete
+    let base = [];
     if (apiUser?.all_permissions && Array.isArray(apiUser.all_permissions)) {
-      return apiUser.all_permissions;
+      base = apiUser.all_permissions;
+    } else if (authUser?.all_permissions && Array.isArray(authUser.all_permissions)) {
+      base = authUser.all_permissions;
     }
-    // Fallback to auth context if available
-    if (authUser?.all_permissions && Array.isArray(authUser.all_permissions)) {
-      return authUser.all_permissions;
-    }
-    return [];
+    return expandImpliedPermissions(base);
   }, [apiUser, authUser]);
 
   // Get role_id

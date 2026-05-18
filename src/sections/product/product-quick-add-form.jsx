@@ -109,6 +109,7 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
       priceSale: null,
       taxes: 0,
       publish: 'publish',
+      show_on_store: true,
       allow_variable_price: false,
       variable_price_min: null,
       variable_price_max: null,

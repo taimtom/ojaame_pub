@@ -70,6 +70,7 @@ export const NewProductSchema = zod
     subDescription: zod.string().optional(),
     taxes: zod.number().nullable().optional(),
     publish: zod.string().optional(),
+    show_on_store: zod.boolean().optional(),
     // Pack fields
     is_pack: zod.boolean().optional(),
     // Allow null so single items (non‑pack) can submit with these cleared
@@ -196,6 +197,9 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
   const [isPublish, setIsPublish] = useState(
     currentProduct?.publish === 'publish'
   );
+  const [isShowOnStore, setIsShowOnStore] = useState(
+    currentProduct?.show_on_store !== false
+  );
 
 
 
@@ -246,6 +250,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       newLabel: currentProduct?.newLabel || { enabled: false, content: '' },
       saleLabel: currentProduct?.saleLabel || { enabled: false, content: '' },
       publish: currentProduct?.publish || 'draft',
+      show_on_store: currentProduct?.show_on_store !== false,
       // Pack fields
       is_pack: currentProduct?.is_pack || false,
       quantity_per_pack: currentProduct?.quantity_per_pack || null,
@@ -362,6 +367,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
     if (currentProduct) {
       reset(defaultValues);
       setIsPublish(currentProduct.publish === 'publish');
+      setIsShowOnStore(currentProduct.show_on_store !== false);
       setProductType(currentProduct.is_pack ? 'pack' : 'single');
     }
   }, [currentProduct, defaultValues, reset]);
@@ -446,6 +452,8 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
 
       // Set publish state.
       data.publish = isPublish ? 'publish' : 'draft';
+      data.show_on_store =
+        data.product_kind === 'production_input' ? false : isShowOnStore;
 
       if (data.product_kind === 'production_input') {
         const cp = Number(data.costPrice ?? 0);
@@ -1227,9 +1235,31 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
           />
         }
         label="Publish"
-        sx={{ pl: 3, flexGrow: 1 }}
+        sx={{ pl: 3 }}
       />
-      <LoadingButton type="submit" variant="contained" size="large" loading={isSubmitting}>
+      {values.product_kind !== 'production_input' && (
+        <FormControlLabel
+          control={
+            <Switch
+              checked={isShowOnStore}
+              onChange={(e) => {
+                setIsShowOnStore(e.target.checked);
+                setValue('show_on_store', e.target.checked);
+              }}
+              inputProps={{ id: 'show-on-store-switch' }}
+            />
+          }
+          label="Show on online store"
+          sx={{ pl: 1 }}
+        />
+      )}
+      <LoadingButton
+        type="submit"
+        variant="contained"
+        size="large"
+        loading={isSubmitting}
+        sx={{ ml: 'auto' }}
+      >
         {!currentProduct ? `Create ${t('product')}` : 'Save changes'}
       </LoadingButton>
     </Stack>

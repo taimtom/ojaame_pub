@@ -45,6 +45,8 @@ export function AccountBillingWallet() {
     hasPaidInvoice,
     subscriptionTotal,
     nextBillingDate,
+    inTrial,
+    trialDaysRemaining,
   } = useGetSubscriptionStatus();
 
   const [creating, setCreating] = useState(false);
@@ -121,38 +123,51 @@ export function AccountBillingWallet() {
 
   if (!walletExists) {
     return (
-      <Box
-        sx={{
-          py: 4,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 2,
-          color: 'text.secondary',
-        }}
-      >
-        <Iconify icon="solar:wallet-bold" width={48} sx={{ opacity: 0.4 }} />
-        <Typography variant="body2" align="center">
-          Create a wallet to fund your subscription via bank transfer. A unique account
-          number will be assigned to your business.
-        </Typography>
-        <Button
-          variant="contained"
-          size="small"
-          onClick={handleCreateWallet}
-          disabled={creating}
-          startIcon={creating ? <CircularProgress size={16} /> : <Iconify icon="mingcute:add-line" />}
+      <Stack spacing={2}>
+        {inTrial && (
+          <Alert severity="info" icon={<Iconify icon="solar:calendar-bold" width={20} />}>
+            <strong>Free trial active.</strong> You have{' '}
+            <strong>{trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}</strong> before
+            your first charge
+            {nextBillingDate ? ` on ${new Date(nextBillingDate).toLocaleDateString()}` : ''}. You can
+            use the app now — add a card or wallet before then.
+          </Alert>
+        )}
+        <Box
+          sx={{
+            py: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            color: 'text.secondary',
+          }}
         >
-          {creating ? 'Creating…' : 'Create Wallet'}
-        </Button>
-      </Box>
+          <Iconify icon="solar:wallet-bold" width={48} sx={{ opacity: 0.4 }} />
+          <Typography variant="body2" align="center">
+            {inTrial
+              ? 'Optional: create a wallet to fund your subscription via bank transfer before your trial ends.'
+              : 'Create a wallet to fund your subscription via bank transfer. A unique account number will be assigned to your business.'}
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleCreateWallet}
+            disabled={creating}
+            startIcon={creating ? <CircularProgress size={16} /> : <Iconify icon="mingcute:add-line" />}
+          >
+            {creating ? 'Creating…' : 'Create Wallet'}
+          </Button>
+        </Box>
+      </Stack>
     );
   }
 
   // Alert 1 — first activation: wallet configured but balance not yet enough to trigger the first charge
   const totalDue = subscriptionTotal || statusBalance || 3000;
   const shortfall = Math.max(0, totalDue - walletBalance);
-  const showActivationAlert = walletExists && !hasPaidInvoice && walletBalance < totalDue;
+  const showActivationAlert =
+    walletExists && !hasPaidInvoice && !inTrial && walletBalance < totalDue;
 
   // Alert 2 — upcoming renewal: balance won't cover next charge within 10 days
   const daysUntilBilling = nextBillingDate
@@ -168,6 +183,15 @@ export function AccountBillingWallet() {
 
   return (
     <Stack spacing={2.5}>
+      {inTrial && (
+        <Alert severity="info" icon={<Iconify icon="solar:calendar-bold" width={20} />}>
+          <strong>Free trial active.</strong> First charge in{' '}
+          <strong>{trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}</strong>
+          {nextBillingDate ? ` (${new Date(nextBillingDate).toLocaleDateString()})` : ''}. Top up
+          your wallet or add a card on the Card tab before then.
+        </Alert>
+      )}
+
       {/* Activation alert — balance too low for first charge */}
       {showActivationAlert && (
         <Alert

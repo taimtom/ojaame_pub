@@ -295,6 +295,16 @@ export const useNavData = () => {
           { title: `${t('service')} Report`, path: callIfFunction(paths.dashboard.service.root, currentStore) },
         ],
       },
+      {
+        title: 'Digital Product',
+        path: callIfFunction(paths.dashboard.digitalProduct.root, currentStore),
+        icon: ICONS.ecommerce,
+        permissionKey: 'Digital Product',
+        children: [
+          { title: 'Add Digital Product', path: callIfFunction(paths.dashboard.digitalProduct.new, currentStore) },
+          { title: 'Digital Product Report', path: callIfFunction(paths.dashboard.digitalProduct.root, currentStore) },
+        ],
+      },
     ],
   },
   /**

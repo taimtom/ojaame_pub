@@ -264,6 +264,14 @@ export const endpoints = {
     detail: '/api/services/detail',
     saleHistory: '/api/services/sale-history',
   },
+  digitalProduct: {
+    list: '/api/digital-products/list',
+    add: '/api/digital-products/add',
+    edit: '/api/digital-products/edit',
+    detail: '/api/digital-products/detail',
+    payoutPreview: '/api/digital-products/payout-preview',
+    publish: '/api/digital-products/publish',
+  },
   customers: {
     list: '/api/customers/list/',
     details: '/api/customers/details/',

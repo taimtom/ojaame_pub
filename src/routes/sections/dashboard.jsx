@@ -65,6 +65,10 @@ const ServiceListPage = lazy(() => import('src/pages/dashboard/service/list'));
 const ServiceCreatePage = lazy(() => import('src/pages/dashboard/service/new'));
 const ServiceEditPage = lazy(() => import('src/pages/dashboard/service/edit'));
 const ServiceDetailsPage = lazy(() => import('src/pages/dashboard/service/details'));
+
+const DigitalProductListPage = lazy(() => import('src/pages/dashboard/digital-product/list'));
+const DigitalProductCreatePage = lazy(() => import('src/pages/dashboard/digital-product/new'));
+const DigitalProductEditPage = lazy(() => import('src/pages/dashboard/digital-product/edit'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
@@ -246,6 +250,15 @@ export const dashboardRoutes = [
             { path: 'new', element: <ServiceCreatePage /> },
             { path: ':id', element: <ServiceDetailsPage /> },
             { path: ':id/edit', element: <ServiceEditPage /> },
+          ],
+        },
+        {
+          path: 'digital-product',
+          children: [
+            { index: true, element: <DigitalProductListPage /> },
+            { path: 'list', element: <DigitalProductListPage /> },
+            { path: 'new', element: <DigitalProductCreatePage /> },
+            { path: ':id/edit', element: <DigitalProductEditPage /> },
           ],
         },
         {

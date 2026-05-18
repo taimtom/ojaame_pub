@@ -37,6 +37,8 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
       ...(website?.content_config || {}),
       ...watchedContentConfig,
     },
+    storeName:
+      watchedContentConfig?.displayName?.trim() || website?.storeName,
   };
 
   return (
@@ -53,6 +55,34 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
                   name="slug"
                   label="Slug (subdomain identifier)"
                   helperText="Used for URLs like /site/your-slug"
+                />
+                <Field.Text
+                  name="content_config.displayName"
+                  label="Online store name"
+                  placeholder={website?.storeName || 'Your professional store name'}
+                  helperText="Shown on your public storefront header. Leave blank to use your store name."
+                  onChange={(e) => {
+                    const current = methods.getValues('content_config') || {};
+                    methods.setValue('content_config', {
+                      ...current,
+                      displayName: e.target.value,
+                    });
+                  }}
+                />
+                <Field.Text
+                  name="content_config.promo"
+                  label="Promo banner"
+                  multiline
+                  rows={2}
+                  placeholder="Free delivery on orders over NGN 5,000 · Next-day dispatch · 30-day returns"
+                  helperText="Top banner on your store (use · between messages). Leave blank to hide the promo bar."
+                  onChange={(e) => {
+                    const current = methods.getValues('content_config') || {};
+                    methods.setValue('content_config', {
+                      ...current,
+                      promo: e.target.value,
+                    });
+                  }}
                 />
                 <Typography variant="subtitle2">Template</Typography>
                 <Grid container spacing={1.5}>

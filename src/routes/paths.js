@@ -173,6 +173,11 @@ export const paths = {
         edit: `${ROOTS.DASHBOARD}/service/${MOCK_ID}/edit`,
       },
     },
+    digitalProduct: {
+      root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product`,
+      new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product/new`,
+      edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product/${id}/edit`,
+    },
     product: {
       // root: `${ROOTS.DASHBOARD}/product`,
       // new: `${ROOTS.DASHBOARD}/product/new`,

@@ -19,7 +19,7 @@ export function AuthGuard({ children }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { authenticated, loading, user } = useAuthContext();
-  const { hasPaymentMethod, statusLoading, isOwner } = useGetSubscriptionStatus();
+  const { hasPaymentMethod, statusLoading, isOwner, inTrial } = useGetSubscriptionStatus();
   const [isChecking, setIsChecking] = useState(true);
 
   const createQueryString = useCallback(
@@ -77,7 +77,8 @@ export function AuthGuard({ children }) {
         return;
       }
 
-      if (paymentGateApplies && !hasPaymentMethod) {
+      // hasPaymentMethod is true during admin trial (backend sets in_trial); keep explicit check
+      if (paymentGateApplies && !hasPaymentMethod && !inTrial) {
         const onBillingTab =
           pathname === paths.dashboard.user.account && searchParams.get('tab') === 'billing';
         if (!onBillingTab) {
@@ -105,6 +106,7 @@ export function AuthGuard({ children }) {
     pathname,
     searchParams,
     hasPaymentMethod,
+    inTrial,
     statusLoading,
     isOwner,
   ]);

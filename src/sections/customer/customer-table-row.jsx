@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
@@ -40,15 +41,21 @@ export function CustomerTableRow({ row, selected, onEditRow, onSelectRow, onDele
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar alt={fullName}>{fullName.charAt(0)}</Avatar>
             <Stack sx={{ flex: '1 1 auto', alignItems: 'flex-start' }}>
-              <Link
-                color="inherit"
-                onClick={onEditRow}
-                sx={{ cursor: 'pointer', fontWeight: 500 }}
-              >
-                {fullName}
-              </Link>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Link
+                  color="inherit"
+                  onClick={onEditRow}
+                  sx={{ cursor: 'pointer', fontWeight: 500 }}
+                >
+                  {fullName}
+                </Link>
+                {row.customer_source === 'online' && (
+                  <Chip label="Online" size="small" color="info" variant="soft" />
+                )}
+              </Stack>
               <Box component="span" sx={{ color: 'text.disabled', fontSize: 12 }}>
                 {row.added_by_user_name || 'N/A'}
+                {row.email ? ` · ${row.email}` : ''}
               </Box>
             </Stack>
           </Stack>

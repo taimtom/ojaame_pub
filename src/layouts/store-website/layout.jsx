@@ -8,6 +8,8 @@ import Typography from '@mui/material/Typography';
 import { useParams } from 'src/routes/hooks';
 import axiosInstance from 'src/utils/axios';
 
+import { getStoreDisplayName } from 'src/utils/store-display';
+
 import { StoreWebsiteContext } from './context';
 import { StoreWebsiteHeader } from './header';
 
@@ -67,7 +69,7 @@ export function StoreWebsiteLayout({ children }) {
   return (
     <StoreWebsiteContext.Provider value={website}>
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <StoreWebsiteHeader storeName={website?.storeName} slug={slug} />
+        <StoreWebsiteHeader storeName={getStoreDisplayName(website)} slug={slug} />
         <Box component="main" sx={{ flexGrow: 1 }}>
           {children}
         </Box>

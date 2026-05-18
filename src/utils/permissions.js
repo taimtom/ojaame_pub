@@ -3,6 +3,17 @@
  * Helper functions for checking user permissions
  */
 
+/** Grant digital_products.* when user already has matching products.* or services.* */
+export function expandImpliedPermissions(permissions) {
+  if (!permissions?.length) return [];
+  const expanded = new Set(permissions);
+  ['read', 'create', 'update', 'delete', 'manage'].forEach((action) => {
+    if (expanded.has(`products.${action}`)) expanded.add(`digital_products.${action}`);
+    if (expanded.has(`services.${action}`)) expanded.add(`digital_products.${action}`);
+  });
+  return [...expanded];
+}
+
 /**
  * Check if user has a specific permission
  * @param {string[]} userPermissions - Array of user's permissions (e.g., ['users.read', 'products.create'])
