@@ -1,4 +1,5 @@
 import { paramCase } from 'src/utils/change-case';
+import { getStoreSiteUrl } from 'src/utils/store-site-url';
 
 import { _id, _postTitles } from 'src/_mock/assets';
 
@@ -24,9 +25,9 @@ export const paths = {
   about: '/about-us',
   contact: '/contact-us',
   faqs: '/faqs',
-  publicStore: (slug) => `/site/${slug}`,
-  publicStoreProducts: (slug) => `/site/${slug}/products`,
-  publicStoreProduct: (slug, productId) => `/site/${slug}/products/${productId}`,
+  publicStore: (slug) => getStoreSiteUrl(slug),
+  publicStoreProducts: (slug) => getStoreSiteUrl(slug, { path: '/products' }),
+  publicStoreProduct: (slug, productId) => getStoreSiteUrl(slug, { path: `/products/${productId}` }),
   page403: '/error/403',
   page404: '/error/404',
   page500: '/error/500',

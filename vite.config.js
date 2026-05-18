@@ -98,6 +98,10 @@ export default defineConfig({
         find: /^src(.+)/,
         replacement: path.join(process.cwd(), 'src/$1'),
       },
+      {
+        find: 'store-site',
+        replacement: path.join(process.cwd(), '../store_site_fe/src'),
+      },
     ],
   },
   server: {

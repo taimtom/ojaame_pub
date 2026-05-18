@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -13,11 +13,25 @@ import Typography from '@mui/material/Typography';
 import { Form, Field } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
 import { STORE_WEBSITE_TEMPLATES, getStoreWebsiteTemplate } from 'src/config/store-website-templates';
-import { StoreWebsiteView } from './store-website-view';
+import { getStoreSiteUrl } from 'src/utils/store-site-url';
+import { StoreWebsiteContentEditors } from './store-website-content-editors';
 
-export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
+export function StoreWebsiteSettingsView({ methods, onSubmit, website, previewVersion = 0 }) {
   const templateId = methods.watch('template_id');
   const selectedTemplate = getStoreWebsiteTemplate(templateId || website?.template_id);
+  const previewSlug = methods.watch('slug') || website?.slug;
+  const previewUrl = previewSlug ? getStoreSiteUrl(previewSlug) : '';
+  const [previewKey, setPreviewKey] = useState(0);
+
+  const refreshPreview = useCallback(() => {
+    setPreviewKey((key) => key + 1);
+  }, []);
+
+  const previewSrc = useMemo(() => {
+    if (!previewUrl) return '';
+    const separator = previewUrl.includes('?') ? '&' : '?';
+    return `${previewUrl}${separator}_preview=${previewKey}`;
+  }, [previewUrl, previewKey]);
 
   useEffect(() => {
     if (!methods.getValues('template_id') && selectedTemplate) {
@@ -25,21 +39,11 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
     }
   }, [methods, selectedTemplate]);
 
-  const watchedContentConfig = methods.watch('content_config') || {};
-
-  const previewWebsite = {
-    ...website,
-    template_id: templateId || website?.template_id,
-    seo_title: methods.watch('seo_title') || website?.seo_title,
-    seo_description: methods.watch('seo_description') || website?.seo_description,
-    theme_config: methods.watch('theme_config') || website?.theme_config || {},
-    content_config: {
-      ...(website?.content_config || {}),
-      ...watchedContentConfig,
-    },
-    storeName:
-      watchedContentConfig?.displayName?.trim() || website?.storeName,
-  };
+  useEffect(() => {
+    if (previewVersion > 0) {
+      refreshPreview();
+    }
+  }, [previewVersion, refreshPreview]);
 
   return (
     <Form methods={methods} onSubmit={onSubmit}>
@@ -54,7 +58,7 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
                 <Field.Text
                   name="slug"
                   label="Slug (subdomain identifier)"
-                  helperText="Used for URLs like /site/your-slug"
+                  helperText="Public URL: {slug}.ojaa.me (local dev uses VITE_DEV_SLUG in store_site_fe/.env)"
                 />
                 <Field.Text
                   name="content_config.displayName"
@@ -120,172 +124,14 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
               </Stack>
             </Card>
 
-            {/* Hero Content */}
-            <Accordion defaultExpanded>
-              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                <Typography variant="subtitle1">Hero section</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={2}>
-                  <Field.Text
-                    name="content_config.hero.title"
-                    label="Heading"
-                    placeholder="Welcome to our store"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        hero: { ...(current.hero || {}), title: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.hero.subtitle"
-                    label="Subtitle"
-                    multiline
-                    rows={2}
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        hero: { ...(current.hero || {}), subtitle: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.hero.ctaLabel"
-                    label="Button label"
-                    placeholder="Shop now"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        hero: { ...(current.hero || {}), ctaLabel: e.target.value },
-                      });
-                    }}
-                  />
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
+            <StoreWebsiteContentEditors
+              methods={methods}
+              templateId={templateId || website?.template_id}
+              storeName={website?.storeName}
+            />
 
-            {/* About Content */}
-            <Accordion>
-              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                <Typography variant="subtitle1">About section</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={2}>
-                  <Field.Text
-                    name="content_config.about.title"
-                    label="Title"
-                    placeholder="About us"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        about: { ...(current.about || {}), title: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.about.body"
-                    label="Body text"
-                    multiline
-                    rows={4}
-                    placeholder="Tell your story..."
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        about: { ...(current.about || {}), body: e.target.value },
-                      });
-                    }}
-                  />
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-
-            {/* Contact Content */}
-            <Accordion>
-              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                <Typography variant="subtitle1">Contact section</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={2}>
-                  <Field.Text
-                    name="content_config.contact.title"
-                    label="Section title"
-                    placeholder="Visit or contact us"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        contact: { ...(current.contact || {}), title: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.contact.address"
-                    label="Address"
-                    multiline
-                    rows={2}
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        contact: { ...(current.contact || {}), address: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.contact.phoneNumber"
-                    label="Phone number"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        contact: { ...(current.contact || {}), phoneNumber: e.target.value },
-                      });
-                    }}
-                  />
-                  <Field.Text
-                    name="content_config.contact.email"
-                    label="Email"
-                    type="email"
-                    onChange={(e) => {
-                      const current = methods.getValues('content_config') || {};
-                      methods.setValue('content_config', {
-                        ...current,
-                        contact: { ...(current.contact || {}), email: e.target.value },
-                      });
-                    }}
-                  />
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-
-            {/* Footer Content */}
-            <Accordion>
-              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                <Typography variant="subtitle1">Footer</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Field.Text
-                  name="content_config.footer.copyrightText"
-                  label="Copyright text"
-                  placeholder="© Your Store. All rights reserved."
-                  onChange={(e) => {
-                    const current = methods.getValues('content_config') || {};
-                    methods.setValue('content_config', {
-                      ...current,
-                      footer: { ...(current.footer || {}), copyrightText: e.target.value },
-                    });
-                  }}
-                />
-              </AccordionDetails>
-            </Accordion>
-
-            {/* Theme */}
+            {/* Colors & theme — hidden for now; storefront colors come from the selected template */}
+            {/*
             <Accordion>
               <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
                 <Typography variant="subtitle1">Colors & theme</Typography>
@@ -330,6 +176,7 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
                 </Stack>
               </AccordionDetails>
             </Accordion>
+            */}
 
             {/* SEO */}
             <Accordion>
@@ -355,8 +202,65 @@ export function StoreWebsiteSettingsView({ methods, onSubmit, website }) {
 
         <Grid item xs={12} md={7}>
           <Box sx={{ position: 'sticky', top: 80 }}>
-            <Card sx={{ p: 0, overflow: 'hidden' }}>
-              <StoreWebsiteView website={previewWebsite} template={selectedTemplate} />
+            <Card sx={{ overflow: 'hidden' }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}
+              >
+                <Typography variant="subtitle2">Storefront preview</Typography>
+                {previewUrl && (
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={refreshPreview}
+                      startIcon={<Iconify icon="eva:refresh-fill" />}
+                    >
+                      Refresh preview
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      href={previewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      startIcon={<Iconify icon="eva:external-link-fill" />}
+                    >
+                      Open in new tab
+                    </Button>
+                  </Stack>
+                )}
+              </Stack>
+              {previewUrl ? (
+                <>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1 }}>
+                    Local dev loads {import.meta.env.VITE_STORE_SITE_URL || 'the storefront app'} using{' '}
+                    <code>VITE_DEV_SLUG</code> in store_site_fe/.env (match this store&apos;s slug). Save
+                    settings, then use Refresh preview to reload the storefront.
+                  </Typography>
+                  <Box
+                    component="iframe"
+                    key={previewSrc}
+                    title="Storefront preview"
+                    src={previewSrc}
+                    sx={{
+                      display: 'block',
+                      width: '100%',
+                      height: { xs: 480, md: 'min(80vh, 900px)' },
+                      border: 0,
+                      bgcolor: 'background.neutral',
+                    }}
+                  />
+                </>
+              ) : (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Enter a slug and enable the public website to preview your storefront.
+                  </Typography>
+                </Box>
+              )}
             </Card>
           </Box>
         </Grid>

@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useParams } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
+import { getStoreSiteUrl } from 'src/utils/store-site-url';
 import axiosInstance from 'src/utils/axios';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { Iconify } from 'src/components/iconify';
@@ -22,6 +23,7 @@ export default function StoreWebsiteSettingsPage() {
   const navigate = useNavigate();
   const loading = useBoolean(true);
   const [website, setWebsite] = useState(null);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   useEffect(() => {
     if (!id) {
@@ -104,6 +106,7 @@ export default function StoreWebsiteSettingsPage() {
       const updated = res.data;
       setWebsite((prev) => ({ ...prev, ...updated }));
       toast.success('Website settings saved');
+      setPreviewVersion((v) => v + 1);
       reset({
         ...data,
         slug: updated.slug || data.slug,
@@ -131,7 +134,7 @@ export default function StoreWebsiteSettingsPage() {
               variant="outlined"
               size="small"
               startIcon={<Iconify icon="eva:external-link-fill" />}
-              href={`/site/${website.slug}`}
+              href={getStoreSiteUrl(website.slug)}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -140,7 +143,12 @@ export default function StoreWebsiteSettingsPage() {
           )}
         </Box>
         {!loading.value && (
-          <StoreWebsiteSettingsView methods={methods} onSubmit={onSubmit} website={website || {}} />
+          <StoreWebsiteSettingsView
+            methods={methods}
+            onSubmit={onSubmit}
+            website={website || {}}
+            previewVersion={previewVersion}
+          />
         )}
       </Container>
     </DashboardContent>
