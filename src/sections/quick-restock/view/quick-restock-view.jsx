@@ -28,6 +28,8 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/utils/axios';
 import { bulkRestockProducts } from 'src/actions/product';
+import { ProductQuickAddDialog } from 'src/sections/product/product-quick-add-dialog';
+import { usePermissions } from 'src/hooks/use-permissions';
 
 // ---------------------------------------------------------------------------
 
@@ -60,6 +62,8 @@ function normalizeQuickSearchProduct(item) {
 // ---------------------------------------------------------------------------
 
 export function QuickRestockView() {
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = hasPermission('products.create');
   const [storeId, setStoreId] = useState(() => getStoreIdFromStorage());
 
   // search
@@ -71,6 +75,7 @@ export function QuickRestockView() {
   const [restockCart, setRestockCart] = useState([]);
 
   const [submitting, setSubmitting] = useState(false);
+  const [addProductOpen, setAddProductOpen] = useState(false);
 
   const debounceRef = useRef(null);
 
@@ -119,37 +124,49 @@ export function QuickRestockView() {
   // ── Cart helpers ────────────────────────────────────────────────────────────
 
   const addToCart = useCallback((product) => {
+    const normalized = normalizeQuickSearchProduct({ ...product, type: 'product' });
     setRestockCart((prev) => {
-      if (prev.find((r) => r.productId === product.id)) return prev;
+      if (prev.find((r) => r.productId === normalized.id)) return prev;
       return [
         ...prev,
         {
-          productId: product.id,
-          name: product.name,
-          currentStock: product.stock ?? product.quantity ?? 0,
-          isPack: Boolean(product.is_pack),
-          quantityPerPack: Number(product.quantity_per_pack ?? 0) || null,
-          packsToAdd: product.is_pack ? 1 : null,
-          qty: product.is_pack
-            ? Number(product.quantity_per_pack ?? 0) || 1
+          productId: normalized.id,
+          name: normalized.name,
+          currentStock: normalized.stock ?? normalized.quantity ?? 0,
+          isPack: Boolean(normalized.is_pack),
+          quantityPerPack: Number(normalized.quantity_per_pack ?? 0) || null,
+          packsToAdd: normalized.is_pack ? 1 : null,
+          qty: normalized.is_pack
+            ? Number(normalized.quantity_per_pack ?? 0) || 1
             : 1,
-          costPerPack: product.is_pack
+          costPerPack: normalized.is_pack
             ? Number(
-                product.cost_price_per_pack ??
-                  (Number(product.cost_price ?? 0) * (Number(product.quantity_per_pack ?? 0) || 1))
+                normalized.cost_price_per_pack ??
+                  (Number(normalized.cost_price ?? 0) *
+                    (Number(normalized.quantity_per_pack ?? 0) || 1))
               ) || 0
             : null,
-          costPerUnit: product.is_pack
-            ? ((Number(product.cost_price_per_pack ?? 0) || 0) /
-                (Number(product.quantity_per_pack ?? 0) || 1)) ||
-              Number(product.cost_price ?? 0) ||
+          costPerUnit: normalized.is_pack
+            ? ((Number(normalized.cost_price_per_pack ?? 0) || 0) /
+                (Number(normalized.quantity_per_pack ?? 0) || 1)) ||
+              Number(normalized.cost_price ?? 0) ||
               0
-            : Number(product.cost_price ?? 0) || 0,
+            : Number(normalized.cost_price ?? 0) || 0,
           addAsExpense: true,
         },
       ];
     });
   }, []);
+
+  const handleProductCreated = useCallback(
+    (product) => {
+      addToCart(product);
+      toast.success(`"${product.name}" added to restock list. Set quantity and submit when ready.`);
+      setQuery('');
+      setSearchResults([]);
+    },
+    [addToCart]
+  );
 
   const updateRow = useCallback((productId, field, value) => {
     setRestockCart((prev) =>
@@ -236,9 +253,20 @@ export function QuickRestockView() {
           <Grid xs={12} md={4}>
             <Card sx={{ height: '100%' }}>
               <CardContent>
-                <Typography variant="subtitle1" mb={2}>
-                  Search Products
-                </Typography>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Typography variant="subtitle1">Search Products</Typography>
+                  {canCreateProduct && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<Iconify icon="eva:plus-fill" />}
+                      onClick={() => setAddProductOpen(true)}
+                      disabled={!storeId}
+                    >
+                      Add product
+                    </Button>
+                  )}
+                </Stack>
 
                 <TextField
                   fullWidth
@@ -526,6 +554,16 @@ export function QuickRestockView() {
             </Card>
           </Grid>
         </Grid>
+
+        <ProductQuickAddDialog
+          open={addProductOpen}
+          onClose={() => setAddProductOpen(false)}
+          storeId={storeId}
+          defaultQuantity={0}
+          allowZeroQuantity
+          onProductCreated={handleProductCreated}
+          title="Add product for restock"
+        />
       </Stack>
     </DashboardContent>
   );

@@ -16,6 +16,7 @@ import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const ServiceLogPage = lazy(() => import('src/pages/dashboard/service-log'));
 const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
 const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
@@ -42,6 +43,7 @@ const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/ch
 const ProductBulkAddPage = lazy(() => import('src/pages/dashboard/product/bulk-add'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
+const TransferListPage = lazy(() => import('src/pages/dashboard/transfer/list'));
 
 // Category
 const CategoryListPage = lazy(() => import('src/pages/dashboard/category/list'));
@@ -171,6 +173,8 @@ const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/
 const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
 const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
 const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
+const StoreCustomerReportPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report'));
+const StoreCustomerReportDetailPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report-detail'));
 const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
 
 // ----------------------------------------------------------------------
@@ -199,6 +203,7 @@ export const dashboardRoutes = [
         ),
       },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'service-log', element: <ServiceLogPage /> },
       { path: 'quick-restock', element: <QuickRestockPage /> },
       {
         path: 'usage-dashboard',
@@ -232,6 +237,19 @@ export const dashboardRoutes = [
             { path: ':id/addqty', element: <ProductAddQuantityPage /> },
             { path: ':id/adjust', element: <ProductAdjustStockPage /> },
             { path: ':id/change-price', element: <ProductChangePricePage /> },
+          ],
+        },
+        {
+          path: 'transfer',
+          children: [
+            {
+              index: true,
+              element: (
+                <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+                  <TransferListPage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
         {
@@ -375,6 +393,22 @@ export const dashboardRoutes = [
               element: (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <EndOfDayReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'customers',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCustomerReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'customers/:customerId',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCustomerReportDetailPage />
                 </PermissionGuard>
               ),
             },

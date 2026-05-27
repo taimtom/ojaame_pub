@@ -1,9 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import { useTheme } from '@mui/material/styles';
 import IconButton, { iconButtonClasses } from '@mui/material/IconButton';
 
@@ -69,6 +73,30 @@ export function DashboardLayout({ sx, children, data }) {
   const { user } = useAuthContext();
 
   const { status, paystackStatus, gracePeriodEnd, isOwner } = useGetSubscriptionStatus();
+  const [quickModeAnchorEl, setQuickModeAnchorEl] = useState(null);
+  const [quickEntryMode, setQuickEntryMode] = useState('product'); // default
+  const quickModeMenuOpen = Boolean(quickModeAnchorEl);
+
+  useEffect(() => {
+    if (!user?.company_id) {
+      setQuickEntryMode('product');
+      return;
+    }
+    const stored = localStorage.getItem(`quick_entry_mode_${user.company_id}`);
+    setQuickEntryMode(stored === 'service' ? 'service' : 'product');
+  }, [user?.company_id]);
+
+  const handleSelectQuickMode = (mode) => {
+    if (!user?.company_id) return;
+    setQuickEntryMode(mode);
+    localStorage.setItem(`quick_entry_mode_${user.company_id}`, mode);
+    setQuickModeAnchorEl(null);
+  };
+
+  const quickActionPath =
+    quickEntryMode === 'service' ? paths.dashboard.serviceLog : paths.dashboard.quickDashboard;
+  const quickActionLabel = quickEntryMode === 'service' ? 'Service Log' : `Quick ${t('sale')}`;
+  const quickActionIcon = quickEntryMode === 'service' ? 'solar:clipboard-list-bold' : 'solar:bolt-bold';
 
   // Dynamically update the Profile link in the _account array
   const accountNav = useMemo(
@@ -149,13 +177,13 @@ export function DashboardLayout({ sx, children, data }) {
               rightAreaStart: (
                 <>
                   {/* Full button on sm+ screens */}
-                  <Tooltip title={`Quick ${t('sale')} ⚡`}>
+                  <Tooltip title={quickActionLabel}>
                     <Button
                       size="small"
                       variant="contained"
                       color="primary"
-                      onClick={() => router.push(paths.dashboard.quickDashboard)}
-                      startIcon={<Iconify icon="solar:bolt-bold" width={16} />}
+                      onClick={() => router.push(quickActionPath)}
+                      startIcon={<Iconify icon={quickActionIcon} width={16} />}
                       sx={{
                         mr: 0.5,
                         px: 1.5,
@@ -165,16 +193,56 @@ export function DashboardLayout({ sx, children, data }) {
                         display: { xs: 'none', sm: 'inline-flex' },
                       }}
                     >
-                      Quick {t('sale')}
+                      {quickActionLabel}
                     </Button>
                   </Tooltip>
 
+                  <Tooltip title="Set quick mode">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => setQuickModeAnchorEl(e.currentTarget)}
+                      sx={{
+                        mr: 0.5,
+                        width: 34,
+                        height: 34,
+                        bgcolor: 'background.neutral',
+                      }}
+                    >
+                      <Iconify icon="solar:tuning-2-bold" width={18} />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Menu
+                    anchorEl={quickModeAnchorEl}
+                    open={quickModeMenuOpen}
+                    onClose={() => setQuickModeAnchorEl(null)}
+                  >
+                    <MenuItem
+                      selected={quickEntryMode === 'product'}
+                      onClick={() => handleSelectQuickMode('product')}
+                    >
+                      <ListItemIcon>
+                        <Iconify icon="solar:bolt-bold" width={18} />
+                      </ListItemIcon>
+                      <ListItemText primary={`Product (Quick ${t('sale')})`} />
+                    </MenuItem>
+                    <MenuItem
+                      selected={quickEntryMode === 'service'}
+                      onClick={() => handleSelectQuickMode('service')}
+                    >
+                      <ListItemIcon>
+                        <Iconify icon="solar:clipboard-list-bold" width={18} />
+                      </ListItemIcon>
+                      <ListItemText primary="Service (Service Log)" />
+                    </MenuItem>
+                  </Menu>
+
                   {/* Icon-only button on mobile */}
-                  <Tooltip title={`Quick ${t('sale')} ⚡`}>
+                  <Tooltip title={quickActionLabel}>
                     <IconButton
                       size="small"
                       color="primary"
-                      onClick={() => router.push(paths.dashboard.quickDashboard)}
+                      onClick={() => router.push(quickActionPath)}
                       sx={{
                         mr: 0.5,
                         display: { xs: 'inline-flex', sm: 'none' },
@@ -185,7 +253,7 @@ export function DashboardLayout({ sx, children, data }) {
                         '&:hover': { bgcolor: 'primary.dark' },
                       }}
                     >
-                      <Iconify icon="solar:bolt-bold" width={18} />
+                      <Iconify icon={quickActionIcon} width={18} />
                     </IconButton>
                   </Tooltip>
                 </>

@@ -20,9 +20,6 @@ import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
-import Select from '@mui/material/Select';
-import InputLabel from '@mui/material/InputLabel';
-import FormControl from '@mui/material/FormControl';
 import Table from '@mui/material/Table';
 import TableRow from '@mui/material/TableRow';
 import TableHead from '@mui/material/TableHead';
@@ -44,8 +41,13 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/utils/axios';
 import { enqueueSale } from 'src/utils/offlineQueue';
-import { markSaleAsPaid } from 'src/actions/sale';
+import { addPaymentToSale } from 'src/actions/sale';
 import { addCustomer } from 'src/actions/customer';
+import { useGetPaymentMethods } from 'src/actions/paymentmethod';
+import {
+  QuickDashboardPayments,
+  sumPaymentLines,
+} from 'src/sections/quick-dashboard/quick-dashboard-payments';
 import { ThermalReceiptPDF } from 'src/sections/pos/receipt-thermal';
 import { A4ReceiptPDF } from 'src/sections/pos/receipt-a4';
 
@@ -106,6 +108,35 @@ function cartIdForSearchItem(item, packMode = 'unit') {
   return `${item.type}-${item.id}`;
 }
 
+/** Variable price bounds for a cart line — scaled to whole-pack when selling by pack. */
+function variablePriceBoundsForCartLine(c) {
+  const { variable_price_min: min, variable_price_max: max } = c;
+  const isPackSale = c.is_pack && c.pack_sale_mode === 'pack';
+  const qpp = c.quantity_per_pack || 1;
+  if (isPackSale) {
+    return {
+      min: min != null ? min * qpp : null,
+      max: max != null ? max * qpp : null,
+    };
+  }
+  return { min, max };
+}
+
+function isCartLineVariablePriceInvalid(c) {
+  if (!c.allow_variable_price) return false;
+  const { unit_price: p } = c;
+  const { min, max } = variablePriceBoundsForCartLine(c);
+  if (min != null && p < min) return true;
+  if (max != null && p > max) return true;
+  return false;
+}
+
+function isCartLinePackPriceBelowCost(c) {
+  if (!c.is_pack || c.pack_sale_mode !== 'pack') return false;
+  const cpp = c.cost_price_per_pack;
+  return cpp != null && c.unit_price < cpp;
+}
+
 /** Normalize API fields (snake_case vs camelCase) so pack UI always works. */
 function normalizeQuickSearchProduct(item) {
   if (!item || item.type !== 'product') return item;
@@ -153,8 +184,95 @@ function fDateShort(isoString) {
   });
 }
 
-const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'pos'];
 const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
+
+function defaultPaymentLine(cartTotal, paymentMethods) {
+  return {
+    payment_method_id: paymentMethods[0]?.id ?? '',
+    amount: cartTotal,
+  };
+}
+
+/** Map quick-dashboard or sales-detail line item into a cart row (null if not loadable). */
+function mapSaleItemToCartLine(it) {
+  const productId = it.product_id != null ? Number(it.product_id) : null;
+  const serviceId = it.service_id != null ? Number(it.service_id) : null;
+  let lineType = it.type;
+  if (!lineType || lineType === 'other') {
+    if (productId != null) lineType = 'product';
+    else if (serviceId != null) lineType = 'service';
+  }
+  const entityId =
+    productId
+    ?? serviceId
+    ?? (it.entity_id != null ? Number(it.entity_id) : null);
+  if (lineType !== 'product' && lineType !== 'service') return null;
+  if (entityId == null) return null;
+
+  const qty = Number(it.quantity) || 1;
+  const unitPrice = Number(it.unit_price ?? it.price) || 0;
+  const st = Number(it.subtotal ?? it.total) || qty * unitPrice;
+  const cartId = cartIdForSearchItem(
+    { type: lineType, id: entityId, is_pack: false },
+    'unit'
+  );
+  const name =
+    it.name
+    || it.product_name
+    || it.service_name
+    || it.description
+    || 'Item';
+
+  return {
+    cartId,
+    id: entityId,
+    type: lineType,
+    name,
+    unit_price: unitPrice,
+    quantity: qty,
+    subtotal: st,
+    stock: null,
+    cost_price: null,
+    allow_variable_price: false,
+    variable_price_min: null,
+    variable_price_max: null,
+    is_pack: false,
+    quantity_per_pack: null,
+    cost_price_per_pack: null,
+    pack_sell_price: null,
+    pack_sale_mode: 'unit',
+    base_unit_price: unitPrice,
+  };
+}
+
+async function fetchSaleItemsForQuickDashboard(storeId, saleId) {
+  const res = await axiosInstance.get(`/api/quick-dashboard/sale/${saleId}/items`);
+  const quickItems = res.data?.items || [];
+  if (quickItems.length) return quickItems;
+
+  if (!storeId) return [];
+
+  try {
+    const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${saleId}/`);
+    const detail = detailRes.data;
+    const detailItems = detail?.items || detail?.sales_items || [];
+    return detailItems.map((item) => ({
+    id: item.id,
+    entity_id: item.product_id ?? item.service_id,
+    product_id: item.product_id,
+    service_id: item.service_id,
+    type: item.product_id != null ? 'product' : item.service_id != null ? 'service' : 'other',
+    name: item.product_name || item.service_name || item.description || 'Item',
+    quantity: item.quantity,
+    unit_price: item.price,
+    price: item.price,
+    subtotal: item.total,
+    total: item.total,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 function getPreferredReceiptFormat() {
   if (typeof window === 'undefined') return 'thermal';
@@ -371,10 +489,14 @@ function CartRow({
     setAmountFocused(false);
   };
 
+  const packVariableBounds =
+    isPackLine && item.allow_variable_price
+      ? variablePriceBoundsForCartLine(item)
+      : { min: null, max: null };
+
   const packPriceError =
     isPackLine &&
-    item.cost_price_per_pack != null &&
-    item.unit_price < item.cost_price_per_pack;
+    (isCartLinePackPriceBelowCost(item) || isCartLineVariablePriceInvalid(item));
 
   return (
     <>
@@ -561,9 +683,13 @@ function CartRow({
                   }}
                   error={packPriceError}
                   helperText={
-                    item.cost_price_per_pack != null
-                      ? `Min ${currencySymbol}${item.cost_price_per_pack}`
-                      : 'Whole pack price'
+                    item.allow_variable_price &&
+                    packVariableBounds.min != null &&
+                    packVariableBounds.max != null
+                      ? `${currencySymbol}${packVariableBounds.min.toLocaleString()}–${currencySymbol}${packVariableBounds.max.toLocaleString()}`
+                      : item.cost_price_per_pack != null
+                        ? `Min ${currencySymbol}${item.cost_price_per_pack}`
+                        : 'Whole pack price'
                   }
                 />
               )}
@@ -749,7 +875,7 @@ export function QuickDashboardView() {
   const [saleItemsCache, setSaleItemsCache] = useState({});
   const [loadingSaleId, setLoadingSaleId] = useState(null);
   const [sharingSaleId, setSharingSaleId] = useState(null);
-  const [markingPaidSaleId, setMarkingPaidSaleId] = useState(null);
+  const [collectingSaleId, setCollectingSaleId] = useState(null);
   const [printingSaleId, setPrintingSaleId] = useState(null);
 
   // Search
@@ -763,10 +889,22 @@ export function QuickDashboardView() {
   // Cart
   const [cart, setCart] = useState([]);
   const [rowModes, setRowModes] = useState({}); // { [cartId]: 'qty' | 'amount' }
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [saleStatus, setSaleStatus] = useState('paid');
+  const [paymentLines, setPaymentLines] = useState([{ payment_method_id: '', amount: 0 }]);
   const [creditCustomerName, setCreditCustomerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [collectSale, setCollectSale] = useState(null);
+  const [collectLines, setCollectLines] = useState([]);
+  const [collectSubmitting, setCollectSubmitting] = useState(false);
+  const [editingDraftSale, setEditingDraftSale] = useState(null);
+  const [loadingDraftEditId, setLoadingDraftEditId] = useState(null);
+  const [completeDraftOpen, setCompleteDraftOpen] = useState(false);
+  const [completeDraftSale, setCompleteDraftSale] = useState(null);
+  const [completeDraftLines, setCompleteDraftLines] = useState([]);
+  const [completeDraftSubmitting, setCompleteDraftSubmitting] = useState(false);
+  const paymentsTouchedRef = useRef(false);
+
+  const { paymentMethods, paymentMethodsLoading } = useGetPaymentMethods(storeId);
   /** Block checkout while a variable price field is focused (draft not yet committed). */
   const [variablePriceFocusCartId, setVariablePriceFocusCartId] = useState(null);
 
@@ -779,6 +917,18 @@ export function QuickDashboardView() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+
+  // Default payment method when store methods load
+  useEffect(() => {
+    if (!paymentMethods?.length) return;
+    setPaymentLines((prev) =>
+      prev.map((line) =>
+        line.payment_method_id
+          ? line
+          : { ...line, payment_method_id: paymentMethods[0].id }
+      )
+    );
+  }, [paymentMethods]);
 
   // ── Data fetching ──────────────────────────────────────────────
 
@@ -821,14 +971,14 @@ export function QuickDashboardView() {
     if (saleItemsCache[saleId]) return;
     try {
       setLoadingSaleId(saleId);
-      const res = await axiosInstance.get(`/api/quick-dashboard/sale/${saleId}/items`);
-      setSaleItemsCache((prev) => ({ ...prev, [saleId]: res.data?.items || [] }));
+      const items = await fetchSaleItemsForQuickDashboard(storeId, saleId);
+      setSaleItemsCache((prev) => ({ ...prev, [saleId]: items }));
     } catch {
       setSaleItemsCache((prev) => ({ ...prev, [saleId]: [] }));
     } finally {
       setLoadingSaleId(null);
     }
-  }, [expandedSaleId, saleItemsCache]);
+  }, [expandedSaleId, saleItemsCache, storeId]);
 
   const downloadBlob = useCallback((blob, fileName) => {
     const blobUrl = URL.createObjectURL(blob);
@@ -895,28 +1045,67 @@ export function QuickDashboardView() {
     [downloadBlob, saleItemsCache, sharingSaleId, storeId]
   );
 
-  const handleMarkAsPaid = useCallback(
-    async (sale) => {
-      if (!sale?.id || markingPaidSaleId != null) return;
-      const lowered = String(sale.status || '').toLowerCase();
-      if (lowered !== 'credit') return;
-
-      try {
-        setMarkingPaidSaleId(sale.id);
-        await markSaleAsPaid(sale.id);
-        setRecentSales((prev) =>
-          prev.map((item) => (item.id === sale.id ? { ...item, status: 'paid' } : item))
-        );
-        toast.success('Sale marked as paid.');
-        await Promise.all([fetchStats(), fetchRecent()]);
-      } catch (error) {
-        toast.error(error?.response?.data?.detail || 'Failed to mark this sale as paid.');
-      } finally {
-        setMarkingPaidSaleId(null);
-      }
+  const openCollectBalance = useCallback(
+    (sale) => {
+      const balance =
+        sale.balance_due ??
+        Math.max(0, Number(sale.total_amount || 0) - Number(sale.amount_paid || 0));
+      if (!sale?.id || balance <= 0) return;
+      setCollectSale(sale);
+      setCollectLines([defaultPaymentLine(balance, paymentMethods)]);
+      setCollectOpen(true);
     },
-    [fetchRecent, fetchStats, markingPaidSaleId]
+    [paymentMethods]
   );
+
+  const handleSubmitCollectBalance = useCallback(async () => {
+    if (!collectSale?.id) return;
+    const balanceDue =
+      collectSale.balance_due
+      ?? Math.max(
+        0,
+        Number(collectSale.total_amount || 0) - Number(collectSale.amount_paid || 0)
+      );
+    const collectPaid = sumPaymentLines(collectLines);
+    const validLines = collectLines.filter(
+      (p) => Number(p.amount) > 0 && p.payment_method_id
+    );
+    if (!validLines.length) {
+      toast.error('Enter at least one payment with a method.');
+      return;
+    }
+    if (validLines.some((p) => !p.payment_method_id)) {
+      toast.error('Select a payment method for each line.');
+      return;
+    }
+    if (collectPaid > balanceDue + 0.02) {
+      toast.error(
+        `Total payments (${fCurrency(collectPaid)}) cannot exceed balance due (${fCurrency(balanceDue)}).`
+      );
+      return;
+    }
+    try {
+      setCollectSubmitting(true);
+      setCollectingSaleId(collectSale.id);
+      await Promise.all(
+        validLines.map((line) =>
+          addPaymentToSale(collectSale.id, {
+            payment_method_id: Number(line.payment_method_id),
+            amount: Number(line.amount),
+          })
+        )
+      );
+      toast.success('Payment recorded.');
+      setCollectOpen(false);
+      setCollectSale(null);
+      await Promise.all([fetchStats(), fetchRecent()]);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Failed to record payment.');
+    } finally {
+      setCollectSubmitting(false);
+      setCollectingSaleId(null);
+    }
+  }, [collectLines, collectSale, fetchRecent, fetchStats]);
 
   const handlePrintSale = useCallback(
     async (sale) => {
@@ -1346,25 +1535,268 @@ export function QuickDashboardView() {
   // ── Cart totals ────────────────────────────────────────────────
 
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
+  const paidSum = sumPaymentLines(paymentLines);
+  const balanceDue = Math.max(0, cartTotal - paidSum);
+  const hasCreditIdentity =
+    Boolean(selectedCustomer?.id) || Boolean(creditCustomerName.trim());
+  const needsCustomer =
+    cartTotal > 0 && (balanceDue > 0.02 || paidSum <= 0);
+  const paymentOverpaid = paidSum > cartTotal + 0.02;
 
-  const cartHasInvalidVariablePrice = cart.some((c) => {
-    if (!c.allow_variable_price) return false;
-    const { unit_price: p, variable_price_min: min, variable_price_max: max } = c;
-    if (min != null && p < min) return true;
-    if (max != null && p > max) return true;
-    return false;
-  });
+  // Keep single payment line matched to cart total until cashier edits amounts
+  useEffect(() => {
+    if (paymentsTouchedRef.current) return;
+    setPaymentLines((prev) => {
+      if (prev.length !== 1) return prev;
+      if (prev[0].amount === cartTotal) return prev;
+      return [{ ...prev[0], amount: cartTotal }];
+    });
+  }, [cartTotal]);
 
-  const cartHasInvalidPackPrice = cart.some((c) => {
-    if (!c.is_pack || c.pack_sale_mode !== 'pack') return false;
-    const cpp = c.cost_price_per_pack;
-    return cpp != null && c.unit_price < cpp;
-  });
+  useEffect(() => {
+    if (!cart.length) {
+      paymentsTouchedRef.current = false;
+    }
+  }, [cart.length]);
+
+  const cartHasInvalidVariablePrice = cart.some(isCartLineVariablePriceInvalid);
+
+  const cartHasInvalidPackPrice = cart.some(isCartLinePackPriceBelowCost);
 
   const checkoutBlockedByVariablePrice =
     cartHasInvalidVariablePrice || cartHasInvalidPackPrice || variablePriceFocusCartId != null;
 
   // ── Checkout ───────────────────────────────────────────────────
+
+  const mapCartToPayloadItems = () =>
+    cart.map((c) => {
+      const {
+        id,
+        type,
+        name,
+        quantity,
+        unit_price: up,
+        subtotal: st,
+        is_pack: isPack,
+        pack_sale_mode: psm,
+        quantity_per_pack: qpp,
+      } = c;
+      if (type === 'product' && isPack && psm === 'pack' && qpp > 0) {
+        const unitQty = quantity * qpp;
+        const effective = unitQty > 0 ? st / unitQty : 0;
+        const round6 = Math.round(effective * 1e6) / 1e6;
+        return {
+          id,
+          type,
+          name,
+          quantity: unitQty,
+          unit_price: round6,
+          subtotal: st,
+        };
+      }
+      return {
+        id,
+        type,
+        name,
+        quantity,
+        unit_price: up,
+        subtotal: st,
+      };
+    });
+
+  const buildSalePayload = (options = {}) => {
+    const { asDraft = false, asCredit = false } = options;
+    const currencyCode = localStorage.getItem('current_currency') || 'NGN';
+    const payload = {
+      store_id: storeId,
+      items: mapCartToPayloadItems(),
+      currency_code: currencyCode,
+      status: asDraft ? 'draft' : asCredit ? 'credit' : 'paid',
+    };
+    if (!asDraft && !asCredit) {
+      const validLines = paymentLines.filter(
+        (p) => Number(p.amount) > 0 && p.payment_method_id
+      );
+      payload.payments = validLines.map((p) => ({
+        payment_method_id: Number(p.payment_method_id),
+        amount: Number(p.amount),
+      }));
+    }
+    if (selectedCustomer?.id) {
+      payload.customer_id = selectedCustomer.id;
+    } else if ((balanceDue > 0 || asCredit) && creditCustomerName.trim()) {
+      payload.customer_name = creditCustomerName.trim();
+    }
+    return payload;
+  };
+
+  const buildDraftUpdatePayload = () => {
+    const currencyCode = localStorage.getItem('current_currency') || 'NGN';
+    const payload = {
+      store_id: storeId,
+      items: mapCartToPayloadItems(),
+      currency_code: currencyCode,
+    };
+    if (selectedCustomer?.id) {
+      payload.customer_id = selectedCustomer.id;
+    } else if (creditCustomerName.trim()) {
+      payload.customer_name = creditCustomerName.trim();
+    }
+    return payload;
+  };
+
+  const cancelEditDraft = () => {
+    setEditingDraftSale(null);
+    paymentsTouchedRef.current = false;
+    setCart([]);
+    setPaymentLines([defaultPaymentLine(0, paymentMethods)]);
+    setCreditCustomerName('');
+    setSelectedCustomer(null);
+    setCustomerInput('');
+  };
+
+  const finalizeSaleSuccess = useCallback(() => {
+    paymentsTouchedRef.current = false;
+    setEditingDraftSale(null);
+    setCart([]);
+    setVariablePriceFocusCartId(null);
+    setRowModes({});
+    setQuery('');
+    setSearchResults([]);
+    setCreditCustomerName('');
+    setSelectedCustomer(null);
+    setCustomerInput('');
+    setCustomerOptions([]);
+    setPaymentLines([defaultPaymentLine(0, paymentMethods)]);
+  }, [paymentMethods]);
+
+  const loadDraftForEdit = useCallback(
+    async (sale) => {
+      if (!storeId || !sale?.id) return;
+      try {
+        setLoadingDraftEditId(sale.id);
+        const rawItems = await fetchSaleItemsForQuickDashboard(storeId, sale.id);
+        const cartLines = rawItems
+          .map((it) => mapSaleItemToCartLine(it))
+          .filter(Boolean);
+        if (!cartLines.length) {
+          toast.error(
+            rawItems.length
+              ? 'Draft lines could not be loaded into the cart. Try completing the sale from the invoice screen.'
+              : 'This draft has no line items. Add products and use Update draft to save.'
+          );
+          return;
+        }
+        const draftTotal = cartLines.reduce((s, c) => s + c.subtotal, 0);
+        paymentsTouchedRef.current = false;
+        setEditingDraftSale({
+          id: sale.id,
+          invoice_number: sale.invoice_number,
+        });
+        setCart(cartLines);
+        setPaymentLines([defaultPaymentLine(draftTotal, paymentMethods)]);
+        setQuery('');
+        setSearchResults([]);
+        toast.info(`Editing draft ${sale.invoice_number}`);
+      } catch (error) {
+        toast.error(error?.response?.data?.detail || 'Failed to load draft.');
+      } finally {
+        setLoadingDraftEditId(null);
+      }
+    },
+    [storeId, paymentMethods]
+  );
+
+  const openCompleteDraft = useCallback(
+    (sale) => {
+      const total = Number(sale.total_amount) || 0;
+      if (!sale?.id || total <= 0) return;
+      setCompleteDraftSale(sale);
+      setCompleteDraftLines([defaultPaymentLine(total, paymentMethods)]);
+      setCompleteDraftOpen(true);
+    },
+    [paymentMethods]
+  );
+
+  const handleSubmitCompleteDraft = useCallback(async () => {
+    if (!completeDraftSale?.id || !storeId) return;
+    const draftTotal = Number(completeDraftSale.total_amount) || 0;
+    const paid = sumPaymentLines(completeDraftLines);
+    const validLines = completeDraftLines.filter(
+      (p) => Number(p.amount) > 0 && p.payment_method_id
+    );
+    if (!validLines.length) {
+      toast.error('Enter at least one payment with a method.');
+      return;
+    }
+    if (paid > draftTotal + 0.02) {
+      toast.error(
+        `Total payments (${fCurrency(paid)}) cannot exceed draft total (${fCurrency(draftTotal)}).`
+      );
+      return;
+    }
+    try {
+      setCompleteDraftSubmitting(true);
+      await axiosInstance.post(
+        `/api/quick-dashboard/sale/${completeDraftSale.id}/complete`,
+        {
+          store_id: storeId,
+          payments: validLines.map((p) => ({
+            payment_method_id: Number(p.payment_method_id),
+            amount: Number(p.amount),
+          })),
+        }
+      );
+      toast.success(`Draft ${completeDraftSale.invoice_number} completed.`);
+      if (editingDraftSale?.id === completeDraftSale.id) {
+        setEditingDraftSale(null);
+      }
+      setCompleteDraftOpen(false);
+      setCompleteDraftSale(null);
+      finalizeSaleSuccess();
+      await Promise.all([fetchStats(), fetchRecent()]);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Failed to complete draft.');
+    } finally {
+      setCompleteDraftSubmitting(false);
+    }
+  }, [
+    completeDraftLines,
+    completeDraftSale,
+    editingDraftSale,
+    fetchRecent,
+    fetchStats,
+    finalizeSaleSuccess,
+    storeId,
+  ]);
+
+  const submitSalePayload = async (payload, successMessage) => {
+    if (!isOnline) {
+      await enqueueSale(payload);
+      await refreshOfflineCount();
+      toast.warning(`${successMessage} saved offline — will sync when connected.`);
+      return;
+    }
+    try {
+      await axiosInstance.post('/api/quick-dashboard/sale', payload);
+      toast.success(successMessage);
+      await Promise.all([fetchStats(), fetchRecent()]);
+    } catch (networkErr) {
+      const isNetworkFailure =
+        !networkErr?.response
+        || networkErr?.code === 'ERR_NETWORK'
+        || networkErr?.code === 'ECONNABORTED';
+      if (isNetworkFailure) {
+        await enqueueSale(payload);
+        await refreshOfflineCount();
+        toast.warning(
+          `Couldn't reach server. ${successMessage} saved offline — will sync when connected.`
+        );
+      } else {
+        throw networkErr;
+      }
+    }
+  };
 
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
@@ -1379,108 +1811,96 @@ export function QuickDashboardView() {
       return;
     }
     if (!storeId) { toast.error('No active store selected.'); return; }
-    const hasCreditIdentity = Boolean(selectedCustomer?.id) || Boolean(creditCustomerName.trim());
-    if (saleStatus === 'credit' && !hasCreditIdentity) {
-      toast.error('Select a customer or enter a customer name for a credit sale.');
+
+    const validLines = paymentLines.filter(
+      (p) => Number(p.amount) > 0 && p.payment_method_id
+    );
+    const isFullCredit = paidSum <= 0 && cartTotal > 0;
+
+    if (!validLines.length && !isFullCredit) {
+      toast.error('Enter at least one payment amount.');
       return;
     }
+    if (paymentLines.some((p) => Number(p.amount) > 0 && !p.payment_method_id)) {
+      toast.error('Select a payment method for each payment line.');
+      return;
+    }
+    if ((balanceDue > 0 || isFullCredit) && !hasCreditIdentity) {
+      toast.error('Select or add a customer when recording a balance due.');
+      return;
+    }
+    if (paymentOverpaid) {
+      toast.error(
+        `Total payments (${fCurrency(paidSum)}) cannot exceed sale total (${fCurrency(cartTotal)}).`
+      );
+      return;
+    }
+
+    const successMessage = isFullCredit
+      ? `Credit sale of ${fCurrency(cartTotal)} recorded`
+      : balanceDue > 0
+        ? `Sale recorded — ${fCurrency(paidSum)} paid, ${fCurrency(balanceDue)} balance`
+        : `Sale of ${fCurrency(cartTotal)} completed`;
+
     try {
       setSubmitting(true);
-      const currencyCode = localStorage.getItem('current_currency') || 'NGN';
-      const payload = {
-        store_id: storeId,
-        items: cart.map((c) => {
-          const {
-            id,
-            type,
-            name,
-            quantity,
-            unit_price: up,
-            subtotal: st,
-            is_pack: isPack,
-            pack_sale_mode: psm,
-            quantity_per_pack: qpp,
-          } = c;
-          if (type === 'product' && isPack && psm === 'pack' && qpp > 0) {
-            const unitQty = quantity * qpp;
-            const effective = unitQty > 0 ? st / unitQty : 0;
-            const round6 = Math.round(effective * 1e6) / 1e6;
-            return {
-              id,
-              type,
-              name,
-              quantity: unitQty,
-              unit_price: round6,
-              subtotal: st,
-            };
-          }
-          return {
-            id,
-            type,
-            name,
-            quantity,
-            unit_price: up,
-            subtotal: st,
-          };
-        }),
-        payment_method: paymentMethod,
-        status: saleStatus,
-        currency_code: currencyCode,
-      };
-      if (selectedCustomer?.id) {
-        payload.customer_id = selectedCustomer.id;
-      } else if (saleStatus === 'credit' && creditCustomerName.trim()) {
-        payload.customer_name = creditCustomerName.trim();
-      }
-
-      if (!isOnline) {
-        // Network is down — save to offline queue
-        await enqueueSale(payload);
-        await refreshOfflineCount();
-        const offlineLabel =
-          saleStatus === 'credit'
-            ? `Credit sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`
-            : `Sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`;
-        toast.warning(offlineLabel);
-      } else {
-        try {
-          await axiosInstance.post('/api/quick-dashboard/sale', payload);
-          const label =
-            saleStatus === 'credit'
-              ? `Credit sale of ${fCurrency(cartTotal)} recorded!`
-              : `Sale of ${fCurrency(cartTotal)} completed!`;
-          toast.success(label);
-          await Promise.all([fetchStats(), fetchRecent()]);
-        } catch (networkErr) {
-          // Request failed despite navigator.onLine — could be server issue or spotty signal
-          const isNetworkFailure =
-            !networkErr?.response || networkErr?.code === 'ERR_NETWORK' || networkErr?.code === 'ECONNABORTED';
-          if (isNetworkFailure) {
-            await enqueueSale(payload);
-            await refreshOfflineCount();
-            toast.warning(
-              `Couldn't reach server. Sale of ${fCurrency(cartTotal)} saved offline — will sync when connected.`
-            );
-          } else {
-            toast.error(networkErr?.response?.data?.detail || 'Sale failed. Please try again.');
-            setSubmitting(false);
-            return;
-          }
+      if (editingDraftSale) {
+        await axiosInstance.put(
+          `/api/quick-dashboard/sale/${editingDraftSale.id}/draft`,
+          buildDraftUpdatePayload()
+        );
+        const completePayload = {
+          store_id: storeId,
+          payments: validLines.map((p) => ({
+            payment_method_id: Number(p.payment_method_id),
+            amount: Number(p.amount),
+          })),
+          status: isFullCredit ? 'credit' : 'paid',
+        };
+        if (selectedCustomer?.id) {
+          completePayload.customer_id = selectedCustomer.id;
+        } else if ((balanceDue > 0 || isFullCredit) && creditCustomerName.trim()) {
+          completePayload.customer_name = creditCustomerName.trim();
         }
+        await axiosInstance.post(
+          `/api/quick-dashboard/sale/${editingDraftSale.id}/complete`,
+          completePayload
+        );
+        toast.success(successMessage);
+        finalizeSaleSuccess();
+        await Promise.all([fetchStats(), fetchRecent()]);
+      } else {
+        const payload = buildSalePayload({ asCredit: isFullCredit });
+        await submitSalePayload(payload, successMessage);
+        finalizeSaleSuccess();
       }
-
-      // Clear cart regardless of online/offline path
-      setCart([]);
-      setVariablePriceFocusCartId(null);
-      setRowModes({});
-      setQuery('');
-      setSearchResults([]);
-      setCreditCustomerName('');
-      setSelectedCustomer(null);
-      setCustomerInput('');
-      setCustomerOptions([]);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!cart.length) { toast.warning('Cart is empty.'); return; }
+    if (!storeId) { toast.error('No active store selected.'); return; }
+    try {
+      setSubmitting(true);
+      if (editingDraftSale) {
+        await axiosInstance.put(
+          `/api/quick-dashboard/sale/${editingDraftSale.id}/draft`,
+          buildDraftUpdatePayload()
+        );
+        toast.success(`Draft ${editingDraftSale.invoice_number} updated · ${fCurrency(cartTotal)}`);
+        finalizeSaleSuccess();
+        await fetchRecent();
+      } else {
+        const payload = buildSalePayload({ asDraft: true });
+        await submitSalePayload(payload, `Draft saved · ${fCurrency(cartTotal)}`);
+        finalizeSaleSuccess();
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to save draft.');
     } finally {
       setSubmitting(false);
     }
@@ -1808,6 +2228,20 @@ export function QuickDashboardView() {
               </Stack>
             </Box>
 
+            {editingDraftSale && (
+              <Alert
+                severity="info"
+                sx={{ mx: 2, mt: 2, mb: 0 }}
+                action={(
+                  <Button color="inherit" size="small" onClick={cancelEditDraft}>
+                    Cancel
+                  </Button>
+                )}
+              >
+                Editing draft {editingDraftSale.invoice_number}
+              </Alert>
+            )}
+
             <Box sx={{ p: 2, minHeight: 200, maxHeight: 400, overflowY: 'auto' }}>
               {cart.length === 0 ? (
                 <Box textAlign="center" py={5}>
@@ -1930,60 +2364,24 @@ export function QuickDashboardView() {
                 Add new customer
               </Button>
 
-              {/* Payment method */}
-              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
-                <InputLabel>Payment Method</InputLabel>
-                <Select
-                  value={paymentMethod}
-                  label="Payment Method"
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <MenuItem key={m} value={m} sx={{ textTransform: 'capitalize' }}>
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <QuickDashboardPayments
+                lines={paymentLines}
+                onChange={setPaymentLines}
+                onPaymentsTouched={() => {
+                  paymentsTouchedRef.current = true;
+                }}
+                cartTotal={cartTotal}
+                paymentMethods={paymentMethods}
+                paymentMethodsLoading={paymentMethodsLoading}
+                disabled={submitting}
+                showSummary
+              />
 
-              {/* Sale status */}
-              <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={saleStatus}
-                  label="Status"
-                  onChange={(e) => {
-                    setSaleStatus(e.target.value);
-                    if (e.target.value !== 'credit') setCreditCustomerName('');
-                  }}
-                >
-                  <MenuItem value="paid">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="solar:check-circle-bold" width={16} sx={{ color: 'success.main' }} />
-                      <span>Paid</span>
-                    </Stack>
-                  </MenuItem>
-                  <MenuItem value="credit">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="solar:clock-circle-bold" width={16} sx={{ color: 'warning.main' }} />
-                      <span>Credit</span>
-                    </Stack>
-                  </MenuItem>
-                  <MenuItem value="draft">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="solar:document-bold" width={16} sx={{ color: 'text.secondary' }} />
-                      <span>Draft</span>
-                    </Stack>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Credit buyer name — when not using customer picker above */}
-              {saleStatus === 'credit' && !selectedCustomer?.id && (
+              {needsCustomer && !selectedCustomer?.id && (
                 <TextField
                   fullWidth
                   size="small"
-                  label="Customer Name *"
+                  label="Customer name *"
                   placeholder="Enter buyer's name"
                   value={creditCustomerName}
                   onChange={(e) => setCreditCustomerName(e.target.value)}
@@ -1995,40 +2393,62 @@ export function QuickDashboardView() {
                       </InputAdornment>
                     ),
                   }}
-                  helperText="Or pick a customer above. A new name will be matched or created."
+                  helperText="Required for balance due. Or pick a customer above."
                 />
               )}
 
-              {/* Checkout button */}
               <Button
                 fullWidth
                 size="large"
                 variant="contained"
-                color={saleStatus === 'credit' ? 'warning' : saleStatus === 'draft' ? 'inherit' : 'primary'}
+                color={balanceDue > 0 ? 'warning' : 'primary'}
                 disabled={
                   !cart.length
                   || submitting
                   || checkoutBlockedByVariablePrice
-                  || (saleStatus === 'credit'
-                    && !selectedCustomer?.id
-                    && !creditCustomerName.trim())
+                  || paymentMethodsLoading
+                  || (paidSum > 0 && !paymentMethods.length)
+                  || (needsCustomer && !hasCreditIdentity)
+                  || paymentOverpaid
                 }
                 onClick={handleCheckout}
-                startIcon={submitting
-                  ? <CircularProgress size={16} color="inherit" />
-                  : <Iconify icon={saleStatus === 'credit' ? 'solar:clock-circle-bold' : 'solar:card-recive-bold'} />
+                startIcon={
+                  submitting ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <Iconify
+                      icon={
+                        balanceDue > 0
+                          ? 'solar:clock-circle-bold'
+                          : 'solar:card-recive-bold'
+                      }
+                    />
+                  )
                 }
                 sx={{ fontWeight: 700, py: 1.5, fontSize: '1rem' }}
               >
                 {submitting
                   ? 'Processing…'
-                  : saleStatus === 'credit'
-                    ? `Record Credit · ${fCurrency(cartTotal)}`
-                    : saleStatus === 'draft'
-                      ? `Save Draft · ${fCurrency(cartTotal)}`
-                      : `Complete Sale · ${fCurrency(cartTotal)}`
-                }
+                  : paidSum <= 0 && cartTotal > 0
+                    ? `Record credit · ${fCurrency(cartTotal)}`
+                    : balanceDue > 0
+                      ? `Record sale · ${fCurrency(paidSum)} paid · ${fCurrency(balanceDue)} balance`
+                      : `Complete sale · ${fCurrency(cartTotal)}`}
               </Button>
+
+              {cart.length > 0 && (
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  disabled={submitting || checkoutBlockedByVariablePrice}
+                  onClick={handleSaveDraft}
+                  sx={{ mt: 1 }}
+                >
+                  {editingDraftSale ? 'Update draft' : 'Save as draft'} · {fCurrency(cartTotal)}
+                </Button>
+              )}
 
               {cart.length > 0 && (
                 <Button
@@ -2036,11 +2456,14 @@ export function QuickDashboardView() {
                   size="small"
                   color="inherit"
                   onClick={() => {
+                    setEditingDraftSale(null);
                     setCart([]);
                     setVariablePriceFocusCartId(null);
                     setRowModes({});
                     setSelectedCustomer(null);
                     setCustomerInput('');
+                    paymentsTouchedRef.current = false;
+                    setPaymentLines([defaultPaymentLine(0, paymentMethods)]);
                   }}
                   sx={{ mt: 1, color: 'text.secondary' }}
                 >
@@ -2076,6 +2499,14 @@ export function QuickDashboardView() {
                 const isExpanded = expandedSaleId === sale.id;
                 const items = saleItemsCache[sale.id] || [];
                 const isLoadingItems = loadingSaleId === sale.id;
+                const amountPaid = Number(sale.amount_paid ?? 0);
+                const saleBalance =
+                  sale.balance_due ??
+                  Math.max(0, Number(sale.total_amount || 0) - amountPaid);
+                const showCollectBalance =
+                  saleBalance > 0.01
+                  && String(sale.status || '').toLowerCase() !== 'draft';
+                const isDraft = String(sale.status || '').toLowerCase() === 'draft';
                 return (
                   <Box
                     key={sale.id}
@@ -2118,6 +2549,15 @@ export function QuickDashboardView() {
                         <Typography variant="body2" fontWeight={700} color="success.main">
                           {fCurrency(sale.total_amount)}
                         </Typography>
+                        {isDraft ? (
+                          <Typography variant="caption" color="text.secondary">
+                            Saved as draft
+                          </Typography>
+                        ) : saleBalance > 0.01 ? (
+                          <Typography variant="caption" color="warning.main" fontWeight={600}>
+                            {fCurrency(amountPaid)} paid · {fCurrency(saleBalance)} due
+                          </Typography>
+                        ) : null}
                         <Chip
                           size="small"
                           label={sale.status}
@@ -2165,23 +2605,62 @@ export function QuickDashboardView() {
                             </span>
                           </Tooltip>
 
-                          {String(sale.status || '').toLowerCase() === 'credit' && (
-                            <Tooltip title="Mark as paid">
+                          {isDraft && (
+                            <>
+                              <Tooltip title="Edit draft">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      loadDraftForEdit(sale);
+                                    }}
+                                    disabled={loadingDraftEditId === sale.id}
+                                    sx={{ p: 0.35 }}
+                                  >
+                                    {loadingDraftEditId === sale.id ? (
+                                      <CircularProgress size={13} color="inherit" />
+                                    ) : (
+                                      <Iconify icon="eva:edit-fill" width={13} />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Complete sale">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openCompleteDraft(sale);
+                                    }}
+                                    sx={{ p: 0.35 }}
+                                  >
+                                    <Iconify icon="solar:card-recive-bold" width={13} />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </>
+                          )}
+                          {showCollectBalance && (
+                            <Tooltip title="Collect balance">
                               <span>
                                 <IconButton
                                   size="small"
                                   color="success"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    handleMarkAsPaid(sale);
+                                    openCollectBalance(sale);
                                   }}
-                                  disabled={markingPaidSaleId === sale.id}
+                                  disabled={collectingSaleId === sale.id}
                                   sx={{ p: 0.35 }}
                                 >
-                                  {markingPaidSaleId === sale.id ? (
+                                  {collectingSaleId === sale.id ? (
                                     <CircularProgress size={13} color="inherit" />
                                   ) : (
-                                    <Iconify icon="solar:check-circle-bold" width={13} />
+                                    <Iconify icon="solar:wallet-money-bold" width={13} />
                                   )}
                                 </IconButton>
                               </span>
@@ -2233,6 +2712,120 @@ export function QuickDashboardView() {
         </Grid>
 
       </Grid>
+
+      <Dialog
+        open={completeDraftOpen}
+        onClose={() => !completeDraftSubmitting && setCompleteDraftOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Complete draft sale</DialogTitle>
+        <DialogContent>
+          {completeDraftSale && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {completeDraftSale.invoice_number} — total{' '}
+              {fCurrency(completeDraftSale.total_amount)}
+            </Typography>
+          )}
+          <QuickDashboardPayments
+            lines={completeDraftLines}
+            onChange={setCompleteDraftLines}
+            cartTotal={Number(completeDraftSale?.total_amount) || 0}
+            paymentMethods={paymentMethods}
+            paymentMethodsLoading={paymentMethodsLoading}
+            disabled={completeDraftSubmitting}
+            showSummary
+            compact
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setCompleteDraftOpen(false)}
+            disabled={completeDraftSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitCompleteDraft}
+            disabled={
+              completeDraftSubmitting
+              || paymentMethodsLoading
+              || sumPaymentLines(completeDraftLines)
+                > (Number(completeDraftSale?.total_amount) || 0) + 0.02
+            }
+          >
+            {completeDraftSubmitting ? 'Completing…' : 'Complete sale'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={collectOpen}
+        onClose={() => !collectSubmitting && setCollectOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Collect balance</DialogTitle>
+        <DialogContent>
+          {collectSale && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {collectSale.invoice_number} — balance{' '}
+              {fCurrency(
+                collectSale.balance_due
+                  ?? Math.max(
+                    0,
+                    Number(collectSale.total_amount || 0)
+                      - Number(collectSale.amount_paid || 0)
+                  )
+              )}
+            </Typography>
+          )}
+          <QuickDashboardPayments
+            lines={collectLines}
+            onChange={setCollectLines}
+            cartTotal={
+              collectSale?.balance_due
+              ?? Math.max(
+                0,
+                Number(collectSale?.total_amount || 0)
+                  - Number(collectSale?.amount_paid || 0)
+              )
+            }
+            paymentMethods={paymentMethods}
+            paymentMethodsLoading={paymentMethodsLoading}
+            disabled={collectSubmitting}
+            showSummary
+            compact
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setCollectOpen(false)}
+            disabled={collectSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitCollectBalance}
+            disabled={
+              collectSubmitting
+              || paymentMethodsLoading
+              || sumPaymentLines(collectLines)
+                > (collectSale?.balance_due
+                  ?? Math.max(
+                    0,
+                    Number(collectSale?.total_amount || 0)
+                      - Number(collectSale?.amount_paid || 0)
+                  ))
+                + 0.02
+            }
+          >
+            {collectSubmitting ? 'Recording…' : 'Record payment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={newCustomerOpen} onClose={() => !creatingCustomer && setNewCustomerOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add New Customer</DialogTitle>

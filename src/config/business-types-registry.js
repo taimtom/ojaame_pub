@@ -52,6 +52,7 @@ const DEFAULT_CONFIG = {
     salesInvoice: 'Sales Invoice',
     usageDashboard: 'Usage dashboard',
     quickDashboard: 'Quick Dashboard',
+    serviceLog: 'Service Log',
     quickRestock: 'Quick Restock',
     salesAndOrdersSection: 'Sales & Orders',
     inventorySection: 'Inventory',
@@ -241,6 +242,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Service Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },
@@ -291,6 +293,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Visit Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },

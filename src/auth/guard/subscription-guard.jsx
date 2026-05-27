@@ -9,6 +9,7 @@ import { NotFoundView } from 'src/sections/error';
 // These paths match the start of the current pathname.
 const ALLOWED_PATHS = [
   '/app/quick-dashboard',
+  '/app/service-log',
   '/app/usage-dashboard',
   '/app/quick-sale',
   '/app/user/account',

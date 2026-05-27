@@ -39,14 +39,41 @@ const EMPTY_FORM = {
   pack_sell_price: '',
 };
 
+function buildCreatedProductSnapshot(form, productId) {
+  const isPack = Boolean(form.is_pack && form.product_kind === 'sellable');
+  const packsInStock = Number(form.quantity) || 0;
+  const quantityPerPack = isPack ? Number(form.quantity_per_pack) || 0 : null;
+  const unitStock = isPack ? packsInStock * (quantityPerPack || 0) : packsInStock;
+
+  return {
+    id: productId,
+    name: form.name.trim(),
+    stock: unitStock,
+    quantity: unitStock,
+    is_pack: isPack,
+    quantity_per_pack: quantityPerPack,
+    cost_price: form.costPrice !== '' ? Number(form.costPrice) : 0,
+    cost_price_per_pack:
+      form.cost_price_per_pack !== '' ? Number(form.cost_price_per_pack) : null,
+  };
+}
+
 // ----------------------------------------------------------------------
 
-export function ProductQuickAddForm({ storeId, storeSlug }) {
+export function ProductQuickAddForm({
+  storeId,
+  storeSlug,
+  defaultQuantity = 1,
+  allowZeroQuantity = false,
+  embedded = false,
+  onCreated,
+  onCancel,
+}) {
   const router = useRouter();
   const { currencySymbol } = useCurrencyFormat();
   const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
 
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(() => ({ ...EMPTY_FORM, quantity: defaultQuantity }));
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [lastCreated, setLastCreated] = useState(null);
@@ -61,7 +88,12 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
     const errs = {};
     if (!form.name.trim()) errs.name = 'Name is required';
     if (!form.category_id) errs.category_id = 'Category is required';
-    if (!form.quantity || Number(form.quantity) < 1) errs.quantity = 'Quantity must be at least 1';
+    const qtyNum = Number(form.quantity);
+    if (Number.isNaN(qtyNum) || qtyNum < 0) {
+      errs.quantity = 'Quantity cannot be negative';
+    } else if (!allowZeroQuantity && qtyNum < 1) {
+      errs.quantity = 'Quantity must be at least 1';
+    }
     if (form.product_kind === 'sellable') {
       if (!form.price || Number(form.price) < 1) errs.price = 'Selling price must be at least 1';
     }
@@ -126,10 +158,14 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
     setSubmitting(true);
     try {
       const response = await addProduct(payload);
+      const productId = response?.product_id ?? response?.id;
       toast.success(`"${form.name}" created!`);
-      setLastCreated({ name: form.name, id: response?.id });
+      if (onCreated) {
+        onCreated(buildCreatedProductSnapshot(form, productId));
+      }
+      setLastCreated({ name: form.name, id: productId });
       if (andAddAnother) {
-        setForm(EMPTY_FORM);
+        setForm({ ...EMPTY_FORM, quantity: defaultQuantity });
         setErrors({});
         setLastCreated(null);
       }
@@ -153,10 +189,22 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
       ? Number(form.quantity || 0) * Number(form.quantity_per_pack)
       : null;
 
+  const quantityLabel = form.is_pack && !isProductionInput
+    ? 'Packs in stock *'
+    : 'Quantity in stock *';
+  const quantityMin = allowZeroQuantity ? 0 : 1;
+  const quantityHelper =
+    errors.quantity ||
+    (allowZeroQuantity
+      ? 'Start at 0 if you will add stock via restock.'
+      : totalUnits != null
+        ? `Total individual units in stock: ${totalUnits}`
+        : undefined);
+
   return (
-    <Stack spacing={3}>
+    <Stack spacing={embedded ? 2 : 3}>
       {/* Success banner with quick actions */}
-      {lastCreated && !submitting && (
+      {!embedded && lastCreated && !submitting && (
         <Alert
           severity="success"
           action={
@@ -195,7 +243,7 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
         </Alert>
       )}
 
-      <Card sx={{ p: 3 }}>
+      <Card sx={{ p: embedded ? 0 : 3, boxShadow: embedded ? 'none' : undefined }}>
         <Stack spacing={3}>
           {/* Inventory role toggle */}
           <Stack spacing={1}>
@@ -313,19 +361,14 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
 
           {/* Quantity */}
           <TextField
-            label="Quantity in stock *"
+            label={quantityLabel}
             type="number"
             fullWidth
             value={form.quantity}
-            inputProps={{ min: 1 }}
+            inputProps={{ min: quantityMin }}
             onChange={(e) => set('quantity', e.target.value)}
             error={!!errors.quantity}
-            helperText={
-              errors.quantity ||
-              (totalUnits != null
-                ? `Total individual units in stock: ${totalUnits}`
-                : undefined)
-            }
+            helperText={quantityHelper}
           />
 
           <Divider />
@@ -477,6 +520,11 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
 
           {/* Submit actions */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            {embedded && onCancel && (
+              <Button variant="outlined" size="large" disabled={submitting} onClick={onCancel} sx={{ flex: 1 }}>
+                Cancel
+              </Button>
+            )}
             <Button
               variant="contained"
               size="large"
@@ -485,28 +533,32 @@ export function ProductQuickAddForm({ storeId, storeSlug }) {
               startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
               sx={{ flex: 1 }}
             >
-              {submitting ? 'Creating...' : 'Create Item'}
+              {submitting ? 'Creating...' : embedded ? 'Create product' : 'Create Item'}
             </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              disabled={submitting}
-              onClick={() => handleSubmit(true)}
-              sx={{ flex: 1 }}
-            >
-              Create &amp; Add Another
-            </Button>
+            {!embedded && (
+              <Button
+                variant="outlined"
+                size="large"
+                disabled={submitting}
+                onClick={() => handleSubmit(true)}
+                sx={{ flex: 1 }}
+              >
+                Create &amp; Add Another
+              </Button>
+            )}
           </Stack>
 
-          <Box sx={{ textAlign: 'center' }}>
-            <Button
-              variant="text"
-              size="small"
-              onClick={() => router.push(paths.dashboard.product.bulkAdd(storeSlug))}
-            >
-              Adding many items at once? Use Bulk Add instead →
-            </Button>
-          </Box>
+          {!embedded && (
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => router.push(paths.dashboard.product.bulkAdd(storeSlug))}
+              >
+                Adding many items at once? Use Bulk Add instead →
+              </Button>
+            </Box>
+          )}
         </Stack>
       </Card>
     </Stack>

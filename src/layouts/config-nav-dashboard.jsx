@@ -217,16 +217,14 @@ export const useNavData = () => {
   {
     subheader: 'Overview',
     items: [
-      { title: 'Company Dashboard', path: paths.dashboard.general.analytics, icon: ICONS.analytics },
       {
         title: 'Store Dashboard',
         path: storeBasePath || paths.dashboard.store.list,
         icon: ICONS.dashboard,
       },
       { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: getNavLabel('serviceLog'), path: paths.dashboard.serviceLog, icon: ICONS.booking, permissionKey: 'Service Log' },
       { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
-      { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
-      { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
     ],
   },
   /**
@@ -296,6 +294,13 @@ export const useNavData = () => {
         ],
       },
       {
+        title: 'Store Transfers',
+        path: callIfFunction(paths.dashboard.transfer.root, currentStore),
+        icon: ICONS.folder,
+        permissionKey: 'Inventory',
+      },
+      { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
+      {
         title: 'Digital Product',
         path: callIfFunction(paths.dashboard.digitalProduct.root, currentStore),
         icon: ICONS.ecommerce,
@@ -350,6 +355,7 @@ export const useNavData = () => {
           { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
           { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
           { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
+          { title: 'Customer Report', path: callIfFunction(paths.dashboard.reports.customers, currentStore) },
         ],
       },
       {
@@ -422,6 +428,7 @@ export const useNavData = () => {
         ],
       },
       { title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar },
+      { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
       ...(currentStoreId ? [{
         title: 'Store Website',
         path: paths.dashboard.store.website(currentStoreId),

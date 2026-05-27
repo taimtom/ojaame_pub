@@ -10,6 +10,7 @@ export function expandImpliedPermissions(permissions) {
   ['read', 'create', 'update', 'delete', 'manage'].forEach((action) => {
     if (expanded.has(`products.${action}`)) expanded.add(`digital_products.${action}`);
     if (expanded.has(`services.${action}`)) expanded.add(`digital_products.${action}`);
+    if (expanded.has(`sales.${action}`)) expanded.add(`service_logs.${action}`);
   });
   return [...expanded];
 }

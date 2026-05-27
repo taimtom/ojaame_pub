@@ -24,6 +24,7 @@ import { useCurrencyFormat } from 'src/hooks/use-currency-format';
 
 import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
+import { ServiceConsumableTemplates } from './service-consumable-templates';
 
 // ----------------------------------------------------------------------
 
@@ -397,6 +398,13 @@ export function ServiceEditForm({ currentService, storeId, storeSlug  }) {
         {renderDetails}
 
         {renderPricing}
+
+        {currentService && (
+          <ServiceConsumableTemplates
+            serviceId={currentService.id}
+            storeId={storeId || Number(localStorage.getItem('store_id')) || null}
+          />
+        )}
 
         {renderActions}
       </Stack>

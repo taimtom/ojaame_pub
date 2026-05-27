@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import { fetcher, endpoints } from 'src/utils/axios';
+import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
 
 const swrOptions = {
   revalidateIfStale: true,
@@ -217,4 +217,75 @@ export function useCompanyRevenueTrend(companyId, period = 'this_year', groupBy 
     }),
     [data, error, isLoading, mutate]
   );
+}
+
+// ─── Customer report ───────────────────────────────────────────────────────────
+
+export function useCustomerReport(
+  storeId,
+  period = 'this_month',
+  month = undefined,
+  year = undefined,
+  date = undefined,
+  options = {}
+) {
+  const { q, sort = 'amount_owing', order = 'desc', page = 1, pageSize = 25 } = options;
+
+  const key = storeId
+    ? [
+        endpoints.reports.customers,
+        {
+          params: {
+            ...periodParams({ store_id: storeId, sort, order, page, page_size: pageSize }, period, month, year, date),
+            ...(q ? { q } : {}),
+          },
+        },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      report: data || null,
+      reportLoading: isLoading,
+      reportError: error,
+      refetchReport: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useCustomerReportDetail(
+  storeId,
+  customerId,
+  period = 'this_month',
+  month = undefined,
+  year = undefined,
+  date = undefined
+) {
+  const key = storeId && customerId
+    ? [
+        endpoints.reports.customerDetail(customerId),
+        { params: periodParams({ store_id: storeId }, period, month, year, date) },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      detail: data || null,
+      detailLoading: isLoading,
+      detailError: error,
+      refetchDetail: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export async function collectCustomerPayment(customerId, payload) {
+  const url = endpoints.reports.collectCustomerPayment(customerId);
+  const response = await axiosInstance.post(url, payload);
+  return response.data;
 }

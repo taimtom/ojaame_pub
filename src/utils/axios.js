@@ -246,6 +246,9 @@ export const endpoints = {
     profitLoss: '/api/reports/profit-loss',
     cashFlow: '/api/reports/cash-flow',
     tax: '/api/reports/tax',
+    customers: '/api/reports/customers',
+    customerDetail: (customerId) => `/api/reports/customers/${customerId}`,
+    collectCustomerPayment: (customerId) => `/api/reports/customers/${customerId}/collect-payment`,
   },
 
   paymentMethod:{
@@ -328,5 +331,19 @@ export const endpoints = {
   support: {
     tickets: '/api/support/tickets',
     ticketComments: (id) => `/api/support/tickets/${id}/comments`,
+  },
+  transfer: {
+    create: '/api/transfers/',
+    list: '/api/transfers/',
+    details: (id) => `/api/transfers/${id}`,
+    pack: (id) => `/api/transfers/${id}/pack`,
+    assignDriver: (id) => `/api/transfers/${id}/assign-driver`,
+    pickup: (id) => `/api/transfers/${id}/pickup`,
+    inTransit: (id) => `/api/transfers/${id}/in-transit`,
+    deliver: (id) => `/api/transfers/${id}/deliver`,
+    receive: (id) => `/api/transfers/${id}/receive`,
+    close: (id) => `/api/transfers/${id}/close`,
+    kpis: '/api/transfers/metrics/kpis',
+    sop: '/api/transfers/ops/sop',
   },
 };

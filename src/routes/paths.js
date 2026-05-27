@@ -109,6 +109,7 @@ export const paths = {
   dashboard: {
     root: ROOTS.DASHBOARD,
     quickDashboard: `${ROOTS.DASHBOARD}/quick-dashboard`,
+    serviceLog: `${ROOTS.DASHBOARD}/service-log`,
     quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
     usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,
     mail: `${ROOTS.DASHBOARD}/mail`,
@@ -200,6 +201,9 @@ export const paths = {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,
         edit: `${ROOTS.DASHBOARD}/product/${MOCK_ID}/edit`,
       },
+    },
+    transfer: {
+      root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/transfer`,
     },
     pos: {
       root:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/pos`,
@@ -309,6 +313,9 @@ export const paths = {
       profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
       salesTrends: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/sales-trends`,
       endOfDay: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/end-of-day`,
+      customers: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/customers`,
+      customerDetail: (storeParam, customerId) =>
+        `${ROOTS.DASHBOARD}/${storeParam}/reports/customers/${customerId}`,
 
       // Company-level reports (not scoped to a single store)
       companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
