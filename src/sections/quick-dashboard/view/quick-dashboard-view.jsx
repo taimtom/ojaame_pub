@@ -245,6 +245,62 @@ function mapSaleItemToCartLine(it) {
   };
 }
 
+function maxAllowedQtyForCartLine(line) {
+  if (!line || line.type !== 'product') return Infinity;
+  const isPackSale = Boolean(line.is_pack && line.pack_sale_mode === 'pack');
+  const qpp = Number(line.quantity_per_pack) || 1;
+  const maxPacks =
+    line.stock != null && qpp > 0 ? Math.floor(Number(line.stock) / qpp) : Infinity;
+  return isPackSale
+    ? maxPacks
+    : line.stock != null
+      ? Number(line.stock)
+      : Infinity;
+}
+
+async function hydrateDraftCartLinesWithLiveStock(storeId, cartLines) {
+  if (!storeId || !Array.isArray(cartLines) || !cartLines.length) return cartLines;
+  const productLines = cartLines.filter((line) => line.type === 'product');
+  if (!productLines.length) return cartLines;
+
+  try {
+    const hydratedById = new Map();
+    await Promise.all(
+      productLines.map(async (line) => {
+        const query = String(line.name || '').trim();
+        if (!query) return;
+        const res = await axiosInstance.get('/api/quick-dashboard/search', {
+          params: { store_id: storeId, query, limit: 20 },
+        });
+        const match = (res.data?.results || []).find(
+          (r) => r?.type === 'product' && Number(r.id) === Number(line.id)
+        );
+        if (match) hydratedById.set(Number(line.id), normalizeQuickSearchProduct(match));
+      })
+    );
+
+    return cartLines.map((line) => {
+      if (line.type !== 'product') return line;
+      const live = hydratedById.get(Number(line.id));
+      if (!live) return line;
+      return {
+        ...line,
+        stock: live.stock ?? line.stock,
+        cost_price: live.cost_price ?? line.cost_price,
+        allow_variable_price: live.allow_variable_price ?? line.allow_variable_price,
+        variable_price_min: live.variable_price_min ?? line.variable_price_min,
+        variable_price_max: live.variable_price_max ?? line.variable_price_max,
+        is_pack: live.is_pack ?? line.is_pack,
+        quantity_per_pack: live.quantity_per_pack ?? line.quantity_per_pack,
+        cost_price_per_pack: live.cost_price_per_pack ?? line.cost_price_per_pack,
+        pack_sell_price: live.pack_sell_price ?? line.pack_sell_price,
+      };
+    });
+  } catch {
+    return cartLines;
+  }
+}
+
 async function fetchSaleItemsForQuickDashboard(storeId, saleId) {
   const res = await axiosInstance.get(`/api/quick-dashboard/sale/${saleId}/items`);
   const quickItems = res.data?.items || [];
@@ -461,6 +517,8 @@ function CartRow({
   // (e.g. "30.000000000000004") on every keystroke.
   const [amountDraft, setAmountDraft] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
+  const [qtyDraft, setQtyDraft] = useState(() => String(item.quantity ?? ''));
+  const [qtyFocused, setQtyFocused] = useState(false);
 
   useEffect(() => {
     if (!priceFocused) {
@@ -473,6 +531,12 @@ function CartRow({
       setPackPriceDraft(String(item.unit_price ?? ''));
     }
   }, [item.unit_price, item.cartId, packPriceFocused]);
+
+  useEffect(() => {
+    if (!qtyFocused) {
+      setQtyDraft(String(item.quantity ?? ''));
+    }
+  }, [item.quantity, item.cartId, qtyFocused]);
 
   const handleAmountFocus = () => {
     const clean = item.subtotal != null ? parseFloat(item.subtotal.toFixed(2)) : 0;
@@ -587,8 +651,19 @@ function CartRow({
                 <Iconify icon="eva:minus-fill" width={14} />
               </IconButton>
               <TextField
-                value={item.quantity}
-                onChange={(e) => onQtyInput?.(item.cartId, e.target.value)}
+                value={qtyFocused ? qtyDraft : String(item.quantity ?? '')}
+                onFocus={() => {
+                  setQtyDraft(String(item.quantity ?? ''));
+                  setQtyFocused(true);
+                }}
+                onChange={(e) => {
+                  setQtyDraft(e.target.value);
+                }}
+                onBlur={() => {
+                  setQtyFocused(false);
+                  const raw = qtyDraft.trim();
+                  if (raw !== '') onQtyInput?.(item.cartId, raw);
+                }}
                 type="number"
                 variant="outlined"
                 size="small"
@@ -917,6 +992,7 @@ export function QuickDashboardView() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [pickingContact, setPickingContact] = useState(false);
 
   // Default payment method when store methods load
   useEffect(() => {
@@ -1311,20 +1387,16 @@ export function QuickDashboardView() {
   }, []);
 
   const setQtyExact = useCallback((cartId, rawValue) => {
+    if (rawValue == null || String(rawValue).trim() === '') return;
     const value = Number(rawValue);
-    if (!value || value < 0.01) return;
+    if (!Number.isFinite(value) || value < 0.01) return;
     setCart((prev) =>
       prev.map((c) => {
         if (c.cartId !== cartId) return c;
-        const isPackSale = c.is_pack && c.pack_sale_mode === 'pack';
-        const qpp = c.quantity_per_pack || 1;
-        const maxPacks =
-          c.stock != null && qpp > 0 ? Math.floor(c.stock / qpp) : Infinity;
-        const maxQty = isPackSale
-          ? maxPacks
-          : c.stock != null
-            ? c.stock
-            : Infinity;
+        const maxQty = maxAllowedQtyForCartLine(c);
+        if (value > maxQty && Number.isFinite(maxQty)) {
+          toast.error(`Quantity cannot exceed available stock of ${maxQty}.`);
+        }
         const clampedQty = Math.min(value, maxQty);
         return { ...c, quantity: clampedQty, subtotal: clampedQty * c.unit_price };
       })
@@ -1562,6 +1634,22 @@ export function QuickDashboardView() {
   const cartHasInvalidVariablePrice = cart.some(isCartLineVariablePriceInvalid);
 
   const cartHasInvalidPackPrice = cart.some(isCartLinePackPriceBelowCost);
+  const outOfStockLines = cart.filter(
+    (line) => line.type === 'product' && line.stock != null && Number(line.stock) <= 0
+  );
+  const outOfStockItemNames = Array.from(
+    new Set(outOfStockLines.map((line) => line.name).filter(Boolean))
+  );
+  const outOfStockSummary = outOfStockItemNames.slice(0, 4).join(', ');
+  const outOfStockRemainingCount = Math.max(0, outOfStockItemNames.length - 4);
+  const cartHasOutOfStockItems = cart.some(
+    (line) => line.type === 'product' && line.stock != null && Number(line.stock) <= 0
+  );
+  const cartHasInsufficientStock = cart.some((line) => {
+    if (line.type !== 'product') return false;
+    const maxQty = maxAllowedQtyForCartLine(line);
+    return Number.isFinite(maxQty) && Number(line.quantity) > maxQty;
+  });
 
   const checkoutBlockedByVariablePrice =
     cartHasInvalidVariablePrice || cartHasInvalidPackPrice || variablePriceFocusCartId != null;
@@ -1688,12 +1776,13 @@ export function QuickDashboardView() {
           return;
         }
         const draftTotal = cartLines.reduce((s, c) => s + c.subtotal, 0);
+        const hydratedCartLines = await hydrateDraftCartLinesWithLiveStock(storeId, cartLines);
         paymentsTouchedRef.current = false;
         setEditingDraftSale({
           id: sale.id,
           invoice_number: sale.invoice_number,
         });
-        setCart(cartLines);
+        setCart(hydratedCartLines);
         setPaymentLines([defaultPaymentLine(draftTotal, paymentMethods)]);
         setQuery('');
         setSearchResults([]);
@@ -1800,6 +1889,16 @@ export function QuickDashboardView() {
 
   const handleCheckout = async () => {
     if (!cart.length) { toast.warning('Cart is empty.'); return; }
+    if (cartHasOutOfStockItems) {
+      const names = outOfStockSummary || 'One or more items';
+      const more = outOfStockRemainingCount > 0 ? ` (+${outOfStockRemainingCount} more)` : '';
+      toast.error(`${names}${more} out of stock. Save as draft or restock before completing sale.`);
+      return;
+    }
+    if (cartHasInsufficientStock) {
+      toast.error('One or more item quantities exceed available stock. Reduce quantity or restock.');
+      return;
+    }
     if (checkoutBlockedByVariablePrice) {
       if (variablePriceFocusCartId != null) {
         toast.error('Finish editing the price field (click outside or press Tab) before completing the sale.');
@@ -1955,6 +2054,35 @@ export function QuickDashboardView() {
       toast.error(error?.response?.data?.detail || 'Could not add customer.');
     } finally {
       setCreatingCustomer(false);
+    }
+  };
+
+  const canPickContact =
+    typeof navigator !== 'undefined'
+    && navigator.contacts
+    && typeof navigator.contacts.select === 'function';
+
+  const handlePickContact = async () => {
+    if (!canPickContact) {
+      toast.info('Contact picker is not supported on this device/browser. Enter details manually.');
+      return;
+    }
+    try {
+      setPickingContact(true);
+      const contacts = await navigator.contacts.select(['name', 'tel'], {
+        multiple: false,
+      });
+      if (!contacts?.length) return;
+      const selected = contacts[0] || {};
+      const pickedName = Array.isArray(selected.name) ? selected.name[0] : selected.name;
+      const pickedTel = Array.isArray(selected.tel) ? selected.tel[0] : selected.tel;
+      if (pickedName) setNewCustomerName(String(pickedName));
+      if (pickedTel) setNewCustomerPhone(String(pickedTel));
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      toast.error('Could not read contacts from this device.');
+    } finally {
+      setPickingContact(false);
     }
   };
 
@@ -2397,6 +2525,21 @@ export function QuickDashboardView() {
                 />
               )}
 
+              {cartHasOutOfStockItems && (
+                <Alert severity="warning" sx={{ mb: 1.5 }}>
+                  <strong>Out of stock:</strong> {outOfStockSummary}
+                  {outOfStockRemainingCount > 0 ? ` (+${outOfStockRemainingCount} more)` : ''}. You
+                  can save this transaction as draft, but you cannot complete the sale until stock
+                  is added.
+                </Alert>
+              )}
+              {cartHasInsufficientStock && !cartHasOutOfStockItems && (
+                <Alert severity="warning" sx={{ mb: 1.5 }}>
+                  One or more item quantities exceed available stock. Reduce quantity or restock
+                  before completing sale.
+                </Alert>
+              )}
+
               <Button
                 fullWidth
                 size="large"
@@ -2406,6 +2549,8 @@ export function QuickDashboardView() {
                   !cart.length
                   || submitting
                   || checkoutBlockedByVariablePrice
+                  || cartHasOutOfStockItems
+                  || cartHasInsufficientStock
                   || paymentMethodsLoading
                   || (paidSum > 0 && !paymentMethods.length)
                   || (needsCustomer && !hasCreditIdentity)
@@ -2846,6 +2991,21 @@ export function QuickDashboardView() {
               fullWidth
               size="small"
             />
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={handlePickContact}
+              disabled={creatingCustomer || pickingContact}
+              startIcon={pickingContact ? <CircularProgress size={14} color="inherit" /> : <Iconify icon="solar:user-plus-bold" width={16} />}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              {pickingContact ? 'Opening contacts...' : 'Pick from contacts'}
+            </Button>
+            {!canPickContact && (
+              <Typography variant="caption" color="text.secondary">
+                Contact picker is not supported here. Enter name and phone manually.
+              </Typography>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>

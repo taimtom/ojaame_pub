@@ -34,6 +34,8 @@ const EMPTY_FORM = {
   is_pack: false,
   costPrice: '',
   price: '',
+  allow_variable_price: false,
+  variable_price_min: '',
   quantity_per_pack: '',
   cost_price_per_pack: '',
   pack_sell_price: '',
@@ -95,7 +97,21 @@ export function ProductQuickAddForm({
       errs.quantity = 'Quantity must be at least 1';
     }
     if (form.product_kind === 'sellable') {
-      if (!form.price || Number(form.price) < 1) errs.price = 'Selling price must be at least 1';
+      if (!form.price || Number(form.price) < 1) {
+        errs.price = form.allow_variable_price
+          ? 'Max selling price must be at least 1'
+          : 'Selling price must be at least 1';
+      }
+
+      if (form.allow_variable_price) {
+        const minNum = Number(form.variable_price_min);
+        const maxNum = Number(form.price);
+        if (form.variable_price_min === '' || Number.isNaN(minNum) || minNum < 1) {
+          errs.variable_price_min = 'Min selling price must be at least 1';
+        } else if (!Number.isNaN(maxNum) && minNum > maxNum) {
+          errs.variable_price_min = 'Min selling price cannot be greater than max selling price';
+        }
+      }
     }
     if (form.product_kind === 'production_input') {
       if (form.costPrice === '' || Number(form.costPrice) < 0)
@@ -154,6 +170,12 @@ export function ProductQuickAddForm({
           : null,
       sub_items: [],
     };
+
+    if (!isProductionInput && form.allow_variable_price) {
+      payload.allow_variable_price = true;
+      payload.variable_price_min = Number(form.variable_price_min);
+      payload.variable_price_max = Number(form.price);
+    }
 
     setSubmitting(true);
     try {
@@ -260,6 +282,8 @@ export function ProductQuickAddForm({
                     ...prev,
                     product_kind: v,
                     is_pack: false,
+                    allow_variable_price: false,
+                    variable_price_min: '',
                     quantity_per_pack: '',
                     cost_price_per_pack: '',
                     pack_sell_price: '',
@@ -495,14 +519,25 @@ export function ProductQuickAddForm({
                   }}
                 />
                 <TextField
-                  label={form.is_pack ? 'Selling price per item *' : 'Selling price *'}
+                  label={
+                    form.allow_variable_price
+                      ? form.is_pack
+                        ? 'Max selling price per item *'
+                        : 'Max selling price *'
+                      : form.is_pack
+                        ? 'Selling price per item *'
+                        : 'Selling price *'
+                  }
                   type="number"
                   fullWidth
                   value={form.price}
                   helperText={
-                    form.is_pack
-                      ? 'Price charged per individual item when selling from a pack'
-                      : undefined
+                    errors.price ||
+                    (form.allow_variable_price
+                      ? 'Used as the highest allowed selling price.'
+                      : form.is_pack
+                        ? 'Price charged per individual item when selling from a pack'
+                        : undefined)
                   }
                   onChange={(e) => set('price', e.target.value)}
                   error={!!errors.price}
@@ -512,6 +547,42 @@ export function ProductQuickAddForm({
                     ),
                   }}
                 />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.allow_variable_price}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setForm((prev) => ({
+                          ...prev,
+                          allow_variable_price: enabled,
+                          ...(!enabled && { variable_price_min: '' }),
+                        }));
+                        setErrors((prev) => ({
+                          ...prev,
+                          variable_price_min: undefined,
+                        }));
+                      }}
+                    />
+                  }
+                  label="Allow variable pricing"
+                />
+                {form.allow_variable_price && (
+                  <TextField
+                    label={form.is_pack ? 'Min selling price per item *' : 'Min selling price *'}
+                    type="number"
+                    fullWidth
+                    value={form.variable_price_min}
+                    helperText={errors.variable_price_min || 'Lowest allowed selling price.'}
+                    onChange={(e) => set('variable_price_min', e.target.value)}
+                    error={!!errors.variable_price_min}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                      ),
+                    }}
+                  />
+                )}
               </>
             )}
           </Stack>

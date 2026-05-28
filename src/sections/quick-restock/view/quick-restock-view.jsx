@@ -76,6 +76,7 @@ export function QuickRestockView() {
 
   const [submitting, setSubmitting] = useState(false);
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [qtyDrafts, setQtyDrafts] = useState({});
 
   const debounceRef = useRef(null);
 
@@ -179,6 +180,43 @@ export function QuickRestockView() {
   }, []);
 
   const clearCart = useCallback(() => setRestockCart([]), []);
+
+  const handleQtyDraftChange = useCallback((productId, rawValue) => {
+    setQtyDrafts((prev) => ({ ...prev, [productId]: rawValue }));
+  }, []);
+
+  const handleQtyDraftBlur = useCallback(
+    (row, isPack) => {
+      const key = row.productId;
+      const raw = String(qtyDrafts[key] ?? '').trim();
+
+      if (raw === '') {
+        if (isPack) {
+          updateRow(key, 'packsToAdd', 0);
+          updateRow(key, 'qty', 0);
+        } else {
+          updateRow(key, 'qty', 0);
+        }
+      } else {
+        const parsed = Number(raw);
+        const normalized = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+        if (isPack) {
+          const quantityPerPack = row.quantityPerPack || 1;
+          updateRow(key, 'packsToAdd', normalized);
+          updateRow(key, 'qty', normalized * quantityPerPack);
+        } else {
+          updateRow(key, 'qty', normalized);
+        }
+      }
+
+      setQtyDrafts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    },
+    [qtyDrafts, updateRow]
+  );
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -413,13 +451,21 @@ export function QuickRestockView() {
                                       size="small"
                                       type="number"
                                       inputProps={{ min: 1, style: { textAlign: 'center' } }}
-                                      value={row.packsToAdd ?? 0}
+                                      value={
+                                        qtyDrafts[row.productId] !== undefined
+                                          ? qtyDrafts[row.productId]
+                                          : row.packsToAdd ?? 0
+                                      }
                                       onChange={(e) => {
-                                        const packsToAdd = Math.max(0, Number(e.target.value));
+                                        const raw = e.target.value;
+                                        handleQtyDraftChange(row.productId, raw);
+                                        if (raw === '') return;
+                                        const packsToAdd = Math.max(0, Number(raw));
                                         const quantityPerPack = row.quantityPerPack || 1;
                                         updateRow(row.productId, 'packsToAdd', packsToAdd);
                                         updateRow(row.productId, 'qty', packsToAdd * quantityPerPack);
                                       }}
+                                      onBlur={() => handleQtyDraftBlur(row, true)}
                                       sx={{ width: 90 }}
                                     />
                                     <Typography variant="caption" color="text.secondary" display="block">
@@ -431,14 +477,20 @@ export function QuickRestockView() {
                                     size="small"
                                     type="number"
                                     inputProps={{ min: 1, style: { textAlign: 'center' } }}
-                                    value={row.qty}
-                                    onChange={(e) =>
-                                      updateRow(
-                                        row.productId,
-                                        'qty',
-                                        Math.max(0, Number(e.target.value))
-                                      )
+                                    value={
+                                      qtyDrafts[row.productId] !== undefined
+                                        ? qtyDrafts[row.productId]
+                                        : row.qty
                                     }
+                                    onChange={(e) =>
+                                      (() => {
+                                        const raw = e.target.value;
+                                        handleQtyDraftChange(row.productId, raw);
+                                        if (raw === '') return;
+                                        updateRow(row.productId, 'qty', Math.max(0, Number(raw)));
+                                      })()
+                                    }
+                                    onBlur={() => handleQtyDraftBlur(row, false)}
                                     sx={{ width: 80 }}
                                   />
                                 )}
