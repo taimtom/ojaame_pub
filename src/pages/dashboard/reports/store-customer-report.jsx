@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -6,24 +6,35 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
 import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
 import { fCurrency } from 'src/utils/format-number';
 import { paramCase } from 'src/utils/change-case';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
+import { toast } from 'src/components/snackbar';
 import { ReportPeriodSelector } from 'src/components/report-period-selector';
-import { useCustomerReport } from 'src/actions/reports';
+import { TableSelectedAction } from 'src/components/table/table-selected-action';
+import { useCustomerReport, mergeCustomerAccounts } from 'src/actions/reports';
 
 function getStoreId(storeParam) {
   if (storeParam) return storeParam.split('-').pop();
@@ -97,10 +108,14 @@ export default function StoreCustomerReportPage() {
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [selectedById, setSelectedById] = useState({});
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [primaryId, setPrimaryId] = useState(null);
+  const [merging, setMerging] = useState(false);
 
   const { period, month, year, date } = periodState;
 
-  const { report, reportLoading, reportError } = useCustomerReport(
+  const { report, reportLoading, reportError, refetchReport } = useCustomerReport(
     storeId,
     period,
     month,
@@ -111,6 +126,16 @@ export default function StoreCustomerReportPage() {
 
   const summary = report?.summary;
   const items = report?.items || [];
+
+  const selectedRows = useMemo(
+    () => Object.values(selectedById),
+    [selectedById]
+  );
+  const selectedIds = useMemo(
+    () => selectedRows.map((row) => row.customer_id),
+    [selectedRows]
+  );
+  const numSelected = selectedIds.length;
 
   const handleSort = (columnId) => {
     if (sort === columnId) {
@@ -124,6 +149,83 @@ export default function StoreCustomerReportPage() {
 
   const openDetail = (customerId) => {
     navigate(paths.dashboard.reports.customerDetail(storeParam, customerId));
+  };
+
+  const toggleRow = (row) => {
+    setSelectedById((prev) => {
+      const next = { ...prev };
+      if (next[row.customer_id]) {
+        delete next[row.customer_id];
+      } else {
+        next[row.customer_id] = row;
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllPage = (checked) => {
+    if (!checked) {
+      setSelectedById((prev) => {
+        const next = { ...prev };
+        items.forEach((row) => {
+          delete next[row.customer_id];
+        });
+        return next;
+      });
+      return;
+    }
+    setSelectedById((prev) => {
+      const next = { ...prev };
+      items.forEach((row) => {
+        next[row.customer_id] = row;
+      });
+      return next;
+    });
+  };
+
+  const pageAllSelected = items.length > 0 && items.every((row) => selectedById[row.customer_id]);
+  const pageSomeSelected = items.some((row) => selectedById[row.customer_id]) && !pageAllSelected;
+
+  const openMergeDialog = () => {
+    if (selectedRows.length < 2) return;
+    const defaultPrimary =
+      [...selectedRows].sort((a, b) => b.transaction_count - a.transaction_count)[0];
+    setPrimaryId(defaultPrimary.customer_id);
+    setMergeOpen(true);
+  };
+
+  const mergePreview = useMemo(() => {
+    if (!primaryId || selectedRows.length < 2) return null;
+    const others = selectedRows.filter((r) => r.customer_id !== primaryId);
+    return {
+      totalPurchased: selectedRows.reduce((sum, r) => sum + (r.total_purchased || 0), 0),
+      amountOwing: selectedRows.reduce((sum, r) => sum + (r.amount_owing || 0), 0),
+      transactions: selectedRows.reduce((sum, r) => sum + (r.transaction_count || 0), 0),
+      mergeCount: others.length,
+    };
+  }, [primaryId, selectedRows]);
+
+  const handleMerge = async () => {
+    if (!storeId || !primaryId || selectedIds.length < 2) return;
+    const mergeIds = selectedIds.filter((id) => id !== primaryId);
+    setMerging(true);
+    try {
+      const result = await mergeCustomerAccounts({
+        store_id: Number(storeId),
+        primary_customer_id: primaryId,
+        merge_customer_ids: mergeIds,
+      });
+      toast.success(
+        `Merged ${result.merged_customer_ids?.length ?? mergeIds.length} account(s) into ${result.name}.`
+      );
+      setSelectedById({});
+      setMergeOpen(false);
+      refetchReport();
+    } catch (err) {
+      toast.error(err.message || 'Could not merge customers.');
+    } finally {
+      setMerging(false);
+    }
   };
 
   return (
@@ -186,29 +288,67 @@ export default function StoreCustomerReportPage() {
 
         <Card>
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <TextField
-              size="small"
-              placeholder="Search by name or phone…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify icon="eva:search-fill" width={20} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ maxWidth: 360 }}
-            />
+            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+              <TextField
+                size="small"
+                placeholder="Search by name or phone…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Iconify icon="eva:search-fill" width={20} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ maxWidth: 360 }}
+              />
+              {numSelected > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  {numSelected} selected across pages
+                </Typography>
+              )}
+            </Stack>
           </Box>
 
-          <Box sx={{ overflowX: 'auto' }}>
+          <Box sx={{ overflowX: 'auto', position: 'relative' }}>
+            <TableSelectedAction
+              numSelected={numSelected}
+              rowCount={items.length}
+              onSelectAllRows={handleSelectAllPage}
+              action={
+                numSelected >= 2 ? (
+                  <Button
+                    size="small"
+                    color="primary"
+                    variant="contained"
+                    startIcon={<Iconify icon="solar:users-group-two-rounded-bold" />}
+                    onClick={openMergeDialog}
+                  >
+                    Merge accounts
+                  </Button>
+                ) : (
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                    Select 2+ to merge
+                  </Typography>
+                )
+              }
+            />
+
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      indeterminate={pageSomeSelected}
+                      checked={pageAllSelected}
+                      onChange={(e) => handleSelectAllPage(e.target.checked)}
+                      disabled={reportLoading || items.length === 0}
+                    />
+                  </TableCell>
                   {SORT_COLUMNS.map((col) => (
                     <TableCell
                       key={col.id}
@@ -231,46 +371,61 @@ export default function StoreCustomerReportPage() {
               <TableBody>
                 {reportLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                       <CircularProgress size={28} />
                     </TableCell>
                   </TableRow>
                 )}
                 {!reportLoading && items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                       <Typography color="text.secondary">No customers found.</Typography>
                     </TableCell>
                   </TableRow>
                 )}
                 {!reportLoading &&
-                  items.map((row) => (
-                    <TableRow
-                      key={row.customer_id}
-                      hover
-                      sx={{ cursor: 'pointer' }}
-                      onClick={() => openDetail(row.customer_id)}
-                    >
-                      <TableCell>
-                        <Typography variant="subtitle2">{row.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {row.phone_number}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">{fCurrency(row.total_purchased)}</TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          color={row.amount_owing > 0 ? 'warning.main' : 'text.primary'}
-                          fontWeight={row.amount_owing > 0 ? 600 : 400}
-                        >
-                          {fCurrency(row.amount_owing)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">{row.transaction_count}</TableCell>
-                      <TableCell align="right">{row.visits_per_month.toFixed(1)}</TableCell>
-                    </TableRow>
-                  ))}
+                  items.map((row) => {
+                    const selected = Boolean(selectedById[row.customer_id]);
+                    return (
+                      <TableRow
+                        key={row.customer_id}
+                        hover
+                        selected={selected}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selected}
+                            onChange={() => toggleRow(row)}
+                          />
+                        </TableCell>
+                        <TableCell onClick={() => openDetail(row.customer_id)}>
+                          <Typography variant="subtitle2">{row.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.phone_number}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" onClick={() => openDetail(row.customer_id)}>
+                          {fCurrency(row.total_purchased)}
+                        </TableCell>
+                        <TableCell align="right" onClick={() => openDetail(row.customer_id)}>
+                          <Typography
+                            variant="body2"
+                            color={row.amount_owing > 0 ? 'warning.main' : 'text.primary'}
+                            fontWeight={row.amount_owing > 0 ? 600 : 400}
+                          >
+                            {fCurrency(row.amount_owing)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" onClick={() => openDetail(row.customer_id)}>
+                          {row.transaction_count}
+                        </TableCell>
+                        <TableCell align="right" onClick={() => openDetail(row.customer_id)}>
+                          {row.visits_per_month.toFixed(1)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </Box>
@@ -289,6 +444,70 @@ export default function StoreCustomerReportPage() {
           />
         </Card>
       </DashboardContent>
+
+      <Dialog open={mergeOpen} onClose={() => !merging && setMergeOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Merge customer accounts</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            All sales, owing balances, and service records from the other accounts will move to
+            the primary account you choose below. The duplicate accounts will be removed.
+          </Typography>
+
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Primary account (keep this name &amp; profile)
+          </Typography>
+          <RadioGroup
+            value={primaryId ?? ''}
+            onChange={(e) => setPrimaryId(Number(e.target.value))}
+          >
+            {selectedRows.map((row) => (
+              <FormControlLabel
+                key={row.customer_id}
+                value={row.customer_id}
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      {row.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {row.phone_number} · {row.transaction_count} transactions ·{' '}
+                      {fCurrency(row.amount_owing)} owing
+                    </Typography>
+                  </Box>
+                }
+              />
+            ))}
+          </RadioGroup>
+
+          {mergePreview && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.neutral', borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                After merge
+              </Typography>
+              <Typography variant="body2">
+                {mergePreview.mergeCount} duplicate account(s) removed ·{' '}
+                {mergePreview.transactions} total transactions ·{' '}
+                {fCurrency(mergePreview.totalPurchased)} purchased ·{' '}
+                {fCurrency(mergePreview.amountOwing)} owing
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="outlined" color="inherit" onClick={() => setMergeOpen(false)} disabled={merging}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleMerge}
+            disabled={merging || !primaryId || selectedIds.length < 2}
+            startIcon={merging ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {merging ? 'Merging…' : 'Merge accounts'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

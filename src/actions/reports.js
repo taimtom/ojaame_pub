@@ -289,3 +289,8 @@ export async function collectCustomerPayment(customerId, payload) {
   const response = await axiosInstance.post(url, payload);
   return response.data;
 }
+
+export async function mergeCustomerAccounts(payload) {
+  const response = await axiosInstance.post(endpoints.reports.mergeCustomers, payload);
+  return response.data;
+}

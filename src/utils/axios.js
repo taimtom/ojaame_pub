@@ -247,6 +247,7 @@ export const endpoints = {
     cashFlow: '/api/reports/cash-flow',
     tax: '/api/reports/tax',
     customers: '/api/reports/customers',
+    mergeCustomers: '/api/reports/customers/merge',
     customerDetail: (customerId) => `/api/reports/customers/${customerId}`,
     collectCustomerPayment: (customerId) => `/api/reports/customers/${customerId}/collect-payment`,
   },
