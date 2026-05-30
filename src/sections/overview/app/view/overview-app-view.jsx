@@ -92,7 +92,14 @@ export function OverviewAppView({ storeId }) {
     useStoreSalesByPaymentMethod(storeId, paymentPeriod);
 
   const {
-    dailySales = { total_sales: 0, change_percentage: 0, hourly_data: [] },
+    dailySales = {
+      total_sales: 0,
+      total_paid: 0,
+      total_debt: 0,
+      change_percentage: 0,
+      period: 'last 7 days',
+      hourly_data: [],
+    },
     dailySalesLoading,
   } = useStoreDailySales(storeId);
 
@@ -263,7 +270,11 @@ export function OverviewAppView({ storeId }) {
           <AppWidgetSummary
             title={`Today's ${t('sale')}s`}
             percent={dailySales.change_percentage}
-            total={dailySales.total_sales}
+            total={dailySales.total_paid ?? dailySales.total_sales}
+            secondaryLabel="Debt outside"
+            secondaryValue={dailySales.total_debt ?? 0}
+            periodLabel={dailySales.period || 'last 7 days'}
+            formatAsCurrency
             loading={dailySalesLoading}
             chart={{ categories: hours, series: amounts }}
           />
@@ -274,6 +285,8 @@ export function OverviewAppView({ storeId }) {
             title={`Total Weekly ${t('sale')}s`}
             percent={weeklyPct}
             total={weeklyTotal}
+            periodLabel={weeklySales?.period || 'last 7 days'}
+            formatAsCurrency
             loading={weeklySalesLoading}
             chart={{ categories: weeklyCategories, series: weeklyAmounts }}
           />
@@ -284,6 +297,8 @@ export function OverviewAppView({ storeId }) {
             title={`Total Monthly ${t('sale')}s`}
             percent={monthlyPct}
             total={monthlyTotal}
+            periodLabel={monthlySales?.period || 'last month'}
+            formatAsCurrency
             loading={monthlySalesLoading}
             chart={{
               colors: [theme.vars.palette.info.main],
