@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 
@@ -23,9 +23,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { useAuthContext } from 'src/auth/hooks';
+import { usePermissions } from 'src/hooks/use-permissions';
 import axiosInstance from 'src/utils/axios';
 import { fCurrency } from 'src/utils/format-number';
 import { toast } from 'src/components/snackbar';
+import { ConfirmDialog } from 'src/components/custom-dialog';
+import { useBoolean } from 'src/hooks/use-boolean';
 
 // ----------------------------------------------------------------------
 
@@ -57,8 +60,31 @@ function startOfWeek(dateObj) {
   return d;
 }
 
+/** Calendar date in local timezone (avoids UTC shift from toISOString). */
 function toIsoDate(dateObj) {
-  return new Date(dateObj).toISOString().slice(0, 10);
+  const d = new Date(dateObj);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function defaultPeriodValueForType(periodType) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  switch (periodType) {
+    case 'monthly':
+      return `${y}-${m}-01`;
+    case 'quarterly':
+      return `${y}-01-01`;
+    case 'yearly':
+      return `${y}-01-01`;
+    case 'weekly':
+    case 'daily':
+    default:
+      return toIsoDate(now);
+  }
 }
 
 function getPeriodBounds(periodType, periodValue, quarter, yearValue) {
@@ -104,6 +130,12 @@ function getPeriodBounds(periodType, periodValue, quarter, yearValue) {
 export default function EndOfDayReportPage() {
   const { storeParam } = useParams();
   const { user } = useAuthContext();
+  const { hasPermission } = usePermissions();
+  const canUpdateReports = hasPermission('reports.update');
+  const canCreateReports = hasPermission('reports.create');
+  const canDeleteReports =
+    hasPermission('reports.delete') || hasPermission('reports.update');
+  const confirmDelete = useBoolean();
   const storeId = getStoreId(storeParam);
   const companyId = user?.company_id;
 
@@ -112,7 +144,8 @@ export default function EndOfDayReportPage() {
   const [list, setList] = useState([]);
   const [preview, setPreview] = useState(null);
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => toIsoDate(new Date()), []);
+  const periodTypeTouchedRef = useRef(false);
   const [periodType, setPeriodType] = useState('daily');
   const [periodValue, setPeriodValue] = useState(today);
   const [quarter, setQuarter] = useState('1');
@@ -124,7 +157,9 @@ export default function EndOfDayReportPage() {
     { bank_account_id: '', balance: '', entry_method: 'manual', statement_file_url: '' },
   ]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [reportToDelete, setReportToDelete] = useState(null);
 
   const fetchAccounts = useCallback(async () => {
     if (!companyId) return;
@@ -152,14 +187,17 @@ export default function EndOfDayReportPage() {
   }, [storeId]);
 
   const fetchPeriodType = useCallback(async () => {
-    if (!storeId) return;
+    if (!storeId || periodTypeTouchedRef.current) return;
     try {
       const { data } = await axiosInstance.get(`/api/end-of-day/stores/${storeId}/settings/period-type`);
-      setPeriodType(data?.period_type || 'daily');
+      const nextType = data?.period_type || 'daily';
+      setPeriodType(nextType);
+      setPeriodValue(defaultPeriodValueForType(nextType));
     } catch {
       setPeriodType('daily');
+      setPeriodValue(today);
     }
-  }, [storeId]);
+  }, [storeId, today]);
 
   const fetchPreview = useCallback(async () => {
     if (!storeId) return;
@@ -224,6 +262,37 @@ export default function EndOfDayReportPage() {
       ),
     [lines]
   );
+
+  const periodBounds = useMemo(
+    () => getPeriodBounds(periodType, periodValue, quarter, yearValue),
+    [periodType, periodValue, quarter, yearValue]
+  );
+
+  const enteredClosingTotal = useMemo(() => {
+    const cash = parseFloat(cashBalance, 10);
+    if (Number.isNaN(cash)) return null;
+    const bankSum = lines.reduce((sum, line) => {
+      if (line.bank_account_id === '' || line.bank_account_id == null) return sum;
+      const bal = parseFloat(line.balance, 10);
+      return sum + (Number.isNaN(bal) ? 0 : bal);
+    }, 0);
+    return cash + bankSum;
+  }, [cashBalance, lines]);
+
+  const liveVariance = useMemo(() => {
+    if (!preview || enteredClosingTotal == null) return null;
+    const opening = preview.requires_initial_opening
+      ? parseFloat(initialOpening, 10)
+      : preview.opening_total;
+    if (preview.requires_initial_opening && Number.isNaN(opening)) return null;
+    return enteredClosingTotal - opening - preview.net_operations;
+  }, [preview, enteredClosingTotal, initialOpening]);
+
+  const handlePeriodTypeChange = (nextType) => {
+    periodTypeTouchedRef.current = true;
+    setPeriodType(nextType);
+    setPeriodValue(defaultPeriodValueForType(nextType));
+  };
 
   const handleUpload = async (idx, file) => {
     if (!file) return;
@@ -294,11 +363,21 @@ export default function EndOfDayReportPage() {
     if (Number.isNaN(cash)) {
       throw new Error('Enter a valid cash balance.');
     }
-    return {
+    const payload = {
       cash_balance: cash,
       bank_lines: buildBankLines(),
       notes: notes || null,
+      period_start: periodBounds.period_start,
+      period_end: periodBounds.period_end,
+      period_type: periodType,
     };
+    if (preview?.requires_initial_opening) {
+      const io = parseFloat(initialOpening, 10);
+      if (!Number.isNaN(io)) {
+        payload.initial_opening_total = io;
+      }
+    }
+    return payload;
   };
 
   const loadReportForEdit = async (reportId) => {
@@ -308,6 +387,7 @@ export default function EndOfDayReportPage() {
         `/api/end-of-day/stores/${storeId}/reports/${reportId}`
       );
       setEditingId(reportId);
+      periodTypeTouchedRef.current = true;
       const nextPeriodType = data.period_type || periodType;
       const nextPeriodStart = data.period_start || data.report_date;
       setPeriodType(nextPeriodType);
@@ -319,7 +399,9 @@ export default function EndOfDayReportPage() {
       }
       setCashBalance(String(data.cash_balance));
       setNotes(data.notes || '');
-      setInitialOpening('');
+      setInitialOpening(
+        data.used_initial_opening ? String(data.opening_total_snapshot ?? '') : ''
+      );
       const bl = (data.bank_balances || []).map((b) => ({
         bank_account_id: b.bank_account_id,
         balance: String(b.balance),
@@ -339,17 +421,55 @@ export default function EndOfDayReportPage() {
 
   const clearEdit = () => {
     setEditingId(null);
+    periodTypeTouchedRef.current = false;
     setPeriodValue(today);
     setCashBalance('');
     setNotes('');
     setInitialOpening('');
     setLines([{ bank_account_id: '', balance: '', entry_method: 'manual', statement_file_url: '' }]);
+    fetchPeriodType();
     fetchPreview();
+  };
+
+  const openDeleteConfirm = (row) => {
+    setReportToDelete(row);
+    confirmDelete.onTrue();
+  };
+
+  const handleDeleteReport = async () => {
+    if (!storeId || !reportToDelete?.id) return;
+    try {
+      setDeleting(true);
+      await axiosInstance.delete(
+        `/api/end-of-day/stores/${storeId}/reports/${reportToDelete.id}`
+      );
+      if (editingId === reportToDelete.id) {
+        clearEdit();
+      }
+      toast.success('End-of-period report deleted.');
+      confirmDelete.onFalse();
+      setReportToDelete(null);
+      fetchList();
+      fetchPreview();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : err.message || 'Delete failed.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!storeId) return;
+    if (editingId && !canUpdateReports) {
+      toast.error('You need reports.update permission to edit end-of-period reports.');
+      return;
+    }
+    if (!editingId && !canCreateReports) {
+      toast.error('You need reports.create permission to save end-of-period reports.');
+      return;
+    }
     let payload;
     try {
       payload = editingId ? buildPatchPayload() : buildPayload();
@@ -430,13 +550,18 @@ export default function EndOfDayReportPage() {
               </Stack>
               <Box component="form" onSubmit={handleSubmit}>
                 <Stack spacing={2}>
+                  {!editingId && (
+                    <Typography variant="caption" color="text.secondary">
+                      Period: {periodBounds.period_start} → {periodBounds.period_end}
+                    </Typography>
+                  )}
+
                   <TextField
                     select
                     label="Period type"
                     value={periodType}
-                    onChange={(e) => setPeriodType(e.target.value)}
+                    onChange={(e) => handlePeriodTypeChange(e.target.value)}
                     fullWidth
-                    disabled={Boolean(editingId)}
                   >
                     <MenuItem value="daily">Daily</MenuItem>
                     <MenuItem value="weekly">Weekly</MenuItem>
@@ -453,7 +578,6 @@ export default function EndOfDayReportPage() {
                       onChange={(e) => setPeriodValue(e.target.value)}
                       InputLabelProps={{ shrink: true }}
                       fullWidth
-                      disabled={Boolean(editingId)}
                     />
                   )}
                   {periodType === 'weekly' && (
@@ -464,7 +588,6 @@ export default function EndOfDayReportPage() {
                       onChange={(e) => setPeriodValue(e.target.value)}
                       InputLabelProps={{ shrink: true }}
                       fullWidth
-                      disabled={Boolean(editingId)}
                     />
                   )}
                   {periodType === 'monthly' && (
@@ -475,7 +598,6 @@ export default function EndOfDayReportPage() {
                       onChange={(e) => setPeriodValue(`${e.target.value}-01`)}
                       InputLabelProps={{ shrink: true }}
                       fullWidth
-                      disabled={Boolean(editingId)}
                     />
                   )}
                   {periodType === 'quarterly' && (
@@ -486,7 +608,6 @@ export default function EndOfDayReportPage() {
                         value={quarter}
                         onChange={(e) => setQuarter(e.target.value)}
                         fullWidth
-                        disabled={Boolean(editingId)}
                       >
                         <MenuItem value="1">Q1</MenuItem>
                         <MenuItem value="2">Q2</MenuItem>
@@ -499,7 +620,6 @@ export default function EndOfDayReportPage() {
                         value={yearValue}
                         onChange={(e) => setYearValue(e.target.value)}
                         fullWidth
-                        disabled={Boolean(editingId)}
                       />
                     </Stack>
                   )}
@@ -510,8 +630,14 @@ export default function EndOfDayReportPage() {
                       value={yearValue}
                       onChange={(e) => setYearValue(e.target.value)}
                       fullWidth
-                      disabled={Boolean(editingId)}
                     />
+                  )}
+
+                  {editingId && (
+                    <Typography variant="caption" color="text.secondary">
+                      Editing period: {periodBounds.period_start} → {periodBounds.period_end}. Later
+                      reports will be recalculated from this one.
+                    </Typography>
                   )}
 
                   {preview && (
@@ -533,6 +659,39 @@ export default function EndOfDayReportPage() {
                         <Typography variant="body2">
                           Net operations: <strong>{fCurrency(preview.net_operations)}</strong>
                         </Typography>
+                        <Typography variant="body2">
+                          Expected closing (opening + net):{' '}
+                          <strong>
+                            {fCurrency(
+                              (() => {
+                                const opening = preview.requires_initial_opening
+                                  ? parseFloat(initialOpening, 10)
+                                  : preview.opening_total;
+                                if (Number.isNaN(opening)) return preview.opening_total + preview.net_operations;
+                                return opening + preview.net_operations;
+                              })()
+                            )}
+                          </strong>
+                        </Typography>
+                        {enteredClosingTotal != null && (
+                          <Typography variant="body2">
+                            Your closing total: <strong>{fCurrency(enteredClosingTotal)}</strong>
+                          </Typography>
+                        )}
+                        {liveVariance != null && (
+                          <Typography
+                            variant="body2"
+                            color={
+                              Math.abs(liveVariance) <= 1
+                                ? 'success.main'
+                                : liveVariance > 0
+                                  ? 'warning.main'
+                                  : 'error.main'
+                            }
+                          >
+                            Variance (before save): <strong>{fCurrency(liveVariance)}</strong>
+                          </Typography>
+                        )}
                         {preview.requires_initial_opening && (
                           <Alert severity="warning" sx={{ mt: 1 }}>
                             First end-of-period for this store: enter the opening total (cash + all
@@ -543,13 +702,13 @@ export default function EndOfDayReportPage() {
                     </Card>
                   )}
 
-                  {preview?.requires_initial_opening && !editingId && (
+                  {preview?.requires_initial_opening && (
                     <TextField
                       label="Initial opening total (₦)"
                       value={initialOpening}
                       onChange={(e) => setInitialOpening(e.target.value)}
                       fullWidth
-                      required
+                      required={!editingId}
                     />
                   )}
 
@@ -653,7 +812,12 @@ export default function EndOfDayReportPage() {
                     minRows={2}
                   />
 
-                  <Button type="submit" variant="contained" size="large" disabled={saving}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="large"
+                    disabled={saving || (editingId ? !canUpdateReports : !canCreateReports)}
+                  >
                     {saving ? 'Saving…' : editingId ? 'Update end of period' : 'Save end of period'}
                   </Button>
                 </Stack>
@@ -680,7 +844,12 @@ export default function EndOfDayReportPage() {
                   <TableBody>
                     {list.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell>{`${row.period_start || row.report_date} to ${row.period_end || row.report_date}`}</TableCell>
+                        <TableCell>
+                          {row.period_type && row.period_type !== 'daily'
+                            ? `${row.period_type} · `
+                            : ''}
+                          {`${row.period_start || row.report_date} to ${row.period_end || row.report_date}`}
+                        </TableCell>
                         <TableCell align="right">{fCurrency(row.closing_total_snapshot)}</TableCell>
                         <TableCell align="right">{fCurrency(row.variance_amount)}</TableCell>
                         <TableCell>
@@ -692,9 +861,27 @@ export default function EndOfDayReportPage() {
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" onClick={() => loadReportForEdit(row.id)}>
-                            Edit
-                          </Button>
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            {canUpdateReports && (
+                              <Button size="small" onClick={() => loadReportForEdit(row.id)}>
+                                Edit
+                              </Button>
+                            )}
+                            {canDeleteReports && (
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => openDeleteConfirm(row)}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                            {!canUpdateReports && !canDeleteReports && (
+                              <Typography variant="caption" color="text.secondary">
+                                —
+                              </Typography>
+                            )}
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -705,6 +892,39 @@ export default function EndOfDayReportPage() {
           </Stack>
         )}
       </DashboardContent>
+
+      <ConfirmDialog
+        open={confirmDelete.value}
+        onClose={() => {
+          confirmDelete.onFalse();
+          setReportToDelete(null);
+        }}
+        title="Delete end-of-period report?"
+        content={
+          reportToDelete ? (
+            <>
+              Remove the report for{' '}
+              <strong>
+                {reportToDelete.period_start || reportToDelete.report_date} to{' '}
+                {reportToDelete.period_end || reportToDelete.report_date}
+              </strong>
+              ? Later reports will be recalculated from the previous period.
+            </>
+          ) : (
+            'Remove this end-of-period report?'
+          )
+        }
+        action={
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleting}
+            onClick={handleDeleteReport}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        }
+      />
     </>
   );
 }
