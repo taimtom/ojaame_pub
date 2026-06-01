@@ -3,6 +3,8 @@ import { Outlet } from 'react-router-dom';
 
 import { MainLayout } from 'src/layouts/main';
 import { SimpleLayout } from 'src/layouts/simple';
+import { StoreWebsiteLayout } from 'src/layouts/store-website/layout';
+import { CheckoutLayout } from 'src/layouts/store-website/checkout-layout';
 
 import { SplashScreen } from 'src/components/loading-screen';
 
@@ -43,6 +45,31 @@ export const mainRoutes = [
       </Suspense>
     ),
     children: [
+      // Public store website routes — use store-specific layout (no platform nav)
+      {
+        path: 'site/:slug',
+        element: (
+          <StoreWebsiteLayout>
+            <StoreWebsitePage />
+          </StoreWebsiteLayout>
+        ),
+      },
+      {
+        path: 'site/:slug/products',
+        element: (
+          <StoreWebsiteLayout>
+            <StoreProductsPage />
+          </StoreWebsiteLayout>
+        ),
+      },
+      {
+        path: 'site/:slug/products/:productId',
+        element: (
+          <StoreWebsiteLayout>
+            <StoreProductDetailPage />
+          </StoreWebsiteLayout>
+        ),
+      },
       {
         element: (
           <MainLayout>
@@ -50,18 +77,6 @@ export const mainRoutes = [
           </MainLayout>
         ),
         children: [
-          {
-            path: 'site/:slug',
-            element: <StoreWebsitePage />,
-          },
-          {
-            path: 'site/:slug/products',
-            element: <StoreProductsPage />,
-          },
-          {
-            path: 'site/:slug/products/:productId',
-            element: <StoreProductDetailPage />,
-          },
           {
             path: 'about-us',
             element: <AboutPage />,
@@ -84,7 +99,6 @@ export const mainRoutes = [
               { element: <ProductListPage />, index: true },
               { path: 'list', element: <ProductListPage /> },
               { path: ':id', element: <ProductDetailsPage /> },
-              { path: 'checkout', element: <ProductCheckoutPage /> },
             ],
           },
           {
@@ -127,6 +141,15 @@ export const mainRoutes = [
           <SimpleLayout content={{ compact: true }}>
             <MaintenancePage />
           </SimpleLayout>
+        ),
+      },
+      // Checkout — store-aware layout with back-to-store link
+      {
+        path: 'product/checkout',
+        element: (
+          <CheckoutLayout>
+            <ProductCheckoutPage />
+          </CheckoutLayout>
         ),
       },
       { path: '500', element: <Page500 /> },

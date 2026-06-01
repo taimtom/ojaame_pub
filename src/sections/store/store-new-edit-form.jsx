@@ -2,7 +2,7 @@ import { z as zod } from 'zod';
 import { useMemo, useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
-import { isValidPhoneNumber } from 'react-phone-number-input/input';
+import { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -17,7 +17,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
 
 import { fData } from 'src/utils/format-number';
 
@@ -29,15 +28,40 @@ import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
+// Derive a human-readable country name from an E.164 phone number.
+// Falls back to empty string if the number can't be parsed.
+function countryFromPhone(e164) {
+  if (!e164) return '';
+  try {
+    const parsed = parsePhoneNumber(e164);
+    if (!parsed?.country) return '';
+    const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    return displayNames.of(parsed.country) || '';
+  } catch {
+    return '';
+  }
+}
+
+// ----------------------------------------------------------------------
 // Validation schema for a new/edit store.
 export const NewStoreSchema = zod.object({
   avatarUrl: schemaHelper.file({ message: { required_error: 'Avatar is required!' } }).optional().nullable(),
   storeName: zod.string().min(1, { message: 'Store Name is required!' }),
   storeEmail: zod
     .string()
-    .min(1, { message: 'Email is required!' })
-    .email({ message: 'Email must be a valid email address!' }),
-  phoneNumber: schemaHelper.phoneNumber({ isValidPhoneNumber }),
+    .trim()
+    .optional()
+    .or(zod.literal(''))
+    .refine((value) => !value || zod.string().email().safeParse(value).success, {
+      message: 'Email must be a valid email address!',
+    }),
+  phoneNumber: zod
+    .string()
+    .optional()
+    .or(zod.literal(''))
+    .refine((value) => !value || isValidPhoneNumber(value), {
+      message: 'Phone number must be valid',
+    }),
   address: zod.string().min(1, { message: 'Address is required!' }),
   status: zod.string(),
   isVerified: zod.boolean(),
@@ -47,8 +71,8 @@ export const NewStoreSchema = zod.object({
 // StoreNewEditForm Component
 // Use a default value of null for currentStore in create mode.
 export function StoreNewEditForm({ currentStore = null, mutate }) {
-  const router = useRouter();
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Memoize default values based on currentStore.
   const defaultValues = useMemo(
@@ -116,12 +140,18 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      // Process avatarUrl: if it's a File, upload it first.
+      // avatarUrl is normally an https URL after immediate upload on drop; keep File fallback.
       if (data.avatarUrl && data.avatarUrl instanceof File) {
         data.avatarUrl = await uploadFile(data.avatarUrl, data.storeName);
       } else if (!data.avatarUrl || data.avatarUrl === '') {
-        // If no image is uploaded, set to null
         data.avatarUrl = null;
+      }
+
+      // Derive country from the phone number's calling code so users never
+      // have to pick it manually.
+      const derivedCountry = countryFromPhone(data.phoneNumber);
+      if (derivedCountry) {
+        data.country = derivedCountry;
       }
 
       if (currentStore) {
@@ -192,6 +222,9 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
             <Box sx={{ mb: 5 }}>
               <Field.UploadAvatar
                 name="avatarUrl"
+                uploadImmediately
+                getUploadName={() => values.storeName || currentStore?.storeName || 'store'}
+                onUploadingChange={setAvatarUploading}
                 maxSize={3145728}
                 helperText={
                   <Typography
@@ -322,7 +355,12 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
               <Field.Text name="address" label="Address" />
             </Box>
             <Stack alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              <LoadingButton
+                type="submit"
+                variant="contained"
+                loading={isSubmitting || avatarUploading}
+                disabled={avatarUploading}
+              >
                 {!currentStore ? 'Create Store' : 'Save changes'}
               </LoadingButton>
             </Stack>

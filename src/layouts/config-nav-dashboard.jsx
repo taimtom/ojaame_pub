@@ -71,8 +71,13 @@ export const useNavData = () => {
   const { getNavLabel, t } = useBusinessType();
   const { userPermissions } = usePermissions();
 
-  // 1. Hydrate currentStore from URL or localStorage
-  let currentStore = storeParam;
+  // 1. Hydrate currentStore from URL or localStorage.
+  // A valid storeParam must end with a numeric ID (e.g. "my-store-42").
+  // Reject strings like "null", "undefined", or plain page-names that can
+  // land in :storeParam when a route is accidentally visited.
+  const isValidStoreParam = (p) => Boolean(p && /^.+-\d+$/.test(p));
+
+  let currentStore = isValidStoreParam(storeParam) ? storeParam : null;
   if (!currentStore) {
     try {
       const raw = localStorage.getItem('activeWorkspace');
@@ -89,12 +94,19 @@ export const useNavData = () => {
 
   // 2. Redirect away from any store-scoped page if no currentStore
   React.useEffect(() => {
-    const isStoreMgmt = location.pathname.startsWith(paths.dashboard.store.list);
-    const isAnalytics = location.pathname === paths.dashboard.general.analytics;
-    const isRoleList = location.pathname === paths.dashboard.role.root;
-    const isRoleNew = location.pathname === paths.dashboard.role.new;
+    // Pages that are legitimately NOT store-scoped — never redirect from these.
+    const isExempt = (
+      location.pathname.startsWith(paths.dashboard.store.list) ||
+      location.pathname === paths.dashboard.general.analytics ||
+      location.pathname === paths.dashboard.role.root ||
+      location.pathname === paths.dashboard.role.new ||
+      location.pathname === paths.dashboard.reports.companyRoot ||
+      location.pathname.startsWith(paths.dashboard.user.root) ||
+      location.pathname.startsWith(paths.dashboard.integration.root) ||
+      location.pathname === paths.dashboard.helpSupport
+    );
 
-    // List of store-scoped roots we guard
+    // List of store-scoped roots we guard (only meaningful when currentStore is truthy)
     const guardedRoots = [
       callIfFunction(paths.dashboard.pos.root, currentStore),
       callIfFunction(paths.dashboard.category.root, currentStore),
@@ -104,13 +116,14 @@ export const useNavData = () => {
       callIfFunction(paths.dashboard.customer.root, currentStore),
       callIfFunction(paths.dashboard.paymentMethod.root, currentStore),
       callIfFunction(paths.dashboard.expense.root, currentStore),
+      callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
     ];
 
     const onGuardedPage = guardedRoots.some((root) =>
       location.pathname.startsWith(root || '')
     );
 
-    if (!currentStore && onGuardedPage && !isStoreMgmt && !isAnalytics && !isRoleList && !isRoleNew) {
+    if (!currentStore && onGuardedPage && !isExempt) {
       navigate(paths.dashboard.store.list, { replace: true });
     }
   }, [currentStore, location.pathname, navigate]);
@@ -172,8 +185,10 @@ export const useNavData = () => {
     }
     return items
       .map((item) => {
-        // Check if item is visible based on permissions
-        const itemVisible = isItemVisible(userPermissions, item.title);
+        // Use permissionKey (stable) when available, otherwise fall back to the
+        // display title. This keeps permission checks working when the title is
+        // rendered dynamically via the business-type registry.
+        const itemVisible = isItemVisible(userPermissions, item.permissionKey || item.title);
         if (!itemVisible) {
           return null;
         }
@@ -202,27 +217,35 @@ export const useNavData = () => {
   {
     subheader: 'Overview',
     items: [
-      { title: 'Company Dashboard', path: paths.dashboard.general.analytics, icon: ICONS.analytics },
-      { title: 'Store Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard },
-      { title: 'Quick Dashboard', path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      {
+        title: 'Store Dashboard',
+        path: storeBasePath || paths.dashboard.store.list,
+        icon: ICONS.dashboard,
+      },
+      { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: getNavLabel('serviceLog'), path: paths.dashboard.serviceLog, icon: ICONS.booking, permissionKey: 'Service Log' },
+      { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
     ],
   },
   /**
    * Sales & Orders
    */
   {
-    subheader: 'Sales & Orders',
+    sectionPermKey: 'Sales & Orders',
+    subheader: getNavLabel('salesAndOrdersSection'),
     items: [
       {
         title: getNavLabel('pointOfSales'),
         path: callIfFunction(paths.dashboard.pos.root, currentStore),
         icon: ICONS.pos,
+        permissionKey: 'Point of Sales',
         children: [{ title: `Add ${t('sale')}`, path: callIfFunction(paths.dashboard.pos.root, currentStore) }],
       },
       {
         title: getNavLabel('salesInvoice'),
         path: callIfFunction(paths.dashboard.invoice.root, currentStore),
         icon: ICONS.invoice,
+        permissionKey: 'Sales Invoice',
         children: [
           { title: `${t('sale')} Report`, path: callIfFunction(paths.dashboard.invoice.root, currentStore  ) },
           { title: `${t('sale')} History`, path: callIfFunction(paths.dashboard.invoice.history, currentStore  ) },
@@ -234,23 +257,28 @@ export const useNavData = () => {
    * Inventory
    */
   {
-    subheader: 'Inventory',
+    sectionPermKey: 'Inventory',
+    subheader: getNavLabel('inventorySection'),
     items: [
       {
-        title: 'Category',
+        title: t('category'),
         path: callIfFunction(paths.dashboard.category.root, currentStore),
         icon: ICONS.category,
+        permissionKey: 'Category',
         children: [
-          { title: 'Add Category', path: callIfFunction(paths.dashboard.category.new, currentStore) },
-          { title: 'Category Report', path: callIfFunction(paths.dashboard.category.root, currentStore )},
+          { title: `Add ${t('category')}`, path: callIfFunction(paths.dashboard.category.new, currentStore) },
+          { title: `${t('category')} Report`, path: callIfFunction(paths.dashboard.category.root, currentStore )},
         ],
       },
       {
         title: getNavLabel('productManagement'),
         path: callIfFunction(paths.dashboard.product.root, currentStore),
         icon: ICONS.product,
+        permissionKey: 'Product Management',
         children: [
           { title: `Add ${t('product')}`, path: callIfFunction(paths.dashboard.product.new, currentStore) },
+          // Temporarily hidden from nav while refining UX; route still works at .../product/bulk-add
+          // { title: `Bulk add ${t('product')}`, path: callIfFunction(paths.dashboard.product.bulkAdd, currentStore) },
           { title: `${t('product')} Report`, path: callIfFunction(paths.dashboard.product.root, currentStore) },
           { title: `${t('product')} History`, path: callIfFunction(paths.dashboard.product.history, currentStore) },
         ],
@@ -259,9 +287,27 @@ export const useNavData = () => {
         title: getNavLabel('serviceManagement'),
         path: callIfFunction(paths.dashboard.service.root, currentStore),
         icon: ICONS.service,
+        permissionKey: 'Service Management',
         children: [
           { title: `Add ${t('service')}`, path: callIfFunction(paths.dashboard.service.new, currentStore) },
           { title: `${t('service')} Report`, path: callIfFunction(paths.dashboard.service.root, currentStore) },
+        ],
+      },
+      {
+        title: 'Store Transfers',
+        path: callIfFunction(paths.dashboard.transfer.root, currentStore),
+        icon: ICONS.folder,
+        permissionKey: 'Inventory',
+      },
+      { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
+      {
+        title: 'Digital Product',
+        path: callIfFunction(paths.dashboard.digitalProduct.root, currentStore),
+        icon: ICONS.ecommerce,
+        permissionKey: 'Digital Product',
+        children: [
+          { title: 'Add Digital Product', path: callIfFunction(paths.dashboard.digitalProduct.new, currentStore) },
+          { title: 'Digital Product Report', path: callIfFunction(paths.dashboard.digitalProduct.root, currentStore) },
         ],
       },
     ],
@@ -293,6 +339,36 @@ export const useNavData = () => {
     ],
   },
   /**
+   * Reports
+   */
+  {
+    subheader: 'Reports',
+    items: [
+      {
+        title: 'Store Reports',
+        path: callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
+        icon: ICONS.analytics,
+        children: [
+          { title: 'General Store Reports', path: callIfFunction(paths.dashboard.reports.generalReport, currentStore) },
+          { title: 'Inventory Report', path: callIfFunction(paths.dashboard.reports.inventory, currentStore) },
+          { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
+          { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
+          { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
+          { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
+          { title: 'Customer Report', path: callIfFunction(paths.dashboard.reports.customers, currentStore) },
+        ],
+      },
+      {
+        title: 'Company Reports',
+        path: paths.dashboard.reports.companyRoot,
+        icon: ICONS.banking,
+        children: [
+          { title: 'All Company Reports', path: paths.dashboard.reports.companyRoot },
+        ],
+      },
+    ],
+  },
+  /**
    * Customer Management
    */
   {
@@ -302,6 +378,7 @@ export const useNavData = () => {
         title: `Manage ${t('customer')}`,
         path: callIfFunction(paths.dashboard.customer.root, currentStore),
         icon: ICONS.customer,
+        permissionKey: 'Manage Customer',
         children: [
           { title: `Add ${t('customer')}`, path: callIfFunction(paths.dashboard.customer.new, currentStore  ) },
           { title: `${t('customer')} List`, path: callIfFunction(paths.dashboard.customer.root, currentStore  ) },
@@ -351,6 +428,7 @@ export const useNavData = () => {
         ],
       },
       { title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar },
+      { title: 'Help & Support', path: paths.dashboard.helpSupport, icon: ICONS.mail },
       ...(currentStoreId ? [{
         title: 'Store Website',
         path: paths.dashboard.store.website(currentStoreId),
@@ -366,8 +444,13 @@ export const useNavData = () => {
   // 6. Filter navigation data based on permissions
   const filteredNavData = navData
     .map((section) => {
-      // Check if section is visible
-      const sectionVisible = isSectionVisible(userPermissions, section.subheader);
+      // Use sectionPermKey (stable) when available, otherwise fall back to the
+      // display subheader. This keeps permission checks working when the subheader
+      // is rendered dynamically via the business-type registry.
+      const sectionVisible = isSectionVisible(
+        userPermissions,
+        section.sectionPermKey || section.subheader
+      );
       if (!sectionVisible) {
         return null;
       }

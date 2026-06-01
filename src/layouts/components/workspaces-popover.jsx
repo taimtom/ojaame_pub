@@ -2,6 +2,8 @@ import { keyframes } from '@emotion/react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import MenuList from '@mui/material/MenuList';
@@ -30,6 +32,7 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
   const popover = usePopover();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuthContext();
 
   const { id: currentStoreParam } = useParams();
   const storedWorkspaceJson = localStorage.getItem('activeWorkspace');
@@ -72,9 +75,9 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
   const handleChangeWorkspace = useCallback(newWs => {
     setWorkspace(newWs);
     popover.onClose();
-    localStorage.setItem('activeWorkspace', JSON.stringify(newWs));
+    localStorage.setItem('activeWorkspace', JSON.stringify({ ...newWs, user_id: user?.user_id }));
     navigate(`${paths.dashboard.root}/${buildStoreParam(newWs)}`);
-  }, [popover, navigate]);
+  }, [popover, navigate, user]);
 
   const handleEditStore = useCallback(
     (storeId) => {

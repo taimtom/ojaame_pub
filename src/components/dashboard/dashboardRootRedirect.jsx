@@ -14,8 +14,16 @@ export default function DashboardRootRedirect() {
   const { user } = useAuthContext(); // user object includes user_id and other login info
 
   useEffect(() => {
-    // Allow direct access to the company-level analytics page
-    if (location.pathname === paths.dashboard.general.analytics) {
+    // Allow direct access to pages that are NOT store-scoped.
+    const nonStorePages = [
+      paths.dashboard.general.analytics,
+      paths.dashboard.reports?.companyRoot,
+      paths.dashboard.user?.root,
+      paths.dashboard.integration?.root,
+      paths.dashboard.role?.root,
+      paths.dashboard.role?.new,
+    ];
+    if (nonStorePages.some((p) => p && location.pathname.startsWith(p))) {
       return;
     }
 
@@ -30,8 +38,10 @@ export default function DashboardRootRedirect() {
 
     const activeWorkspace = JSON.parse(activeWorkspaceJson);
 
-    // Verify that the active workspace belongs to the logged-in user.
-    if (activeWorkspace.user_id !== user.user_id) {
+    // Only enforce user ownership if user_id was explicitly stored in the workspace.
+    // Workspaces saved via store-item.jsx may not include user_id, so we skip
+    // the check when it is absent rather than always clearing localStorage.
+    if (activeWorkspace.user_id && activeWorkspace.user_id !== user.user_id) {
       localStorage.removeItem('activeWorkspace');
       navigate(paths.dashboard.store.list, { replace: true });
       return;

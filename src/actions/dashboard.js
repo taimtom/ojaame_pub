@@ -206,16 +206,21 @@ export function useStoreSalesByPaymentMethod(storeId, period = 'month') {
     ? [endpoints.dashboard.store.salesByPaymentMethod(storeId), { params: { period } }]
     : null;
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    key,
+    fetcher,
+    { ...swrOptions, keepPreviousData: true }
+  );
 
   return useMemo(
     () => ({
       salesByPaymentMethod: data || [],
       salesByPaymentMethodLoading: isLoading,
+      salesByPaymentMethodValidating: isValidating,
       salesByPaymentMethodError: error,
       refetchSalesByPaymentMethod: mutate,
     }),
-    [data, error, isLoading, mutate]
+    [data, error, isLoading, isValidating, mutate]
   );
 }
 
@@ -320,5 +325,27 @@ export function useStoreExpenses(storeId, period = 'month') {
       refetchExpenses: mutate,
     }),
     [data, error, isLoading, isValidating, mutate, period]
+  );
+}
+
+export function useStoreFeatured(storeId, limit = 3) {
+  const key = storeId
+    ? [endpoints.dashboard.store.featured(storeId), { params: { limit } }]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    fetcher,
+    { ...swrOptions, keepPreviousData: true }
+  );
+
+  return useMemo(
+    () => ({
+      featuredProducts: Array.isArray(data) ? data : [],
+      featuredLoading: isLoading,
+      featuredError: error,
+      refetchFeatured: mutate,
+    }),
+    [data, error, isLoading, mutate]
   );
 }

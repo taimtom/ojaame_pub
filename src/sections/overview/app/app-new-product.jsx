@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -28,16 +28,35 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom } from 'src/components/table';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
-export function AppNewProduct({ title, subheader, storeId, headLabel, ...other }) {
-  const [period, setPeriod] = useState('month');
-  const [limit, setLimit] = useState(5);
+export function AppNewProduct({
+  title,
+  subheader,
+  storeId,
+  headLabel,
+  period: periodProp,
+  limit: limitProp,
+  onPeriodChange,
+  onLimitChange,
+  ...other
+}) {
+  // Use parent-controlled state when provided; fall back to internal state
+  const [internalPeriod, setInternalPeriod] = useState('month');
+  const [internalLimit, setInternalLimit]   = useState(5);
 
-  const { topProducts = [], topProductsLoading, refetchTopProducts } =
+  const period = periodProp ?? internalPeriod;
+  const limit  = limitProp  ?? internalLimit;
+
+  const handlePeriodChange = (val) => {
+    if (onPeriodChange) onPeriodChange(val);
+    else setInternalPeriod(val);
+  };
+  const handleLimitChange = (val) => {
+    if (onLimitChange) onLimitChange(val);
+    else setInternalLimit(val);
+  };
+
+  const { topProducts = [], topProductsLoading } =
     useStoreTopProducts(storeId, period, limit);
-
-  useEffect(() => {
-    if (refetchTopProducts) refetchTopProducts();
-  }, [period, limit, refetchTopProducts]);
 
   const tableData = useMemo(
     () =>
@@ -63,7 +82,7 @@ export function AppNewProduct({ title, subheader, storeId, headLabel, ...other }
               <Select
                 value={period}
                 label="Period"
-                onChange={(e) => setPeriod(e.target.value)}
+                onChange={(e) => handlePeriodChange(e.target.value)}
                 size="small"
               >
                 <MenuItem value="day">Day</MenuItem>
@@ -76,7 +95,7 @@ export function AppNewProduct({ title, subheader, storeId, headLabel, ...other }
               <Select
                 value={limit}
                 label="Limit"
-                onChange={(e) => setLimit(Number(e.target.value))}
+                onChange={(e) => handleLimitChange(Number(e.target.value))}
                 size="small"
               >
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (

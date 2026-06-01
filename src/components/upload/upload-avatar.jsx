@@ -29,13 +29,28 @@ export function UploadAvatar({ sx, error, value, disabled, helperText, ...other 
   useEffect(() => {
     if (typeof value === 'string') {
       setPreview(value);
-    } else if (value instanceof File) {
-      setPreview(URL.createObjectURL(value));
+      return undefined;
     }
+    if (value instanceof File) {
+      const url = URL.createObjectURL(value);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setPreview('');
+    return undefined;
   }, [value]);
 
+  const isRemoteHttpUrl =
+    typeof preview === 'string' && (preview.startsWith('http://') || preview.startsWith('https://'));
+
   const renderPreview = hasFile && (
-    <Image alt="avatar" src={preview} sx={{ width: 1, height: 1, borderRadius: '50%' }} />
+    <Image
+      alt="avatar"
+      src={preview}
+      visibleByDefault={isRemoteHttpUrl}
+      disabledEffect={isRemoteHttpUrl}
+      sx={{ width: 1, height: 1, borderRadius: '50%' }}
+    />
   );
 
   const renderPlaceholder = (

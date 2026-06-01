@@ -19,6 +19,7 @@ import { RouterLink } from 'src/routes/components';
 import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { usePermissions } from 'src/hooks/use-permissions';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import { paramCase } from 'src/utils/change-case';
@@ -91,6 +92,10 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
 
   // const { expenses, expensesLoading } = useGetExpenses(numericStoreId);
   const { expenses, expensesLoading, expensesError } = useGetExpenses(numericStoreId);
+  const { hasPermission } = usePermissions();
+  const canCreateExpense = hasPermission('expenses.create');
+  const canUpdateExpense = hasPermission('expenses.update');
+  const canDeleteExpense = hasPermission('expenses.delete');
 
   const [statusCode, setStatusCode] = useState(null);
 
@@ -166,6 +171,7 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
         setFilterButtonEl={setFilterButtonEl}
         filteredResults={dataFiltered.length}
         onOpenConfirmDeleteRows={confirmRows.onTrue}
+        canDeleteExpense={canDeleteExpense}
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,24 +225,36 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      getActions: (params) => [
+      getActions: (params) => {
+        const actions = [];
 
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:pen-bold" />}
-          label="Edit"
-          onClick={() => handleEditRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:trash-bin-trash-bold" />}
-          label="Delete"
-          onClick={() => {
-            handleDeleteRow(params.row.id);
-          }}
-          sx={{ color: 'error.main' }}
-        />,
-      ],
+        if (canUpdateExpense) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:pen-bold" />}
+              label="Edit"
+              onClick={() => handleEditRow(params.row.id)}
+            />
+          );
+        }
+
+        if (canDeleteExpense) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              label="Delete"
+              onClick={() => {
+                handleDeleteRow(params.row.id);
+              }}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+
+        return actions;
+      },
     },
   ];
 
@@ -257,7 +275,7 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
             { name: 'expense', href: paths.dashboard.expense.root(storeSlug) },
             { name: 'List' },
           ]}
-          action={
+          action={canCreateExpense ? (
             <Button
               component={RouterLink}
               href={paths.dashboard.expense.new(storeSlug)}
@@ -266,7 +284,7 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
             >
               New Expense
             </Button>
-          }
+          ) : null}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
@@ -279,7 +297,7 @@ export function ExpenseListView({storeSlug: propStoreSlug }) {
           }}
         >
           <DataGrid
-            checkboxSelection
+            checkboxSelection={canDeleteExpense}
             disableRowSelectionOnClick
             rows={dataFiltered}
             columns={columns}
@@ -338,6 +356,7 @@ function CustomToolbar({
   filteredResults,
   setFilterButtonEl,
   onOpenConfirmDeleteRows,
+  canDeleteExpense,
 }) {
   return (
     <>
@@ -356,7 +375,7 @@ function CustomToolbar({
           alignItems="center"
           justifyContent="flex-end"
         >
-          {!!selectedRowIds.length && (
+          {!!selectedRowIds.length && canDeleteExpense && (
             <Button
               size="small"
               color="error"
