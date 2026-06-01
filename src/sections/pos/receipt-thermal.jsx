@@ -218,6 +218,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
     store_name,
     store_address,
     store_phone,
+    rc_cac_reg_number,
     user_fullname,
   } = receipt || {};
 
@@ -229,6 +230,9 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
       <Text style={styles.companyName}>{store_name || 'Your Store'}</Text>
       <Text style={styles.companyDetails}>{store_address}</Text>
       <Text style={styles.companyDetails}>Tel: {store_phone}</Text>
+      {rc_cac_reg_number ? (
+        <Text style={styles.companyDetails}>{rc_cac_reg_number}</Text>
+      ) : null}
       <View style={styles.divider} />
     </View>
   );

@@ -195,6 +195,7 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     store_state,
     store_country,
     store_phone,
+    rc_cac_reg_number,
     user_fullname,
   } = receipt || {};
 
@@ -245,6 +246,9 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
           {store_state && store_country ? `${store_state}, ${store_country}` : ''}
         </Text>
         <Text style={styles.body2}>Phone: {store_phone}</Text>
+        {rc_cac_reg_number ? (
+          <Text style={styles.body2}>{rc_cac_reg_number}</Text>
+        ) : null}
       </View>
 
       {/* Customer details */}

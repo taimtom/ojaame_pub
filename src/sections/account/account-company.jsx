@@ -35,6 +35,7 @@ export const UpdateCompanySchema = zod.object({
   companyName: zod.string().min(1, { message: 'Name is required!' }),
   companyLogo: schemaHelper.file1({ message: { required_error: 'Company logo is required!' } }),
   companyLocation: zod.string().min(1, { message: 'Address is required!' }),
+  rcCacRegNumber: zod.string().optional(),
   primaryIndustry: zod.string().min(1, { message: 'Industry is required!' }),
   subIndustry: zod.string().min(1, { message: 'Sub Industry is required!' }),
   exactBusiness: zod.string().min(1, { message: 'Exact Business is required!' }),
@@ -63,6 +64,7 @@ export function AccountCompany() {
       companyName: '',
       companyLogo: null,
       companyLocation: '',
+      rcCacRegNumber: '',
       primaryIndustry: '',
       subIndustry: '',
       exactBusiness: '',
@@ -90,6 +92,7 @@ export function AccountCompany() {
         companyName: company.companyName || '',
         companyLogo: logoValue,
         companyLocation: company.companyLocation || '',
+        rcCacRegNumber: company.rcCacRegNumber || '',
         primaryIndustry: company.primaryIndustry || '',
         subIndustry: company.subIndustry || '',
         exactBusiness: company.exactBusiness || '',
@@ -163,6 +166,7 @@ export function AccountCompany() {
       const formData = new FormData();
       formData.append('companyName', data.companyName);
       formData.append('companyLocation', data.companyLocation);
+      formData.append('rcCacRegNumber', data.rcCacRegNumber || '');
       formData.append('primaryIndustry', data.primaryIndustry);
       formData.append('subIndustry', data.subIndustry);
       formData.append('exactBusiness', data.exactBusiness);
@@ -245,7 +249,13 @@ export function AccountCompany() {
             <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
               <Field.Text name="companyName" label="Company Name" />
               <Field.Text name="companyLocation" label="Company Location" />
-              
+              <Field.Text
+                name="rcCacRegNumber"
+                label="RC/CAC Reg number"
+                placeholder="e.g. RC123456"
+                helperText="Optional — shown on sales receipts when set"
+              />
+
               <Field.Select 
                 name="primaryIndustry" 
                 label="Industry" 
