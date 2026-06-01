@@ -186,6 +186,15 @@ export default function EndOfDayReportPage() {
     }
   }, [storeId]);
 
+  const sortedList = useMemo(() => {
+    return [...list].sort((a, b) => {
+      const ta = new Date(a.created_at || 0).getTime();
+      const tb = new Date(b.created_at || 0).getTime();
+      if (tb !== ta) return tb - ta;
+      return (b.id || 0) - (a.id || 0);
+    });
+  }, [list]);
+
   const fetchPeriodType = useCallback(async () => {
     if (!storeId || periodTypeTouchedRef.current) return;
     try {
@@ -828,7 +837,7 @@ export default function EndOfDayReportPage() {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 History
               </Typography>
-              {list.length === 0 ? (
+              {sortedList.length === 0 ? (
                 <Typography color="text.secondary">No reports yet.</Typography>
               ) : (
                 <Table size="small">
@@ -842,7 +851,7 @@ export default function EndOfDayReportPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {list.map((row) => (
+                    {sortedList.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell>
                           {row.period_type && row.period_type !== 'daily'
