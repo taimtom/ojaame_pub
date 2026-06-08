@@ -1,5 +1,15 @@
 import { useState, useCallback } from 'react';
-import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
+import { PDFViewer, PDFDownloadLink, pdf } from '@react-pdf/renderer';
+
+import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import {
+  getPreferredReceiptFormat,
+  getPreferredThermalWidthMm,
+  setPreferredReceiptFormat,
+  setPreferredThermalWidthMm,
+  normalizeThermalWidthMm,
+} from 'src/utils/receipt-preferences';
+import { printReceiptBlob } from 'src/utils/print-receipt';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -25,60 +35,83 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { toast } from 'src/components/snackbar';
 
-import { A4ReceiptPDF } from '../receipt-a4';
-import { InvoicePDF } from '../../invoice/invoice-pdf';
-import { ThermalReceiptPDF } from '../receipt-thermal';
 import { InvoiceDetails } from '../../invoice/invoice-details';
 
 // ----------------------------------------------------------------------
 
-const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
-
-function readStoredReceiptFormat() {
-  if (typeof window === 'undefined') return 'thermal';
-  const v = window.localStorage.getItem(RECEIPT_FORMAT_STORAGE_KEY);
-  if (v === 'thermal' || v === 'a4') return v;
-  return 'thermal';
-}
-
 export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, storeNameSlug, storeId }) {
   const router = useRouter();
   const view = useBoolean();
-  const [receiptFormat, setReceiptFormat] = useState(() => readStoredReceiptFormat());
+  const [receiptFormat, setReceiptFormat] = useState(() => getPreferredReceiptFormat());
+  const [thermalWidthMm, setThermalWidthMm] = useState(() => getPreferredThermalWidthMm());
+  const [printLoading, setPrintLoading] = useState(false);
 
   const handleBackToSales = useCallback(() => {
     router.push(paths.dashboard.pos.root(storeSlug));
   }, [router, storeSlug]);
 
-  const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
+  const handlePrint = useCallback(async () => {
+    if (!receipt || printLoading) return;
+
+    setPrintLoading(true);
+    try {
+      const receiptDoc = buildReceiptPdfDocument({
+        receipt,
+        currentStatus: receipt?.status,
+        receiptFormat,
+        pdfFlavor: 'pos',
+        thermalWidthMm,
+      });
+
+      if (!receiptDoc) {
+        toast.error('No receipt data available to print.');
+        return;
+      }
+
+      const fileName = `receipt-${receipt?.invoice_number || 'unknown'}.pdf`;
+      const blob = await pdf(receiptDoc).toBlob();
+      const result = await printReceiptBlob(blob, fileName);
+
+      if (result === 'downloaded') {
+        toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
+      } else if (result === 'shared') {
+        toast.info('Choose Print from the share menu to send to your printer.');
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        toast.error('Failed to prepare receipt for printing.');
+      }
+    } finally {
+      setPrintLoading(false);
+    }
+  }, [receipt, printLoading, receiptFormat, thermalWidthMm]);
 
   const handleFormatChange = (event, newFormat) => {
     if (newFormat !== null) {
       setReceiptFormat(newFormat);
-      try {
-        localStorage.setItem(RECEIPT_FORMAT_STORAGE_KEY, newFormat);
-      } catch {
-        /* quota / private mode */
-      }
+      setPreferredReceiptFormat(newFormat);
     }
   };
 
-  // Get the appropriate PDF component based on format
-  const getPDFComponent = () => {
-    if (!receipt) return <span />;
-
-    switch (receiptFormat) {
-      case 'thermal':
-        return <ThermalReceiptPDF receipt={receipt} currentStatus={receipt?.status} />;
-      case 'a4':
-        return <A4ReceiptPDF receipt={receipt} currentStatus={receipt?.status} />;
-      default:
-        return <InvoicePDF invoice={receipt} currentStatus={receipt?.status} />;
+  const handleThermalWidthChange = (event, newWidth) => {
+    if (newWidth !== null) {
+      const width = normalizeThermalWidthMm(newWidth);
+      setThermalWidthMm(width);
+      setPreferredThermalWidthMm(width);
     }
   };
+
+  const getPDFComponent = () => (
+    buildReceiptPdfDocument({
+      receipt,
+      currentStatus: receipt?.status,
+      receiptFormat,
+      pdfFlavor: 'pos',
+      thermalWidthMm,
+    }) || <span />
+  );
 
   // Get status color for visual feedback
   const getStatusColor = (status) => {
@@ -188,25 +221,39 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Receipt format (print, download, share):
                 </Typography>
-                <ToggleButtonGroup
-                  value={receiptFormat}
-                  exclusive
-                  onChange={handleFormatChange}
-                  size="small"
-                >
-                  <ToggleButton value="thermal">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="mdi:receipt" />
-                      <span>80mm Thermal</span>
-                    </Stack>
-                  </ToggleButton>
-                  <ToggleButton value="a4">
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Iconify icon="mdi:file-pdf-box" />
-                      <span>A4 Paper</span>
-                    </Stack>
-                  </ToggleButton>
-                </ToggleButtonGroup>
+                <Stack direction="row" flexWrap="wrap" alignItems="center" spacing={1}>
+                  <ToggleButtonGroup
+                    value={receiptFormat}
+                    exclusive
+                    onChange={handleFormatChange}
+                    size="small"
+                  >
+                    <ToggleButton value="thermal">
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Iconify icon="mdi:receipt" />
+                        <span>Thermal</span>
+                      </Stack>
+                    </ToggleButton>
+                    <ToggleButton value="a4">
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Iconify icon="mdi:file-pdf-box" />
+                        <span>A4 Paper</span>
+                      </Stack>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+
+                  {receiptFormat === 'thermal' && (
+                    <ToggleButtonGroup
+                      value={thermalWidthMm}
+                      exclusive
+                      onChange={handleThermalWidthChange}
+                      size="small"
+                    >
+                      <ToggleButton value={80}>80mm</ToggleButton>
+                      <ToggleButton value={58}>58mm</ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
+                </Stack>
               </Box>
 
               {/* Action Buttons */}
@@ -221,10 +268,17 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
 
                 <Button
                   variant="outlined"
-                  startIcon={<Iconify icon="solar:printer-minimalistic-bold" />}
+                  startIcon={
+                    printLoading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      <Iconify icon="solar:printer-minimalistic-bold" />
+                    )
+                  }
                   onClick={handlePrint}
+                  disabled={printLoading}
                 >
-                  Print
+                  {printLoading ? 'Preparing…' : 'Print'}
                 </Button>
 
                 <Tooltip title="View PDF">

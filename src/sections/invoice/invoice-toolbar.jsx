@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { PDFViewer, PDFDownloadLink, pdf } from '@react-pdf/renderer';
+
+import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { getPreferredThermalWidthMm } from 'src/utils/receipt-preferences';
+import { printReceiptBlob } from 'src/utils/print-receipt';
 import html2canvas from 'html2canvas';
 
 import Box from '@mui/material/Box';
@@ -26,10 +30,6 @@ import { paramCase } from 'src/utils/change-case';
 
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
-
-import { InvoicePDF } from './invoice-pdf';
-import { ThermalReceiptPDF } from '../pos/receipt-thermal';
-import { A4ReceiptPDF } from '../pos/receipt-a4';
 
 function invoiceFileLabel(invoice) {
   return invoice?.invoice_number || invoice?.invoiceNumber || invoice?.id || 'invoice';
@@ -141,16 +141,15 @@ export function InvoiceToolbar({
     setReadyShareFile(null);
   }, []);
 
-  const getReceiptPdfDocument = useCallback(() => {
-    if (!invoice) return null;
-    if (receiptFormat === 'thermal') {
-      return <ThermalReceiptPDF receipt={invoice} currentStatus={currentStatus} />;
-    }
-    if (pdfFlavor === 'pos') {
-      return <A4ReceiptPDF receipt={invoice} currentStatus={currentStatus} />;
-    }
-    return <InvoicePDF invoice={invoice} currentStatus={currentStatus} />;
-  }, [invoice, currentStatus, receiptFormat, pdfFlavor]);
+  const getReceiptPdfDocument = useCallback(() => (
+    buildReceiptPdfDocument({
+      invoice,
+      currentStatus,
+      receiptFormat,
+      pdfFlavor,
+      thermalWidthMm: getPreferredThermalWidthMm(),
+    })
+  ), [invoice, currentStatus, receiptFormat, pdfFlavor]);
 
   useEffect(() => {
     setReadyShareFile(null);
@@ -173,25 +172,20 @@ export function InvoiceToolbar({
         toast.error('No invoice data available to print.');
         return;
       }
+
+      const fileName = `${invoiceFileLabel(invoice)}.pdf`;
       const blob = await pdf(invoiceDocument).toBlob();
-      const blobUrl = URL.createObjectURL(blob);
-      const printWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      const result = await printReceiptBlob(blob, fileName);
 
-      if (!printWindow) {
-        URL.revokeObjectURL(blobUrl);
-        toast.error('Unable to open print preview. Please allow popups and try again.');
-        return;
+      if (result === 'downloaded') {
+        toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
+      } else if (result === 'shared') {
+        toast.info('Choose Print from the share menu to send to your printer.');
       }
-
-      // Give the browser a brief moment to load the PDF before printing.
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 300);
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {
-      toast.error('Failed to prepare invoice for printing.');
+      if (error?.name !== 'AbortError') {
+        toast.error('Failed to prepare invoice for printing.');
+      }
     }
   }, [invoice, getReceiptPdfDocument]);
 

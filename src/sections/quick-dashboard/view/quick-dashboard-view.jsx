@@ -48,8 +48,9 @@ import {
   QuickDashboardPayments,
   sumPaymentLines,
 } from 'src/sections/quick-dashboard/quick-dashboard-payments';
-import { ThermalReceiptPDF } from 'src/sections/pos/receipt-thermal';
-import { A4ReceiptPDF } from 'src/sections/pos/receipt-a4';
+import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { getPreferredReceiptFormat } from 'src/utils/receipt-preferences';
+import { printReceiptBlob } from 'src/utils/print-receipt';
 
 // ── Offline product search cache (localStorage) ────────────────────────────
 const SEARCH_CACHE_KEY = 'qs_search_cache';
@@ -183,8 +184,6 @@ function fDateShort(isoString) {
     timeZone: LAGOS_TZ,
   });
 }
-
-const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
 
 function defaultPaymentLine(cartTotal, paymentMethods) {
   return {
@@ -328,12 +327,6 @@ async function fetchSaleItemsForQuickDashboard(storeId, saleId) {
   } catch {
     return [];
   }
-}
-
-function getPreferredReceiptFormat() {
-  if (typeof window === 'undefined') return 'thermal';
-  const raw = window.localStorage.getItem(RECEIPT_FORMAT_STORAGE_KEY);
-  return raw === 'a4' ? 'a4' : 'thermal';
 }
 
 function buildQuickReceiptFallback(sale, items = []) {
@@ -1089,12 +1082,12 @@ export function QuickDashboardView() {
         }
 
         const receiptFormat = getPreferredReceiptFormat();
-        const receiptDoc =
-          receiptFormat === 'a4' ? (
-            <A4ReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
-          ) : (
-            <ThermalReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
-          );
+        const receiptDoc = buildReceiptPdfDocument({
+          receipt,
+          currentStatus: receipt?.status,
+          receiptFormat,
+          pdfFlavor: 'pos',
+        });
 
         const blob = await pdf(receiptDoc).toBlob();
         const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
@@ -1205,29 +1198,25 @@ export function QuickDashboardView() {
         }
 
         const receiptFormat = getPreferredReceiptFormat();
-        const receiptDoc =
-          receiptFormat === 'a4' ? (
-            <A4ReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
-          ) : (
-            <ThermalReceiptPDF receipt={receipt} currentStatus={receipt?.status} />
-          );
+        const receiptDoc = buildReceiptPdfDocument({
+          receipt,
+          currentStatus: receipt?.status,
+          receiptFormat,
+          pdfFlavor: 'pos',
+        });
+        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
         const blob = await pdf(receiptDoc).toBlob();
-        const blobUrl = URL.createObjectURL(blob);
-        const printWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        const result = await printReceiptBlob(blob, fileName);
 
-        if (!printWindow) {
-          URL.revokeObjectURL(blobUrl);
-          toast.error('Unable to open print preview. Please allow popups and try again.');
-          return;
+        if (result === 'downloaded') {
+          toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
+        } else if (result === 'shared') {
+          toast.info('Choose Print from the share menu to send to your printer.');
         }
-
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-        }, 300);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } catch (error) {
-        toast.error('Could not prepare receipt for printing.');
+        if (error?.name !== 'AbortError') {
+          toast.error('Could not prepare receipt for printing.');
+        }
       } finally {
         setPrintingSaleId(null);
       }
