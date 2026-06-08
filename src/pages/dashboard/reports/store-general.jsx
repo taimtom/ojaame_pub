@@ -20,7 +20,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency, fPercent } from 'src/utils/format-number';
-import { paramCase } from 'src/utils/change-case';
+import { resolveReportCompanyId, resolveReportStoreId } from 'src/utils/report-scope';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportPeriodSelector } from 'src/components/report-period-selector';
@@ -42,18 +42,6 @@ import {
 } from 'src/actions/reports';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function getStoreId(storeParam) {
-  if (storeParam) return storeParam.split('-').pop();
-  try {
-    const raw = localStorage.getItem('activeWorkspace');
-    if (raw) {
-      const { storeName, id } = JSON.parse(raw);
-      if (storeName && id) return `${paramCase(storeName)}-${id}`.split('-').pop();
-    }
-  } catch { /* ignore */ }
-  return null;
-}
 
 const CHART_COLORS = ['#00A76F', '#003768', '#FFAB00', '#FF5630', '#00B8D9', '#8E33FF', '#FF3030', '#22C55E'];
 
@@ -162,9 +150,9 @@ function TrendBadge({ direction }) {
 
 export default function StoreGeneralReportPage() {
   const { storeParam } = useParams();
-  const storeId = getStoreId(storeParam);
+  const storeId = resolveReportStoreId(storeParam);
   const { user } = useAuthContext();
-  const companyId = user?.company_id;
+  const companyId = resolveReportCompanyId(user?.company_id, storeId);
 
   const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
   const { period, month, year, date } = periodState;
@@ -189,13 +177,43 @@ export default function StoreGeneralReportPage() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const outOfStock = useMemo(() => alerts.filter((a) => a.status === 'out_of_stock').length, [alerts]);
   const lowStock = useMemo(() => alerts.filter((a) => a.status === 'low_stock').length, [alerts]);
-  const netIncome = (monthlySales?.total_value ?? 0) - (expenses?.total_expenses ?? 0);
-  const cashFlowItems = [
-    { label: 'Revenue (Sales)', value: stats?.total_revenue ?? 0, type: 'in' },
-    { label: 'Cost of Goods Sold', value: profitLoss?.cost_of_goods_sold ?? 0, type: 'out' },
-    { label: 'Operating Expenses', value: expenses?.total_expenses ?? 0, type: 'out' },
-  ];
-  const netCashFlow = cashFlowItems.reduce((acc, i) => i.type === 'in' ? acc + i.value : acc - i.value, 0);
+  const netIncome = profitLoss?.net_profit ?? ((stats?.total_revenue ?? 0) - (profitLoss?.operating_expenses ?? 0));
+  const cashFlowItems = useMemo(() => {
+    if (!profitLoss) {
+      return [
+        { label: 'Revenue (Sales)', value: stats?.total_revenue ?? 0, type: 'in' },
+        { label: 'Cost of Goods Sold', value: 0, type: 'out' },
+        { label: 'Operating Expenses', value: expenses?.total_expenses ?? 0, type: 'out' },
+      ];
+    }
+    const items = [
+      { label: 'Revenue (Sales)', value: profitLoss.net_sales ?? stats?.total_revenue ?? 0, type: 'in' },
+    ];
+    if (profitLoss.costing_mode === 'sale_cogs') {
+      items.push({ label: 'Cost of Goods Sold', value: profitLoss.cost_of_goods_sold ?? 0, type: 'out' });
+      if ((profitLoss.inventory_shrinkage ?? 0) > 0) {
+        items.push({ label: 'Inventory Shrinkage', value: profitLoss.inventory_shrinkage, type: 'out' });
+      }
+      items.push({
+        label: 'Operating Expenses',
+        value: profitLoss.operating_expenses_ex_inventory ?? profitLoss.operating_expenses ?? 0,
+        type: 'out',
+      });
+    } else {
+      items.push({
+        label: 'Inventory Purchases',
+        value: profitLoss.inventory_purchase_expenses ?? 0,
+        type: 'out',
+      });
+      items.push({
+        label: 'Other Operating Expenses',
+        value: profitLoss.operating_expenses_ex_inventory ?? 0,
+        type: 'out',
+      });
+    }
+    return items;
+  }, [profitLoss, stats, expenses]);
+  const netCashFlow = profitLoss?.net_profit ?? cashFlowItems.reduce((acc, i) => (i.type === 'in' ? acc + i.value : acc - i.value), 0);
 
   // ── Chart configs ──────────────────────────────────────────────────────────
 
@@ -383,7 +401,7 @@ export default function StoreGeneralReportPage() {
               color="success.main"
               loading={monthlySalesLoading || expensesLoading}
               value={fCurrency(netIncome)}
-              sub={`Revenue ${fCurrency(monthlySales?.total_value ?? 0)} · Expenses ${fCurrency(expenses?.total_expenses ?? 0)}`}
+              sub={`P&L net profit for selected period · Revenue ${fCurrency(profitLoss?.net_sales ?? stats?.total_revenue ?? 0)}`}
               chip={netIncome >= 0 ? { label: 'Profitable', color: 'success' } : { label: 'Net Loss', color: 'error' }}
             />
           </Grid>

@@ -109,7 +109,7 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
   const currentStock = currentProduct?.quantity ?? 0;
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '', addAsExpense: false }),
+    () => ({ name: currentProduct?.name || '', reason: '', quantity: 1, description: '', addAsExpense: true }),
     [currentProduct]
   );
 
@@ -279,7 +279,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
   const currentPacks     = Math.floor(currentUnits / quantityPerPack);
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: false }),
+    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: true }),
     [currentProduct]
   );
 

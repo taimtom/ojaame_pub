@@ -3,6 +3,7 @@ import ReactApexChart from 'react-apexcharts';
 import { Helmet } from 'react-helmet-async';
 
 import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
@@ -272,6 +273,16 @@ export default function CompanyReportsPage() {
                 ? plMode === 'list'
                   ? (
                     <Box sx={{ p: 2.5 }}>
+                      {profitLoss.costing_mode === 'purchase_expensed' && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          Inventory purchases are expensed at purchase; sale COGS is excluded to avoid double counting.
+                        </Alert>
+                      )}
+                      {profitLoss.costing_mode === 'sale_cogs' && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          Accrual mode: COGS is matched to sales. Inventory purchases are asset movements, not expenses.
+                        </Alert>
+                      )}
                       {[
                         { label: 'Gross Sales', value: profitLoss.gross_sales, color: 'text.primary' },
                         { label: 'Discounts', value: -Math.abs(profitLoss.discounts), color: 'error.main' },

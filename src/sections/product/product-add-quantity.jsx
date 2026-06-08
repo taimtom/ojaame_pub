@@ -84,7 +84,7 @@ function SingleItemForm({ currentProduct, storeSlug }) {
       addQuantity: 0,
       totalQuantity: baseQuantity,
       description: '',
-      addAsExpense: true,
+      addAsExpense: false,
     }),
     [currentProduct, baseQuantity]
   );
@@ -212,7 +212,7 @@ function PackItemForm({ currentProduct, storeSlug }) {
       quantity: currentUnits,
       packsToAdd: 0,
       description: '',
-      addAsExpense: true,
+      addAsExpense: false,
     }),
     [currentProduct, currentUnits]
   );

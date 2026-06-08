@@ -171,6 +171,9 @@ const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/st
 const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
 const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
 const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
+const StoreCashFlowReportPage = lazy(() => import('src/pages/dashboard/reports/store-cash-flow'));
+const StoreBalanceSheetReportPage = lazy(() => import('src/pages/dashboard/reports/store-balance-sheet'));
+const StoreTrialBalanceReportPage = lazy(() => import('src/pages/dashboard/reports/store-trial-balance'));
 const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
 const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
 const StoreCustomerReportPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report'));
@@ -377,6 +380,30 @@ export const dashboardRoutes = [
               element: (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreProfitLossReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'cash-flow',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCashFlowReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'balance-sheet',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreBalanceSheetReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'trial-balance',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTrialBalanceReportPage />
                 </PermissionGuard>
               ),
             },

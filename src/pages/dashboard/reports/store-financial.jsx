@@ -21,10 +21,12 @@ import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fCurrency, fPercent } from 'src/utils/format-number';
-import { paramCase } from 'src/utils/change-case';
+import { resolveReportCompanyId, resolveReportStoreId } from 'src/utils/report-scope';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
+import { useAuthContext } from 'src/auth/hooks';
+import { useStoreProfitLoss } from 'src/actions/reports';
 import {
   useStoreDailySales,
   useStoreMonthlySales,
@@ -34,18 +36,6 @@ import {
 } from 'src/actions/dashboard';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function getStoreId(storeParam) {
-  if (storeParam) return storeParam.split('-').pop();
-  try {
-    const raw = localStorage.getItem('activeWorkspace');
-    if (raw) {
-      const { storeName, id } = JSON.parse(raw);
-      if (storeName && id) return `${paramCase(storeName)}-${id}`.split('-').pop();
-    }
-  } catch { /* ignore */ }
-  return null;
-}
 
 function KpiCard({ icon, label, value, sub, color = 'primary.main', loading }) {
   return (
@@ -82,19 +72,22 @@ const DONUT_COLORS = ['#00A76F', '#003768', '#FFAB00', '#FF5630', '#00B8D9', '#8
 
 export default function StoreFinancialReportPage() {
   const { storeParam } = useParams();
-  const storeId = getStoreId(storeParam);
+  const storeId = resolveReportStoreId(storeParam);
+  const { user } = useAuthContext();
+  const companyId = resolveReportCompanyId(user?.company_id, storeId);
   const [expensePeriod, setExpensePeriod] = useState('month');
   const [paymentPeriod, setPaymentPeriod] = useState('month');
   const [expenseMode, setExpenseMode] = useState('list');
   const [paymentMode, setPaymentMode] = useState('list');
 
+  const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, 'this_month');
   const { dailySales, dailySalesLoading } = useStoreDailySales(storeId);
   const { monthlySales, monthlySalesLoading } = useStoreMonthlySales(storeId);
   const { expenses, expensesLoading, expensesValidating } = useStoreExpenses(storeId, expensePeriod);
   const { salesByPaymentMethod, salesByPaymentMethodLoading, salesByPaymentMethodValidating } = useStoreSalesByPaymentMethod(storeId, paymentPeriod);
   const { data: yearlySales, loading: yearlySalesLoading } = useStoreYearlySales(storeId, new Date().getFullYear());
 
-  const netIncome = (monthlySales?.total_value ?? 0) - (expenses?.total_expenses ?? 0);
+  const netIncome = profitLoss?.net_profit ?? ((monthlySales?.total_value ?? 0) - (expenses?.total_expenses ?? 0));
   const monthlyData = yearlySales?.monthly_data || [];
 
   // ── Chart configs ──────────────────────────────────────────────────────────
@@ -180,7 +173,7 @@ export default function StoreFinancialReportPage() {
             label="Net Income (Month)"
             value={fCurrency(netIncome)}
             color={netIncome >= 0 ? 'success.main' : 'error.main'}
-            loading={monthlySalesLoading || expensesLoading}
+            loading={monthlySalesLoading || expensesLoading || profitLossLoading}
           />
         </Stack>
 

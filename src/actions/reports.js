@@ -19,6 +19,17 @@ function periodParams(base, period, month, year, date) {
   return p;
 }
 
+function reportScopeParams(companyId, storeId) {
+  const params = {};
+  if (companyId) params.company_id = Number(companyId);
+  if (storeId) params.store_id = Number(storeId);
+  return params;
+}
+
+function reportScopeKey(companyId, storeId) {
+  return companyId || storeId;
+}
+
 // ─── Store-dashboard helpers ──────────────────────────────────────────────────
 
 export function useStoreDashboardStats(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
@@ -123,12 +134,12 @@ export function useStoreCategoryPerformance(storeId, period = 'this_month', mont
 // ─── Reports API (company-scoped) ─────────────────────────────────────────────
 
 export function useStoreProfitLoss(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
-  const key = companyId
+  const key = reportScopeKey(companyId, storeId)
     ? [
         endpoints.reports.profitLoss,
         {
           params: periodParams(
-            { company_id: companyId, store_id: storeId || undefined },
+            reportScopeParams(companyId, storeId),
             period,
             month,
             year,
@@ -293,4 +304,48 @@ export async function collectCustomerPayment(customerId, payload) {
 export async function mergeCustomerAccounts(payload) {
   const response = await axiosInstance.post(endpoints.reports.mergeCustomers, payload);
   return response.data;
+}
+
+export function useStoreCashFlow(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = reportScopeKey(companyId, storeId)
+    ? [endpoints.reports.cashFlow, { params: periodParams(reportScopeParams(companyId, storeId), period, month, year, date) }]
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+  return useMemo(
+    () => ({ cashFlow: data || null, cashFlowLoading: isLoading, cashFlowError: error, refetchCashFlow: mutate }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useStoreBalanceSheet(companyId, storeId, asOf) {
+  const key = reportScopeKey(companyId, storeId)
+    ? [endpoints.reports.balanceSheet, { params: { ...reportScopeParams(companyId, storeId), as_of: asOf } }]
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+  return useMemo(
+    () => ({ balanceSheet: data || null, balanceSheetLoading: isLoading, balanceSheetError: error, refetchBalanceSheet: mutate }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useStoreTrialBalance(companyId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = companyId
+    ? [endpoints.reports.trialBalance, { params: periodParams({ company_id: companyId }, period, month, year, date) }]
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+  return useMemo(
+    () => ({ trialBalance: data || null, trialBalanceLoading: isLoading, trialBalanceError: error, refetchTrialBalance: mutate }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useStoreInventoryMovement(storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = storeId
+    ? [endpoints.storeDashboard.inventoryMovement, { params: periodParams({ store_id: storeId }, period, month, year, date) }]
+    : null;
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+  return useMemo(
+    () => ({ movement: data || null, movementLoading: isLoading, movementError: error, refetchMovement: mutate }),
+    [data, error, isLoading, mutate]
+  );
 }

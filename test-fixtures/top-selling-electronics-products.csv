@@ -1,0 +1,34 @@
+Name,Category,Qty,Cost Price,Selling Price,Taxes,Is Pack,Qty per Pack,Cost per Pack,Variable price,Min price,Max price,Input only
+Samsung Galaxy A15 128GB,Phones and Tablets,8,95000,118000,0,no,,,no,,,no
+iPhone 13 128GB (UK Used),Phones and Tablets,5,285000,345000,0,no,,,no,,,no
+Redmi Note 13 128GB,Phones and Tablets,10,72000,92000,0,no,,,no,,,no
+Itel A70 128GB,Phones and Tablets,15,38000,52000,0,no,,,no,,,no
+Samsung 43 inch Smart TV,Televisions,4,185000,235000,0,no,,,no,,,no
+LG 55 inch UHD Smart TV,Televisions,3,320000,395000,0,no,,,no,,,no
+Hisense 32 inch LED TV,Televisions,6,68000,89000,0,no,,,no,,,no
+TP-Link Archer C6 WiFi Router,Networking,12,8500,12500,0,no,,,no,,,no
+Huawei 4G LTE MiFi Router,Networking,8,22000,32000,0,no,,,no,,,no
+Starlink Mini Kit (Local),Networking,2,380000,450000,0,no,,,no,,,no
+Anker 20000mAh Power Bank,Accessories,25,6500,9500,0,no,,,no,,,no
+Oraimo 10000mAh Fast Charge Power Bank,Accessories,30,3500,5500,0,no,,,no,,,no
+USB-C to Lightning Cable 1m,Accessories,40,800,1500,0,no,,,no,,,no
+USB-C Fast Charger 25W,Accessories,35,1200,2500,0,no,,,no,,,no
+Wireless Earbuds TWS (Generic),Accessories,20,2500,4500,0,no,,,no,,,no
+JBL Clip 4 Bluetooth Speaker,Audio,8,12000,17500,0,no,,,no,,,no
+Sony WH-CH520 Headphones,Audio,6,18000,26000,0,no,,,no,,,no
+HP 15 Laptop i3 8GB 256GB,Laptops,3,245000,295000,0,no,,,no,,,no
+Lenovo IdeaPad 14 i5 8GB 512GB,Laptops,2,385000,465000,0,no,,,no,,,no
+Dell 24 inch Monitor FHD,Computers,5,45000,62000,0,no,,,no,,,no
+Logitech MK270 Wireless Keyboard Mouse,Computers,10,8500,12500,0,no,,,no,,,no
+300W Monocrystalline Solar Panel,Solar,12,42000,55000,0,no,,,no,,,no
+5kVA Hybrid Solar Inverter,Solar,4,185000,235000,0,no,,,no,,,no
+200Ah Deep Cycle Battery 12V,Solar,6,95000,125000,0,no,,,no,,,no
+Solar Charge Controller 60A PWM,Solar,10,8500,13500,0,no,,,no,,,no
+4MP IP Dome CCTV Camera,Security and CCTV,15,8500,14500,0,no,,,no,,,no
+8CH DVR 1TB Hikvision Compatible,Security and CCTV,6,32000,45000,0,no,,,no,,,no
+32 inch CCTV Monitor,Security and CCTV,4,28000,38000,0,no,,,no,,,no
+PIR Motion Sensor Wired,Security and CCTV,20,1200,2200,0,no,,,no,,,no
+Door Access Magnetic Lock 280kg,Security and CCTV,8,6500,10500,0,no,,,no,,,no
+Cat6 Ethernet Cable 305m Box,Cables,3,18500,26000,0,yes,305,18500,26000,no,,,no
+HDMI Cable 2m Premium,Cables,50,350,800,0,no,,,no,,,no
+Surge Protector 6-Way 3m,Accessories,18,2200,3800,0,no,,,no,,,no

@@ -134,6 +134,101 @@ function ReportPeriodTypeSection() {
   );
 }
 
+function AccountingMethodSection() {
+  const { user } = useAuthContext();
+  const companyId = user?.company_id;
+  const [mode, setMode] = useState('sale_cogs');
+  const [glEnabled, setGlEnabled] = useState(false);
+  const [hasStockPurchases, setHasStockPurchases] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      setLoading(true);
+      const { data } = await axiosInstance.get(`/api/companies/${companyId}/settings/accounting`);
+      setMode(data?.inventory_costing_mode || 'sale_cogs');
+      setGlEnabled(Boolean(data?.gl_enabled));
+      setHasStockPurchases(Boolean(data?.has_stock_purchase_expenses));
+    } catch {
+      toast.error('Could not load accounting settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleSave = async () => {
+    if (!companyId) return;
+    try {
+      setSaving(true);
+      await axiosInstance.patch(`/api/companies/${companyId}/settings/accounting`, {
+        inventory_costing_mode: mode,
+        gl_enabled: glEnabled,
+      });
+      toast.success('Accounting settings updated.');
+      loadSettings();
+    } catch {
+      toast.error('Failed to update accounting settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <Iconify icon="solar:calculator-minimalistic-bold-duotone" width={24} />
+        <Typography variant="h6">Accounting Method</Typography>
+      </Stack>
+      {!companyId ? (
+        <Alert severity="info">Sign in with a company account to configure accounting.</Alert>
+      ) : (
+        <Stack spacing={2}>
+          {loading ? <LinearProgress /> : null}
+          {hasStockPurchases && mode === 'sale_cogs' && (
+            <Alert severity="warning">
+              This company has historical stock purchase expenses. Review P&amp;L after switching to accrual mode.
+            </Alert>
+          )}
+          <TextField
+            select
+            label="Inventory costing"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            helperText="Accrual matches COGS to sales. Cash/simple expenses inventory at purchase."
+          >
+            <MenuItem value="sale_cogs">Accrual — COGS at sale (recommended)</MenuItem>
+            <MenuItem value="purchase_expensed">Cash / simple — expense at purchase</MenuItem>
+          </TextField>
+          <TextField
+            select
+            label="General ledger"
+            value={glEnabled ? 'enabled' : 'disabled'}
+            onChange={(e) => setGlEnabled(e.target.value === 'enabled')}
+            helperText="Enable double-entry journal posting for balance sheet reports."
+          >
+            <MenuItem value="disabled">Disabled</MenuItem>
+            <MenuItem value="enabled">Enabled</MenuItem>
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={saving || loading}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            Save accounting settings
+          </Button>
+        </Stack>
+      )}
+    </Card>
+  );
+}
+
 // ----------------------------------------------------------------------
 // Currency Section
 // ----------------------------------------------------------------------
@@ -1073,6 +1168,8 @@ function ConnectBankDialog({ open, onClose, onSuccess }) {
 export function AccountFinance() {
   return (
     <Stack spacing={4}>
+      <AccountingMethodSection />
+      <Divider />
       <ReportPeriodTypeSection />
       <Divider />
       <CurrencySection />

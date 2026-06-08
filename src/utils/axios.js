@@ -236,6 +236,7 @@ export const endpoints = {
     salesTrend: '/api/store-dashboard/sales-trend',
     categoryPerformance: '/api/store-dashboard/category-performance',
     forecast: '/api/store-dashboard/forecast',
+    inventoryMovement: '/api/store-dashboard/inventory-movement',
   },
   // Company dashboard (query-param style: ?company_id=X)
   companyDashboard: {
@@ -250,6 +251,15 @@ export const endpoints = {
     mergeCustomers: '/api/reports/customers/merge',
     customerDetail: (customerId) => `/api/reports/customers/${customerId}`,
     collectCustomerPayment: (customerId) => `/api/reports/customers/${customerId}/collect-payment`,
+    balanceSheet: '/api/reports/balance-sheet',
+    trialBalance: '/api/reports/trial-balance',
+  },
+  accounting: {
+    settings: (companyId) => `/api/companies/${companyId}/settings/accounting`,
+    journalEntries: '/api/accounting/journal-entries',
+    vendorBills: '/api/accounting/vendor-bills',
+    periods: '/api/accounting/periods',
+    arAging: '/api/accounting/ar-aging',
   },
 
   paymentMethod:{

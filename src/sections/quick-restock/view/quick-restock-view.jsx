@@ -153,7 +153,7 @@ export function QuickRestockView() {
               Number(normalized.cost_price ?? 0) ||
               0
             : Number(normalized.cost_price ?? 0) || 0,
-          addAsExpense: true,
+          addAsExpense: false,
         },
       ];
     });

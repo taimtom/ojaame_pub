@@ -17,26 +17,12 @@ import TableBody from '@mui/material/TableBody';
 import Alert from '@mui/material/Alert';
 
 import { fCurrency } from 'src/utils/format-number';
-import { paramCase } from 'src/utils/change-case';
+import { resolveReportCompanyId, resolveReportStoreId } from 'src/utils/report-scope';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
 import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { useStoreProfitLoss } from 'src/actions/reports';
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function getStoreId(storeParam) {
-  if (storeParam) return storeParam.split('-').pop();
-  try {
-    const raw = localStorage.getItem('activeWorkspace');
-    if (raw) {
-      const { storeName, id } = JSON.parse(raw);
-      if (storeName && id) return `${paramCase(storeName)}-${id}`.split('-').pop();
-    }
-  } catch { /* ignore */ }
-  return null;
-}
 
 
 function PLRow({ label, value, indent = false, bold = false, color }) {
@@ -66,9 +52,9 @@ function SectionHeader({ label }) {
 
 export default function StoreProfitLossReportPage() {
   const { storeParam } = useParams();
-  const storeId = getStoreId(storeParam);
+  const storeId = resolveReportStoreId(storeParam);
   const { user } = useAuthContext();
-  const companyId = user?.company_id;
+  const companyId = resolveReportCompanyId(user?.company_id, storeId);
   const [periodState, setPeriodState] = useState({ period: 'this_month', month: null, year: null, date: null });
   const { period, month, year, date } = periodState;
   const [plMode, setPlMode] = useState('list');
@@ -169,6 +155,11 @@ export default function StoreProfitLossReportPage() {
                 Inventory purchases are included in operating expenses; sale COGS is excluded from totals to avoid double counting.
               </Alert>
             )}
+            {profitLoss.costing_mode === 'sale_cogs' && (
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                Accrual mode: COGS is calculated from sales. Restocks increase inventory asset, not expenses.
+              </Alert>
+            )}
           </Stack>
         )}
 
@@ -199,6 +190,17 @@ export default function StoreProfitLossReportPage() {
 
                 <SectionHeader label="Cost of Goods Sold" />
                 <PLRow label="Cost of Goods Sold" value={profitLoss.cost_of_goods_sold} indent color="error.main" />
+                {(profitLoss.inventory_shrinkage ?? 0) > 0 && (
+                  <PLRow label="Inventory Shrinkage" value={profitLoss.inventory_shrinkage} indent color="error.main" />
+                )}
+                {(profitLoss.inventory_purchase_expenses ?? 0) > 0 && profitLoss.costing_mode === 'sale_cogs' && (
+                  <PLRow
+                    label="Inventory Purchases (informational)"
+                    value={profitLoss.inventory_purchase_expenses}
+                    indent
+                    color="text.secondary"
+                  />
+                )}
                 <PLRow label="Gross Profit" value={profitLoss.gross_profit} bold color={profitLoss.gross_profit >= 0 ? 'success.main' : 'error.main'} />
                 <TableRow>
                   <TableCell sx={{ pl: 2, color: 'text.secondary', fontSize: 12 }}>Gross Margin</TableCell>

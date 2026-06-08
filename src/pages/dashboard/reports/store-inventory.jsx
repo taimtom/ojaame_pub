@@ -27,6 +27,7 @@ import {
   useStoreDashboardStats,
   useStoreInventoryAlerts,
   useStoreCategoryPerformance,
+  useStoreInventoryMovement,
 } from 'src/actions/reports';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export default function StoreInventoryReportPage() {
   const { stats, statsLoading } = useStoreDashboardStats(storeId, period, month, year, date);
   const { alerts, alertsLoading } = useStoreInventoryAlerts(storeId);
   const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period, month, year, date);
+  const { movement, movementLoading } = useStoreInventoryMovement(storeId, period, month, year, date);
 
   const topByVolume = stats?.best_by_volume || [];
   const outOfStock = alerts.filter((a) => a.status === 'out_of_stock');
@@ -272,6 +274,39 @@ export default function StoreInventoryReportPage() {
               }
             </Card>
           )}
+
+          <Card sx={{ width: '100%' }}>
+            <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="subtitle1" fontWeight={700}>Inventory Movement</Typography>
+              <Typography variant="caption" color="text.secondary">Received, sold, lost, and closing quantities</Typography>
+            </Box>
+            {movementLoading ? <LinearProgress /> : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Product</TableCell>
+                    <TableCell align="right">Received</TableCell>
+                    <TableCell align="right">Sold</TableCell>
+                    <TableCell align="right">Lost</TableCell>
+                    <TableCell align="right">Closing</TableCell>
+                    <TableCell align="right">Value</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(movement?.products || []).slice(0, 15).map((row) => (
+                    <TableRow key={row.product_id} hover>
+                      <TableCell>{row.product_name}</TableCell>
+                      <TableCell align="right">{row.received_qty}</TableCell>
+                      <TableCell align="right">{row.sold_qty}</TableCell>
+                      <TableCell align="right">{row.lost_qty}</TableCell>
+                      <TableCell align="right">{row.closing_qty}</TableCell>
+                      <TableCell align="right">{fCurrency(row.closing_value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
 
         </Stack>
 

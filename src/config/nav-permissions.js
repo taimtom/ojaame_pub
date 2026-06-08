@@ -90,10 +90,15 @@ export const NAV_PERMISSIONS = {
 
     // Reports (store)
     'Store Reports': ['reports.read', 'reports.create', 'reports.update'],
+    'Essential Reports': ['reports.read'],
+    'Advanced Reports': ['reports.read'],
     'General Store Reports': ['reports.read'],
     'Inventory Report': ['reports.read'],
     'Financial Report': ['reports.read'],
     'Profit & Loss': ['reports.read'],
+    'Cash Flow': ['reports.read'],
+    'Balance Sheet': ['reports.read'],
+    'Trial Balance': ['reports.read'],
     'Sales Trends': ['reports.read'],
     'End of period': ['reports.read'],
     'Customer Report': ['reports.read'],

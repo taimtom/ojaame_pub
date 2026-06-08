@@ -225,6 +225,12 @@ export const useNavData = () => {
       { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
       { title: getNavLabel('serviceLog'), path: paths.dashboard.serviceLog, icon: ICONS.booking, permissionKey: 'Service Log' },
       { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
+      {
+        title: 'Customer Report',
+        path: callIfFunction(paths.dashboard.reports.customers, currentStore),
+        icon: ICONS.customer,
+        permissionKey: 'Customer Report',
+      },
     ],
   },
   /**
@@ -348,14 +354,32 @@ export const useNavData = () => {
         title: 'Store Reports',
         path: callIfFunction(paths.dashboard.reports.storeRoot, currentStore),
         icon: ICONS.analytics,
+        permissionKey: 'Store Reports',
         children: [
-          { title: 'General Store Reports', path: callIfFunction(paths.dashboard.reports.generalReport, currentStore) },
-          { title: 'Inventory Report', path: callIfFunction(paths.dashboard.reports.inventory, currentStore) },
-          { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore) },
-          { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore) },
-          { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore) },
-          { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore) },
-          { title: 'Customer Report', path: callIfFunction(paths.dashboard.reports.customers, currentStore) },
+          {
+            title: 'Essential',
+            path: callIfFunction(paths.dashboard.reports.generalReport, currentStore),
+            permissionKey: 'Essential Reports',
+            children: [
+              { title: 'General Store Reports', path: callIfFunction(paths.dashboard.reports.generalReport, currentStore), permissionKey: 'General Store Reports' },
+              { title: 'Inventory Report', path: callIfFunction(paths.dashboard.reports.inventory, currentStore), permissionKey: 'Inventory Report' },
+              { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore), permissionKey: 'Financial Report' },
+              { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore), permissionKey: 'Profit & Loss' },
+              { title: 'Customer Report', path: callIfFunction(paths.dashboard.reports.customers, currentStore), permissionKey: 'Customer Report' },
+            ],
+          },
+          {
+            title: 'Advanced',
+            path: callIfFunction(paths.dashboard.reports.cashFlow, currentStore),
+            permissionKey: 'Advanced Reports',
+            children: [
+              { title: 'Cash Flow', path: callIfFunction(paths.dashboard.reports.cashFlow, currentStore), permissionKey: 'Cash Flow' },
+              { title: 'Balance Sheet', path: callIfFunction(paths.dashboard.reports.balanceSheet, currentStore), permissionKey: 'Balance Sheet' },
+              { title: 'Trial Balance', path: callIfFunction(paths.dashboard.reports.trialBalance, currentStore), permissionKey: 'Trial Balance' },
+              { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore), permissionKey: 'Sales Trends' },
+              { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore), permissionKey: 'End of period' },
+            ],
+          },
         ],
       },
       {
