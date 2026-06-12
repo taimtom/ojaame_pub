@@ -7,13 +7,25 @@ import { paths } from 'src/routes/paths';
 import { paramCase } from 'src/utils/change-case';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { getOnboardingRedirectPath } from 'src/utils/onboarding-routes';
 
 export default function DashboardRootRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext(); // user object includes user_id and other login info
+  const { progress, progressLoading } = useOnboardingProgress({
+    skip: !user?.company_id,
+  });
 
   useEffect(() => {
+    if (progressLoading) {
+      return;
+    }
+    if (progress?.is_owner && !progress.onboarding_completed) {
+      navigate(getOnboardingRedirectPath(progress), { replace: true });
+      return;
+    }
     // Allow direct access to pages that are NOT store-scoped.
     const nonStorePages = [
       paths.dashboard.general.analytics,
@@ -67,7 +79,7 @@ export default function DashboardRootRedirect() {
     if (!location.pathname.includes(storedStoreParam)) {
       navigate(`${paths.dashboard.root}/${storedStoreParam}`, { replace: true });
     }
-  }, [navigate, location, user]);
+  }, [navigate, location, user, progress, progressLoading]);
 
   return null;
 }

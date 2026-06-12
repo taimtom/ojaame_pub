@@ -55,6 +55,35 @@ export function useGetSubscriptionInvoices() {
 
 // ----------------------------------------------------------------------
 
+export function useGetSubscriptionPlans() {
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    endpoints.subscription.plans,
+    fetcher,
+    swrOptions
+  );
+
+  return useMemo(
+    () => ({
+      plans: data?.plans || [],
+      storePrice: data?.store_price ?? 3000,
+      plansLoading: isLoading,
+      plansError: error,
+      isValidating,
+      mutate,
+    }),
+    [data, error, isLoading, isValidating, mutate]
+  );
+}
+
+// ----------------------------------------------------------------------
+
+export async function changePlan({ plan_tier }) {
+  const res = await axiosInstance.post(endpoints.subscription.plan, { plan_tier });
+  return res.data;
+}
+
+// ----------------------------------------------------------------------
+
 export async function adjustSeats({ delta, scope, store_id }) {
   const res = await axiosInstance.post(endpoints.subscription.seats, {
     delta,

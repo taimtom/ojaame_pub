@@ -315,10 +315,19 @@ export const endpoints = {
 
   subscription: {
     summary: '/api/subscription/summary',
+    plans: '/api/subscription/plans',
+    plan: '/api/subscription/plan',
     seats: '/api/subscription/seats',
     invoices: '/api/subscription/invoices',
     invoicesPay: '/api/subscription/invoices/pay',
     status: '/api/subscription/status',
+  },
+
+  onboarding: {
+    progress: '/api/onboarding/progress',
+    skipStep: '/api/onboarding/skip-step',
+    completeReportView: '/api/onboarding/complete-report-view',
+    finish: '/api/onboarding/finish',
   },
 
   billing: {

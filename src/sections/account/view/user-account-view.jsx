@@ -18,6 +18,8 @@ import { AccountBilling } from '../account-billing';
 import { AccountChangePassword } from '../account-change-password';
 import { AccountThemeSettings } from '../account-theme-settings';
 import { AccountFinance } from '../account-finance';
+import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
+import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
 // ----------------------------------------------------------------------
 
@@ -43,6 +45,7 @@ const TABS = [
 export function AccountView() {
   const tabs = useTabs('general');
   const searchParams = useSearchParams();
+  const onboarding = useOnboardingMode();
 
   // Auto-switch to the tab specified in the URL query param (e.g. ?tab=theme-settings)
   useEffect(() => {
@@ -76,10 +79,15 @@ export function AccountView() {
       {tabs.value === 'company' && <AccountCompany />}
 
       {tabs.value === 'billing' && (
-        <AccountBilling
-          cards={[]}
-          addressBook={[]}
-        />
+        <OnboardingSetupShell
+          subtitle={
+            onboarding
+              ? 'Start by adding a payment card to activate your subscription. Trial accounts skip this step automatically.'
+              : undefined
+          }
+        >
+          <AccountBilling cards={[]} addressBook={[]} />
+        </OnboardingSetupShell>
       )}
 
       {tabs.value === 'security' && <AccountChangePassword />}

@@ -25,8 +25,13 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme, useMediaQuery } from '@mui/material';
 
+import { useRouter } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
+import { withOnboardingQuery } from 'src/utils/onboarding-routes';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
+import { useOnboardingProgress } from 'src/actions/onboarding';
 import { toast } from 'src/components/snackbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { bulkOnboardProducts } from 'src/actions/product';
@@ -119,6 +124,10 @@ function buildFormattedBulkRows(rows) {
 // ----------------------------------------------------------------------
 
 export function ProductBulkOnboardView({ storeSlug, storeId }) {
+  const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -134,6 +143,7 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
   const [categoryQuickAddRowKey, setCategoryQuickAddRowKey] = useState(null);
   /** Last bulk-save API error message per row key (shown inline above that row). */
   const [rowSubmitErrors, setRowSubmitErrors] = useState(() => ({}));
+  const [sessionCreatedCount, setSessionCreatedCount] = useState(0);
 
   const clearSubmitErrorForRow = (key) => {
     setRowSubmitErrors((prev) => {
@@ -358,6 +368,11 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
         setRowSubmitErrors({});
         toast.success(`Created ${createdCount} product${createdCount === 1 ? '' : 's'}.`);
       }
+
+      if (createdCount > 0) {
+        setSessionCreatedCount((prev) => prev + createdCount);
+        if (onboarding) await mutateProgress();
+      }
     } catch (error) {
       toast.error(error?.data?.detail || 'Bulk onboarding failed.');
     } finally {
@@ -502,7 +517,21 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
+      <OnboardingSetupShell subtitle="Add many products at once — upload a spreadsheet or paste rows, then continue setup when ready.">
       <Stack spacing={3}>
+        {onboarding && (
+          <Button
+            variant="text"
+            size="small"
+            sx={{ alignSelf: 'flex-start' }}
+            onClick={() =>
+              router.push(withOnboardingQuery(paths.dashboard.product.new(storeSlug)))
+            }
+          >
+            ← Back to quick add (one at a time)
+          </Button>
+        )}
+
         <Alert severity="info">
           Fill rows below, paste from a spreadsheet, or upload a CSV / Excel file. Each row becomes
           one product. Pack and variable-price columns are recognized by common header names. Category
@@ -1137,17 +1166,30 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
                   Add 10 More Rows
                 </Button>
               </Stack>
-              <Button
-                variant="contained"
-                onClick={submitBulk}
-                disabled={submitting || !formattedRows.length}
-              >
-                {submitting ? 'Saving...' : `Save Products (${formattedRows.length})`}
-              </Button>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <Button
+                  variant="contained"
+                  onClick={submitBulk}
+                  disabled={submitting || !formattedRows.length}
+                >
+                  {submitting ? 'Saving...' : `Save Products (${formattedRows.length})`}
+                </Button>
+                {onboarding && sessionCreatedCount > 0 && (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    disabled={submitting}
+                    onClick={() => advanceOnboarding()}
+                  >
+                    Continue setup ({sessionCreatedCount} added)
+                  </Button>
+                )}
+              </Stack>
             </Box>
           </CardContent>
         </Card>
       </Stack>
+      </OnboardingSetupShell>
 
       <CategoryQuickAddDialog
         open={quickAddOpen}

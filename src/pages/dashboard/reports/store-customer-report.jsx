@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -35,6 +35,10 @@ import { toast } from 'src/components/snackbar';
 import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { TableSelectedAction } from 'src/components/table/table-selected-action';
 import { useCustomerReport, mergeCustomerAccounts } from 'src/actions/reports';
+import { completeReportView, finishOnboarding } from 'src/actions/onboarding';
+import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
+import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
+import { getOnboardingRedirectPath } from 'src/utils/onboarding-routes';
 
 function getStoreId(storeParam) {
   if (storeParam) return storeParam.split('-').pop();
@@ -95,7 +99,9 @@ const SORT_COLUMNS = [
 
 export default function StoreCustomerReportPage() {
   const navigate = useNavigate();
+  const onboarding = useOnboardingMode();
   const { storeParam } = useParams();
+  const [finishing, setFinishing] = useState(false);
   const storeId = getStoreId(storeParam);
   const [periodState, setPeriodState] = useState({
     period: 'this_month',
@@ -126,6 +132,24 @@ export default function StoreCustomerReportPage() {
 
   const summary = report?.summary;
   const items = report?.items || [];
+
+  useEffect(() => {
+    if (!onboarding) return undefined;
+    completeReportView().catch(() => {});
+    return undefined;
+  }, [onboarding]);
+
+  const handleFinishSetup = async () => {
+    try {
+      setFinishing(true);
+      const result = await finishOnboarding();
+      navigate(getOnboardingRedirectPath(result));
+    } catch (err) {
+      toast.error(err?.message || 'Could not finish setup.');
+    } finally {
+      setFinishing(false);
+    }
+  };
 
   const selectedRows = useMemo(
     () => Object.values(selectedById),
@@ -234,6 +258,10 @@ export default function StoreCustomerReportPage() {
         <title>Customer Report | Dashboard</title>
       </Helmet>
       <DashboardContent maxWidth="xl">
+        <OnboardingSetupShell subtitle="Review your customer report — see purchases, balances, and visit frequency from the sales you recorded.">
+          <span />
+        </OnboardingSetupShell>
+
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
           <Box>
             <Typography variant="h4" fontWeight={700}>
@@ -285,6 +313,21 @@ export default function StoreCustomerReportPage() {
             loading={reportLoading}
           />
         </Stack>
+
+        {onboarding && (
+          <Stack direction="row" justifyContent="flex-end" mb={3}>
+            <Button
+              variant="contained"
+              color="success"
+              size="large"
+              disabled={finishing}
+              onClick={handleFinishSetup}
+              startIcon={<Iconify icon="solar:check-circle-bold" />}
+            >
+              {finishing ? 'Finishing...' : 'Finish setup'}
+            </Button>
+          </Stack>
+        )}
 
         <Card>
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>

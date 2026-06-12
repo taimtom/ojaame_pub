@@ -4,7 +4,7 @@ export const RECEIPT_FORMAT_STORAGE_KEY = 'pos_receipt_format';
 export const THERMAL_WIDTH_STORAGE_KEY = 'pos_thermal_width_mm';
 
 export const THERMAL_WIDTH_OPTIONS_MM = [80, 58];
-export const DEFAULT_THERMAL_WIDTH_MM = 80;
+export const DEFAULT_THERMAL_WIDTH_MM = 58;
 export const DEFAULT_RECEIPT_FORMAT = 'thermal';
 
 // ----------------------------------------------------------------------

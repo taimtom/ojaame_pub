@@ -18,7 +18,10 @@ import Typography from '@mui/material/Typography';
 
 import { useRouter } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
+import { withOnboardingQuery } from 'src/utils/onboarding-routes';
 import { addProduct } from 'src/actions/product';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import { useGetCategories } from 'src/actions/category';
 import { CategoryQuickAddDialog } from './category-quick-add-dialog';
 import { toast } from 'src/components/snackbar';
@@ -72,6 +75,9 @@ export function ProductQuickAddForm({
   onCancel,
 }) {
   const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
   const { currencySymbol } = useCurrencyFormat();
   const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
 
@@ -186,6 +192,9 @@ export function ProductQuickAddForm({
         onCreated(buildCreatedProductSnapshot(form, productId));
       }
       setLastCreated({ name: form.name, id: productId });
+      if (onboarding) {
+        await mutateProgress();
+      }
       if (andAddAnother) {
         setForm({ ...EMPTY_FORM, quantity: defaultQuantity });
         setErrors({});
@@ -617,6 +626,18 @@ export function ProductQuickAddForm({
                 Create &amp; Add Another
               </Button>
             )}
+            {onboarding && lastCreated && (
+              <Button
+                variant="contained"
+                color="success"
+                size="large"
+                disabled={submitting}
+                onClick={() => advanceOnboarding()}
+                sx={{ flex: 1 }}
+              >
+                Continue setup
+              </Button>
+            )}
           </Stack>
 
           {!embedded && (
@@ -624,7 +645,13 @@ export function ProductQuickAddForm({
               <Button
                 variant="text"
                 size="small"
-                onClick={() => router.push(paths.dashboard.product.bulkAdd(storeSlug))}
+                onClick={() =>
+                  router.push(
+                    onboarding
+                      ? withOnboardingQuery(paths.dashboard.product.bulkAdd(storeSlug))
+                      : paths.dashboard.product.bulkAdd(storeSlug)
+                  )
+                }
               >
                 Adding many items at once? Use Bulk Add instead →
               </Button>

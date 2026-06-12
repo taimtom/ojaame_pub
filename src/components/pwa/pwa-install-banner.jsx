@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { usePathname } from 'src/routes/hooks';
+
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -9,10 +11,11 @@ import { Iconify } from 'src/components/iconify';
 import { usePwaInstall } from 'src/hooks/use-pwa-install';
 
 export function PwaInstallBanner() {
+  const pathname = usePathname();
   const { isInstallable, install } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
 
-  if (!isInstallable || dismissed) return null;
+  if (!pathname.startsWith('/app') || !isInstallable || dismissed) return null;
 
   return (
     <Box

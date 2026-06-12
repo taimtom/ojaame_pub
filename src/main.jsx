@@ -23,11 +23,19 @@ root.render(
   </StrictMode>
 );
 
-registerSW({
-  onNeedRefresh() {
-    console.log('[PWA] New content available, auto-updating...');
-  },
-  onOfflineReady() {
-    console.log('[PWA] App is ready for offline use');
-  },
-});
+const isAppHost =
+  import.meta.env.DEV ||
+  window.location.hostname === 'app.ojaa.me' ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1';
+
+if (isAppHost) {
+  registerSW({
+    onNeedRefresh() {
+      console.log('[PWA] New content available, auto-updating...');
+    },
+    onOfflineReady() {
+      console.log('[PWA] App is ready for offline use');
+    },
+  });
+}

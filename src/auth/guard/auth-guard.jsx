@@ -5,10 +5,17 @@ import { useRouter, usePathname, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/config-global';
 import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { useOnboardingProgress } from 'src/actions/onboarding';
 
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { SIGNUP_PENDING_PAYMENT_METHOD_KEY } from 'src/auth/signup-constants';
+import {
+  currentPathWithSearch,
+  getOnboardingRedirectPath,
+  isAllowedOnboardingPath,
+  withOnboardingQuery,
+} from 'src/utils/onboarding-routes';
 
 import { useAuthContext } from '../hooks';
 
@@ -20,6 +27,9 @@ export function AuthGuard({ children }) {
   const searchParams = useSearchParams();
   const { authenticated, loading, user } = useAuthContext();
   const { hasPaymentMethod, statusLoading, isOwner, inTrial } = useGetSubscriptionStatus();
+  const { progress, progressLoading } = useOnboardingProgress({
+    skip: !(user?.email_verified && user?.company_id !== null),
+  });
   const [isChecking, setIsChecking] = useState(true);
 
   const createQueryString = useCallback(
@@ -64,21 +74,47 @@ export function AuthGuard({ children }) {
       }
 
       // If user is verified and has a company, but they are on the company page,
-      // redirect them to the dashboard.
+      // redirect into guided setup or the dashboard.
       if (user.email_verified && user.company_id !== null && pathname === paths.auth.jwt.company) {
-        router.replace(paths.dashboard.root);
+        if (progressLoading) {
+          return;
+        }
+        if (progress && progress.is_owner && !progress.onboarding_completed) {
+          router.replace(getOnboardingRedirectPath(progress));
+        } else {
+          router.replace(paths.dashboard.root);
+        }
         return;
       }
 
       const paymentGateApplies =
         user.email_verified && user.company_id !== null && isOwner;
 
-      if (paymentGateApplies && statusLoading) {
+      if (paymentGateApplies && (statusLoading || progressLoading)) {
         return;
       }
 
-      // hasPaymentMethod is true during admin trial (backend sets in_trial); keep explicit check
-      if (paymentGateApplies && !hasPaymentMethod && !inTrial) {
+      const onboardingActive =
+        progress && progress.is_owner && !progress.onboarding_completed;
+
+      if (onboardingActive) {
+        const allowed = isAllowedOnboardingPath(pathname, searchParams, progress);
+        if (!allowed) {
+          const target = getOnboardingRedirectPath(progress);
+          const current = currentPathWithSearch(pathname, searchParams);
+          if (target && target !== current) {
+            if (progress.current_step === 'card') {
+              try {
+                localStorage.setItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY, '1');
+              } catch {
+                /* ignore */
+              }
+            }
+            router.replace(target);
+            return;
+          }
+        }
+      } else if (paymentGateApplies && !hasPaymentMethod && !inTrial) {
         const onBillingTab =
           pathname === paths.dashboard.user.account && searchParams.get('tab') === 'billing';
         if (!onBillingTab) {
@@ -87,7 +123,7 @@ export function AuthGuard({ children }) {
           } catch {
             /* ignore */
           }
-          router.replace(`${paths.dashboard.user.account}?tab=billing`);
+          router.replace(withOnboardingQuery(`${paths.dashboard.user.account}?tab=billing`));
           return;
         }
       }
@@ -109,6 +145,8 @@ export function AuthGuard({ children }) {
     inTrial,
     statusLoading,
     isOwner,
+    progress,
+    progressLoading,
   ]);
 
   if (isChecking) {

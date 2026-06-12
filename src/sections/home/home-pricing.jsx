@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -14,51 +15,73 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-const PRICING_COMPONENTS = [
+const PLAN_TIERS = [
   {
-    title: 'Base subscription',
-    price: '₦3,000',
-    period: 'per month',
-    description: 'Core monthly company subscription.',
+    tier: 'basic',
+    title: 'Basic',
+    basePrice: '₦3,000',
+    seatPrice: '₦1,000',
+    description: 'For small shops getting started with Ojaame.',
     features: [
-      'Charged once per company',
-      'Currency billed in NGN',
+      '₦3,000/month base subscription',
+      '₦1,000/month per extra staff seat',
+      'First store included free',
+      '₦3,000/month per additional store',
     ],
+    highlighted: false,
   },
   {
-    title: 'Additional store',
-    price: '₦3,000',
-    period: 'per month',
-    description: 'Charged for each store after your first store.',
+    tier: 'standard',
+    title: 'Standard',
+    basePrice: '₦10,000',
+    seatPrice: '₦2,000',
+    description: 'For growing businesses that need more capacity.',
     features: [
-      'First store has no store fee',
-      'Each extra store adds ₦3,000/month',
+      '₦10,000/month base subscription',
+      '₦2,000/month per extra staff seat',
+      'First store included free',
+      '₦3,000/month per additional store',
     ],
+    highlighted: true,
   },
   {
-    title: 'Extra seats',
-    price: '₦1,000',
-    period: 'per seat/month',
-    description: 'Seat charge applies only beyond the included seat.',
+    tier: 'enterprise',
+    title: 'Enterprise',
+    basePrice: 'Custom',
+    seatPrice: 'Custom',
+    description: 'Tailored pricing for larger operations.',
     features: [
-      'Each store includes 1 seat',
-      'Each seat above 1 in any store is billed',
+      'Custom base subscription',
+      'Custom per-seat pricing',
+      'First store included free',
+      '₦3,000/month per additional store',
+      'Managed by Ojaame team',
     ],
+    highlighted: false,
   },
 ];
 
 const EXAMPLES = [
   {
-    name: 'Example A',
-    details: '1 store, 1 seat in that store',
-    total: '₦3,000/month',
-    formula: 'Base ₦3,000 + Store fees ₦0 + Extra seats ₦0',
+    name: 'Example A — Basic',
+    details: '1 store, 1 seat',
+    basic: '₦3,000/month',
+    standard: '₦10,000/month',
+    formula: 'Base only — no extra stores or seats',
   },
   {
-    name: 'Example B',
-    details: '2 stores, 2 seats in first store, 1 seat in second store',
-    total: '₦7,000/month',
-    formula: 'Base ₦3,000 + 1 extra store ₦3,000 + 1 extra seat ₦1,000',
+    name: 'Example B — Basic',
+    details: '2 stores, 2 seats in first store, 1 seat in second',
+    basic: '₦7,000/month',
+    standard: '₦15,000/month',
+    formula: 'Base + 1 extra store (₦3,000) + 1 extra seat',
+  },
+  {
+    name: 'Example C — Basic',
+    details: '1 store, 4 seats',
+    basic: '₦6,000/month',
+    standard: '₦16,000/month',
+    formula: 'Base + 3 extra seats',
   },
 ];
 
@@ -85,11 +108,11 @@ export function HomePricing() {
             Pricing
           </Typography>
           <Typography variant="h2" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
-            Usage-Based Pricing
+            Choose Your Plan
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640, mx: 'auto' }}>
-            Your monthly total is calculated from clear billing components. First recurring charge starts about 1
-            month after signup.
+            Pick Basic or Standard and pay for extra staff and stores as you grow. Enterprise plans
+            are set up by our team. First recurring charge starts about 1 month after signup.
           </Typography>
         </Box>
 
@@ -98,39 +121,59 @@ export function HomePricing() {
           spacing={3}
           alignItems={{ md: 'stretch' }}
         >
-          {PRICING_COMPONENTS.map((item) => (
-            <Box key={item.title} sx={{ flex: 1 }}>
+          {PLAN_TIERS.map((plan) => (
+            <Box key={plan.tier} sx={{ flex: 1 }}>
               <Card
                 sx={{
                   p: 4,
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  border: `1px solid ${theme.palette.divider}`,
+                  border: plan.highlighted
+                    ? `2px solid ${theme.palette.primary.main}`
+                    : `1px solid ${theme.palette.divider}`,
                   borderRadius: 3,
+                  position: 'relative',
                 }}
               >
+                {plan.highlighted && (
+                  <Chip
+                    label="Popular"
+                    size="small"
+                    color="primary"
+                    sx={{ position: 'absolute', top: 16, right: 16 }}
+                  />
+                )}
+
                 <Typography variant="overline" color="text.secondary" fontWeight={700}>
-                  {item.title}
+                  {plan.title}
                 </Typography>
 
-                <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 1 }}>
+                <Stack direction="row" alignItems="flex-end" spacing={0.5} sx={{ mt: 1.5, mb: 0.5 }}>
                   <Typography variant="h3" fontWeight={800} lineHeight={1}>
-                    {item.price}
+                    {plan.basePrice}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
-                    /{item.period}
-                  </Typography>
+                  {plan.tier !== 'enterprise' && (
+                    <Typography variant="body2" color="text.secondary" sx={{ pb: 0.5 }}>
+                      /month
+                    </Typography>
+                  )}
                 </Stack>
 
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  {plan.tier !== 'enterprise'
+                    ? `+ ${plan.seatPrice}/seat/month beyond included seat`
+                    : 'Contact us for custom rates'}
+                </Typography>
+
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  {item.description}
+                  {plan.description}
                 </Typography>
 
                 <Divider sx={{ mb: 3 }} />
 
                 <Stack spacing={1.5} sx={{ mb: 4, flex: 1 }}>
-                  {item.features.map((feature) => (
+                  {plan.features.map((feature) => (
                     <Stack key={feature} direction="row" alignItems="center" spacing={1}>
                       <Iconify
                         icon="solar:check-circle-bold"
@@ -141,6 +184,32 @@ export function HomePricing() {
                     </Stack>
                   ))}
                 </Stack>
+
+                {plan.tier !== 'enterprise' ? (
+                  <Button
+                    component={RouterLink}
+                    href={paths.auth.jwt.signUp}
+                    size="large"
+                    variant={plan.highlighted ? 'contained' : 'outlined'}
+                    color="primary"
+                    fullWidth
+                    sx={{ borderRadius: 2, fontWeight: 700 }}
+                  >
+                    Get Started
+                  </Button>
+                ) : (
+                  <Button
+                    component="a"
+                    href="mailto:support@ojaame.com"
+                    size="large"
+                    variant="outlined"
+                    color="inherit"
+                    fullWidth
+                    sx={{ borderRadius: 2, fontWeight: 700 }}
+                  >
+                    Contact Sales
+                  </Button>
+                )}
               </Card>
             </Box>
           ))}
@@ -148,40 +217,40 @@ export function HomePricing() {
 
         <Card
           sx={{
-            mt: 3,
+            mt: 4,
             p: { xs: 3, md: 4 },
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 3,
           }}
         >
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-            Example monthly totals
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            How billing works
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Every plan includes one free seat per store. Additional stores cost ₦3,000/month each
+            (first store is free). Extra staff seats are billed per store at your plan&apos;s seat rate.
+          </Typography>
+
           <Stack spacing={2.5}>
             {EXAMPLES.map((example) => (
               <Box key={example.name}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  {example.name}: {example.total}
+                  {example.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {example.details}
+                  {example.details} — {example.formula}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {example.formula}
-                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 0.5 }}>
+                  <Typography variant="body2">
+                    <strong>Basic:</strong> {example.basic}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Standard:</strong> {example.standard}
+                  </Typography>
+                </Stack>
               </Box>
             ))}
           </Stack>
-          <Button
-            component={RouterLink}
-            href={paths.auth.jwt.signUp}
-            size="large"
-            variant="contained"
-            color="primary"
-            sx={{ mt: 3, borderRadius: 2, fontWeight: 700, py: 1.5, px: 4 }}
-          >
-            Get Started
-          </Button>
         </Card>
       </Container>
     </Box>

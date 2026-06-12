@@ -33,6 +33,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { SIGNUP_PENDING_PAYMENT_METHOD_KEY } from 'src/auth/signup-constants';
+import { useAdvanceOnboarding, useOnboardingActive } from 'src/hooks/use-onboarding-mode';
 import { AccountBillingWallet } from './account-billing-wallet';
 
 // ----------------------------------------------------------------------
@@ -49,6 +50,8 @@ const CARD_BRAND_ICONS = {
 
 export function AccountBillingPayment() {
   const router = useRouter();
+  const { active: onboarding } = useOnboardingActive();
+  const advanceOnboarding = useAdvanceOnboarding();
   const { user } = useAuthContext();
   const { cards, cardsLoading, mutateCards } = useGetBillingCards();
   const { hasPaystackSubscription, paymentPreference, mutateStatus } = useGetSubscriptionStatus();
@@ -98,7 +101,14 @@ export function AccountBillingPayment() {
           } catch {
             /* ignore */
           }
-          if (pending) {
+          if (onboarding) {
+            try {
+              localStorage.removeItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY);
+            } catch {
+              /* ignore */
+            }
+            await advanceOnboarding();
+          } else if (pending) {
             try {
               localStorage.removeItem(SIGNUP_PENDING_PAYMENT_METHOD_KEY);
             } catch {

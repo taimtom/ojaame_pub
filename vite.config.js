@@ -36,8 +36,9 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: '/app/quick-dashboard/',
         scope: '/',
+        id: 'https://app.ojaa.me/',
         icons: [
           { src: '/logo/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/logo/pwa-512x512.png', sizes: '512x512', type: 'image/png' },

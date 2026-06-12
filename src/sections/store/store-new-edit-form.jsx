@@ -18,6 +18,8 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { paths } from 'src/routes/paths';
 
+import { useAuthContext } from 'src/auth/hooks';
+import { advanceToNextOnboardingStep } from 'src/actions/onboarding';
 import { fData } from 'src/utils/format-number';
 
 import { uploadFile } from 'src/actions/upload';
@@ -138,6 +140,8 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
     );
   }
 
+  const { user } = useAuthContext();
+
   const onSubmit = handleSubmit(async (data) => {
     try {
       // avatarUrl is normally an https URL after immediate upload on drop; keep File fallback.
@@ -162,9 +166,28 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
         window.location.reload();
       } else {
         // Create mode: add a new store.
-        await addStore(data);
+        const created = await addStore(data);
         toast.success('Store created successfully!');
-        // After 2 seconds, redirect to the store list.
+        const storeId = created?.id;
+        if (storeId && data.storeName) {
+          try {
+            localStorage.setItem(
+              'activeWorkspace',
+              JSON.stringify({
+                id: storeId,
+                storeName: data.storeName,
+                user_id: user?.user_id,
+              })
+            );
+            localStorage.setItem('store_id', String(storeId));
+          } catch {
+            /* ignore */
+          }
+        }
+        const advanced = await advanceToNextOnboardingStep();
+        if (advanced) {
+          return;
+        }
         setTimeout(() => {
           window.location.href = paths.dashboard.store.list;
         }, 2000);

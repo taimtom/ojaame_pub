@@ -19,7 +19,9 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
+import { skipOnboardingStep } from 'src/actions/onboarding';
 import { inviteUser } from 'src/actions/user';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import { useGetRoles } from 'src/actions/role';
 import { useGetStores } from 'src/actions/store';
 
@@ -77,7 +79,10 @@ function parseApiError(error) {
 
 export function UserNewInviteForm() {
   const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
   const [seatLimitReached, setSeatLimitReached] = useState(false);
+  const [skipLoading, setSkipLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
   const { stores, storesLoading } = useGetStores();
@@ -114,7 +119,11 @@ export function UserNewInviteForm() {
       const response = await inviteUser(data);
       toast.success('Invitation sent successfully!');
       reset();
-      router.push(paths.dashboard.user.list);
+      if (onboarding) {
+        await advanceOnboarding();
+      } else {
+        router.push(paths.dashboard.user.list);
+      }
       console.info('Invite response', response);
     } catch (error) {
       console.error('Invitation error:', error);
@@ -237,7 +246,26 @@ export function UserNewInviteForm() {
               </Alert>
             )}
 
-            <Box mt={3} display="flex" justifyContent="flex-end">
+            <Box mt={3} display="flex" justifyContent="flex-end" gap={1.5}>
+              {onboarding && (
+                <Button
+                  variant="outlined"
+                  disabled={skipLoading || isSubmitting}
+                  onClick={async () => {
+                    try {
+                      setSkipLoading(true);
+                      await skipOnboardingStep('staff');
+                      await advanceOnboarding();
+                    } catch (error) {
+                      toast.error(error?.message || 'Could not skip this step.');
+                    } finally {
+                      setSkipLoading(false);
+                    }
+                  }}
+                >
+                  {skipLoading ? 'Skipping...' : 'Skip for now'}
+                </Button>
+              )}
               <LoadingButton
                 type="submit"
                 variant="contained"

@@ -16,6 +16,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
+import { withOnboardingQuery } from 'src/utils/onboarding-routes';
 
 import { fData } from 'src/utils/format-number';
 
@@ -42,7 +43,7 @@ export const UpdateCompanySchema = zod.object({
 });
 
 export function AccountCompany() {
-  const { user } = useAuthContext();
+  const { user, checkUserSession } = useAuthContext();
   // Skip fetching if user has no company_id
   const skipFetch = user?.company_id == null;
 
@@ -184,10 +185,9 @@ export function AccountCompany() {
       } else {
         // Create flow
         await createCompany(formData);
+        await checkUserSession?.();
         toast.success('Company created successfully!');
-        setTimeout(() => {
-          window.location.href = paths.dashboard.root;
-        }, 2000);
+        window.location.href = withOnboardingQuery(`${paths.dashboard.user.account}?tab=billing`);
       }
     } catch (error) {
       console.error('Submission error:', error);

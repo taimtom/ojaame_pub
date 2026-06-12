@@ -1,12 +1,14 @@
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 
+import { usePathname } from 'src/routes/hooks';
 import { useNetworkStatus } from 'src/hooks/use-network-status';
 
 export function OfflineBanner() {
+  const pathname = usePathname();
   const { isOnline } = useNetworkStatus();
 
-  if (isOnline) return null;
+  if (!pathname.startsWith('/app') || isOnline) return null;
 
   return (
     <Box

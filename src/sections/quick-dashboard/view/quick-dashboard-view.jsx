@@ -43,7 +43,10 @@ import axiosInstance from 'src/utils/axios';
 import { enqueueSale } from 'src/utils/offlineQueue';
 import { addPaymentToSale } from 'src/actions/sale';
 import { addCustomer } from 'src/actions/customer';
+import { useOnboardingProgress } from 'src/actions/onboarding';
 import { useGetPaymentMethods } from 'src/actions/paymentmethod';
+import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import {
   QuickDashboardPayments,
   sumPaymentLines,
@@ -900,6 +903,9 @@ function BarcodeScannerDialog({ open, onScan, onClose }) {
 export function QuickDashboardView() {
   const { currencySymbol } = useCurrencyFormat();
   const searchRef = useRef(null);
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
 
   const [storeId, setStoreId] = useState(() => getStoreIdFromStorage());
 
@@ -1747,6 +1753,14 @@ export function QuickDashboardView() {
     setPaymentLines([defaultPaymentLine(0, paymentMethods)]);
   }, [paymentMethods]);
 
+  const checkOnboardingSalesProgress = useCallback(async () => {
+    if (!onboarding) return;
+    const updated = await mutateProgress();
+    if (updated?.steps?.sales?.done) {
+      await advanceOnboarding(updated);
+    }
+  }, [advanceOnboarding, mutateProgress, onboarding]);
+
   const loadDraftForEdit = useCallback(
     async (sale) => {
       if (!storeId || !sale?.id) return;
@@ -1832,6 +1846,7 @@ export function QuickDashboardView() {
       setCompleteDraftOpen(false);
       setCompleteDraftSale(null);
       finalizeSaleSuccess();
+      await checkOnboardingSalesProgress();
       await Promise.all([fetchStats(), fetchRecent()]);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Failed to complete draft.');
@@ -1956,11 +1971,13 @@ export function QuickDashboardView() {
         );
         toast.success(successMessage);
         finalizeSaleSuccess();
+        await checkOnboardingSalesProgress();
         await Promise.all([fetchStats(), fetchRecent()]);
       } else {
         const payload = buildSalePayload({ asCredit: isFullCredit });
         await submitSalePayload(payload, successMessage);
         finalizeSaleSuccess();
+        await checkOnboardingSalesProgress();
       }
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
@@ -2091,6 +2108,9 @@ export function QuickDashboardView() {
 
   return (
     <DashboardContent maxWidth="xl">
+      <OnboardingSetupShell subtitle="Record your first five sales using quick checkout. Each completed sale counts toward setup.">
+        <span />
+      </OnboardingSetupShell>
       {/* ── Offline / sync status banner ── */}
       {(!isOnline || pendingCount > 0 || syncErrors.length > 0) && (
         <Box mb={2}>

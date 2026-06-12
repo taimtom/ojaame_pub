@@ -4,6 +4,7 @@ import { useMemo, useEffect, useCallback } from 'react';
 import Typography from '@mui/material/Typography';
 
 import { Walktour, useWalktour } from 'src/components/walktour';
+import { useOnboardingProgress } from 'src/actions/onboarding';
 
 // ----------------------------------------------------------------------
 
@@ -14,6 +15,7 @@ function storageKey(userId) {
 }
 
 export function WelcomeGuidePopup({ userId }) {
+  const { progress, progressLoading } = useOnboardingProgress();
   const steps = useMemo(
     () => [
       {
@@ -141,7 +143,8 @@ export function WelcomeGuidePopup({ userId }) {
   );
 
   useEffect(() => {
-    if (!userId) return undefined;
+    if (!userId || progressLoading) return undefined;
+    if (progress && !progress.onboarding_completed) return undefined;
     try {
       if (localStorage.getItem(storageKey(userId))) return undefined;
     } catch {
@@ -151,9 +154,9 @@ export function WelcomeGuidePopup({ userId }) {
       setRun(true);
     }, 600);
     return () => clearTimeout(timer);
-  }, [userId, setRun]);
+  }, [userId, setRun, progress, progressLoading]);
 
-  if (!userId) {
+  if (!userId || progressLoading || (progress && !progress.onboarding_completed)) {
     return null;
   }
 
