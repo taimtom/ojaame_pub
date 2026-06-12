@@ -45,16 +45,37 @@ export function notifyBluetoothPrinterChange() {
   }
 }
 
+export function hasBluetoothGetDevices() {
+  return typeof navigator !== 'undefined' && typeof navigator.bluetooth?.getDevices === 'function';
+}
+
 export function isBluetoothPrintSupported() {
   if (typeof window === 'undefined') return false;
   if (!window.isSecureContext) return false;
-  if (!navigator.bluetooth) return false;
+  if (typeof navigator.bluetooth?.requestDevice !== 'function') return false;
 
   // Web Bluetooth for printers is practical on Android Chrome / desktop Chrome.
   const ua = navigator.userAgent || '';
   const isAndroidChrome = /Android/i.test(ua) && /Chrome/i.test(ua) && !/Edg/i.test(ua);
   const isDesktopChrome = /Chrome/i.test(ua) && !/Mobile/i.test(ua) && !/Edg/i.test(ua);
   return isAndroidChrome || isDesktopChrome;
+}
+
+async function findPermittedDevice(deviceId) {
+  if (!hasBluetoothGetDevices()) return null;
+
+  const devices = await navigator.bluetooth.getDevices();
+  return devices.find((d) => d.id === deviceId) || null;
+}
+
+async function connectCachedDevice(device) {
+  const connection = await connectDevice(device);
+  cachedConnection = connection;
+  return {
+    id: device.id,
+    name: device.name || 'Bluetooth printer',
+    ...connection,
+  };
 }
 
 async function resolveWritableCharacteristic(server) {
@@ -137,7 +158,9 @@ export async function requestAndPairPrinter() {
   };
 }
 
-export async function connectPairedPrinter(deviceId) {
+export async function connectPairedPrinter(deviceId, options = {}) {
+  const { repickOnFailure = false } = options;
+
   if (!isBluetoothPrintSupported()) {
     throw BluetoothUnsupportedError();
   }
@@ -145,38 +168,58 @@ export async function connectPairedPrinter(deviceId) {
     throw PrinterNotPairedError();
   }
 
-  if (cachedConnection?.device?.id === deviceId && cachedConnection.device.gatt?.connected) {
-    return cachedConnection;
+  if (cachedConnection?.device?.id === deviceId) {
+    if (cachedConnection.device.gatt?.connected) {
+      return {
+        id: cachedConnection.device.id,
+        name: cachedConnection.device.name || 'Bluetooth printer',
+        ...cachedConnection,
+      };
+    }
+
+    try {
+      return await connectCachedDevice(cachedConnection.device);
+    } catch {
+      cachedConnection = null;
+    }
   }
 
-  const devices = await navigator.bluetooth.getDevices();
-  const device = devices.find((d) => d.id === deviceId);
-  if (!device) {
-    cachedConnection = null;
-    throw PrinterNotPairedError(
-      'Paired printer not found. Tap Pair printer and select your device again.'
-    );
+  const permittedDevice = await findPermittedDevice(deviceId);
+  if (permittedDevice) {
+    try {
+      return await connectCachedDevice(permittedDevice);
+    } catch {
+      cachedConnection = null;
+    }
   }
 
-  const connection = await connectDevice(device);
-  cachedConnection = connection;
-  return connection;
+  if (repickOnFailure) {
+    const paired = await requestAndPairPrinter();
+    return paired;
+  }
+
+  throw PrinterNotPairedError(
+    hasBluetoothGetDevices()
+      ? 'Paired printer not found. Tap Pair printer and select your device again.'
+      : 'Printer session expired. Tap Pair printer and select your device again.'
+  );
 }
 
 export function clearCachedPrinterConnection() {
   cachedConnection = null;
 }
 
-export async function printEscPosBytes(bytes, deviceId) {
-  const connection = await connectPairedPrinter(deviceId);
+export async function printEscPosBytes(bytes, deviceId, options = {}) {
+  const connection = await connectPairedPrinter(deviceId, options);
   await writeEscPos(connection.characteristic, bytes);
+  return connection;
 }
 
 export async function printReceiptViaBluetooth(receipt, options = {}) {
   const bytes = buildReceiptEscPos(receipt, options);
-  const deviceId = options.deviceId;
+  const { deviceId, repickOnFailure } = options;
   if (!deviceId) {
     throw PrinterNotPairedError();
   }
-  await printEscPosBytes(bytes, deviceId);
+  return printEscPosBytes(bytes, deviceId, { repickOnFailure });
 }

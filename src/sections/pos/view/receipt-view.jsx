@@ -1,16 +1,5 @@
 import { useState, useCallback } from 'react';
-import { PDFViewer, PDFDownloadLink, pdf } from '@react-pdf/renderer';
-
-import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
-import {
-  getPreferredReceiptFormat,
-  getPreferredThermalWidthMm,
-  setPreferredReceiptFormat,
-  setPreferredThermalWidthMm,
-  normalizeThermalWidthMm,
-} from 'src/utils/receipt-preferences';
-import { getPrintResultMessage, printReceipt } from 'src/utils/print-receipt';
-import { useBluetoothPrinter } from 'src/hooks/use-bluetooth-printer';
+import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -31,12 +20,23 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useBluetoothPrinter } from 'src/hooks/use-bluetooth-printer';
+
+import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { printReceipt, getPrintResultMessage } from 'src/utils/print-receipt';
+import {
+  normalizeThermalWidthMm,
+  getPreferredReceiptFormat,
+  setPreferredReceiptFormat,
+  getPreferredThermalWidthMm,
+  setPreferredThermalWidthMm,
+} from 'src/utils/receipt-preferences';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { toast } from 'src/components/snackbar';
 
 import { InvoiceDetails } from '../../invoice/invoice-details';
 
@@ -242,7 +242,7 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
                   <Button
                     size="small"
                     variant="text"
-                    onClick={() => void handlePairPrinter()}
+                    onClick={handlePairPrinter}
                     disabled={bluetoothStatus === 'connecting'}
                   >
                     Pair printer

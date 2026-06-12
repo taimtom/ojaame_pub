@@ -81,11 +81,16 @@ export function useBluetoothPrinter() {
       setStatus('printing');
       setError(null);
       try {
-        await printReceiptViaBluetooth(receipt, {
+        const connection = await printReceiptViaBluetooth(receipt, {
           ...options,
           deviceId,
           paperWidthMm: options.paperWidthMm ?? getPreferredThermalWidthMm(),
+          repickOnFailure: options.repickOnFailure ?? false,
         });
+        if (connection?.id && connection.id !== deviceId) {
+          setBluetoothPrinter(connection.id, connection.name);
+          notifyBluetoothPrinterChange();
+        }
         setStatus('idle');
       } catch (err) {
         setStatus('error');
@@ -106,7 +111,11 @@ export function useBluetoothPrinter() {
     setError(null);
     try {
       const bytes = buildTestReceiptEscPos(getPreferredThermalWidthMm());
-      await printEscPosBytes(bytes, deviceId);
+      const connection = await printEscPosBytes(bytes, deviceId, { repickOnFailure: true });
+      if (connection?.id && connection.id !== deviceId) {
+        setBluetoothPrinter(connection.id, connection.name);
+        notifyBluetoothPrinterChange();
+      }
       setStatus('idle');
     } catch (err) {
       setStatus('error');

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -11,14 +13,15 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { useBluetoothPrinter } from 'src/hooks/use-bluetooth-printer';
+
 import {
-  getPreferredThermalWidthMm,
   normalizeThermalWidthMm,
+  getPreferredThermalWidthMm,
   setPreferredThermalWidthMm,
 } from 'src/utils/receipt-preferences';
 
-import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
@@ -35,7 +38,7 @@ export function AccountPrinterSettings() {
     testPrint,
   } = useBluetoothPrinter();
 
-  const thermalWidthMm = getPreferredThermalWidthMm();
+  const [thermalWidthMm, setThermalWidthMm] = useState(() => getPreferredThermalWidthMm());
 
   const handlePair = async () => {
     try {
@@ -63,7 +66,9 @@ export function AccountPrinterSettings() {
 
   const handleWidthChange = (_event, value) => {
     if (value !== null) {
-      setPreferredThermalWidthMm(normalizeThermalWidthMm(value));
+      const width = normalizeThermalWidthMm(value);
+      setPreferredThermalWidthMm(width);
+      setThermalWidthMm(width);
     }
   };
 
@@ -98,7 +103,7 @@ export function AccountPrinterSettings() {
                 <Button
                   variant="contained"
                   startIcon={<Iconify icon="mdi:bluetooth" />}
-                  onClick={() => void handlePair()}
+                  onClick={handlePair}
                   disabled={status === 'connecting' || status === 'printing'}
                 >
                   Pair printer
@@ -106,7 +111,7 @@ export function AccountPrinterSettings() {
                 <Button
                   variant="outlined"
                   startIcon={<Iconify icon="solar:printer-minimalistic-bold" />}
-                  onClick={() => void handleTestPrint()}
+                  onClick={handleTestPrint}
                   disabled={!isPaired || status === 'printing'}
                 >
                   Test print

@@ -1,10 +1,10 @@
 import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder';
 
 import { fDate } from 'src/utils/format-time';
-import { fCurrency } from 'src/utils/format-number';
 import { normalizeThermalWidthMm } from 'src/utils/receipt-preferences';
 
 import { lineItemTotal } from './receipt-from-sale';
+import { fCurrencyEscPos } from './format-currency-escpos';
 
 // ----------------------------------------------------------------------
 
@@ -63,10 +63,12 @@ export function buildReceiptEscPos(receipt, options = {}) {
 
   const encoder = new ReceiptPrinterEncoder({
     language: 'esc-pos',
+    printerModel: 'mpt-ii',
     columns,
   });
 
   encoder
+    .codepage('cp437')
     .align('center')
     .bold(true)
     .line(store_name || 'Your Store')
@@ -108,29 +110,29 @@ export function buildReceiptEscPos(receipt, options = {}) {
         ...items.map((item) => [
           itemLabel(item),
           String(item.quantity ?? ''),
-          fCurrency(item.price),
-          fCurrency(lineItemTotal(item)),
+          fCurrencyEscPos(item.price),
+          fCurrencyEscPos(lineItemTotal(item)),
         ]),
       ]
     )
     .bold(false)
     .line(dividerLine(columns));
 
-  encoder.line(`Subtotal:${' '.repeat(Math.max(1, columns - 9 - fCurrency(subtotal).length))}${fCurrency(subtotal)}`);
+  encoder.line(`Subtotal:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(subtotal).length))}${fCurrencyEscPos(subtotal)}`);
 
   if (Number(discount) > 0) {
-    encoder.line(`Discount:${' '.repeat(Math.max(1, columns - 9 - fCurrency(discount).length))}-${fCurrency(discount)}`);
+    encoder.line(`Discount:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(discount).length))}-${fCurrencyEscPos(discount)}`);
   }
   if (Number(taxes) > 0) {
-    encoder.line(`Tax:${' '.repeat(Math.max(1, columns - 4 - fCurrency(taxes).length))}${fCurrency(taxes)}`);
+    encoder.line(`Tax:${' '.repeat(Math.max(1, columns - 4 - fCurrencyEscPos(taxes).length))}${fCurrencyEscPos(taxes)}`);
   }
   if (Number(shipping) > 0) {
-    encoder.line(`Shipping:${' '.repeat(Math.max(1, columns - 9 - fCurrency(shipping).length))}${fCurrency(shipping)}`);
+    encoder.line(`Shipping:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(shipping).length))}${fCurrencyEscPos(shipping)}`);
   }
 
   encoder
     .bold(true)
-    .line(`TOTAL:${' '.repeat(Math.max(1, columns - 6 - fCurrency(total_amount).length))}${fCurrency(total_amount)}`)
+    .line(`TOTAL:${' '.repeat(Math.max(1, columns - 6 - fCurrencyEscPos(total_amount).length))}${fCurrencyEscPos(total_amount)}`)
     .bold(false);
 
   if (payments.length > 0) {
@@ -138,24 +140,24 @@ export function buildReceiptEscPos(receipt, options = {}) {
 
     payments.forEach((payment, index) => {
       const label = paymentMethodLabel(payment, index);
-      const amount = fCurrency(payment.amount);
+      const amount = fCurrencyEscPos(payment.amount);
       const pad = Math.max(1, columns - label.length - amount.length);
       encoder.line(`${label}${' '.repeat(pad)}${amount}`);
     });
 
     const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const paidLabel = 'Total Paid:';
-    const paidAmount = fCurrency(paidTotal);
+    const paidAmount = fCurrencyEscPos(paidTotal);
     encoder
       .bold(true)
       .line(`${paidLabel}${' '.repeat(Math.max(1, columns - paidLabel.length - paidAmount.length))}${paidAmount}`)
       .bold(false);
 
     if (paidTotal > total_amount) {
-      const change = fCurrency(paidTotal - total_amount);
+      const change = fCurrencyEscPos(paidTotal - total_amount);
       encoder.line(`Change:${' '.repeat(Math.max(1, columns - 7 - change.length))}${change}`);
     } else if (paidTotal < total_amount) {
-      const balance = fCurrency(total_amount - paidTotal);
+      const balance = fCurrencyEscPos(total_amount - paidTotal);
       encoder.line(`Balance:${' '.repeat(Math.max(1, columns - 8 - balance.length))}${balance}`);
     }
 
