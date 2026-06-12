@@ -9,7 +9,8 @@ import {
   setPreferredThermalWidthMm,
   normalizeThermalWidthMm,
 } from 'src/utils/receipt-preferences';
-import { printReceiptBlob } from 'src/utils/print-receipt';
+import { getPrintResultMessage, printReceipt } from 'src/utils/print-receipt';
+import { useBluetoothPrinter } from 'src/hooks/use-bluetooth-printer';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -47,37 +48,46 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
   const [receiptFormat, setReceiptFormat] = useState(() => getPreferredReceiptFormat());
   const [thermalWidthMm, setThermalWidthMm] = useState(() => getPreferredThermalWidthMm());
   const [printLoading, setPrintLoading] = useState(false);
+  const {
+    isSupported: bluetoothSupported,
+    isPaired: bluetoothPaired,
+    printerName,
+    pair: pairBluetoothPrinter,
+    status: bluetoothStatus,
+  } = useBluetoothPrinter();
 
   const handleBackToSales = useCallback(() => {
     router.push(paths.dashboard.pos.root(storeSlug));
   }, [router, storeSlug]);
+
+  const handlePairPrinter = useCallback(async () => {
+    try {
+      const paired = await pairBluetoothPrinter();
+      toast.success(`Paired with ${paired.name}`);
+    } catch (err) {
+      if (err?.name === 'NotFoundError') return;
+      toast.error(err?.message || 'Could not pair Bluetooth printer.');
+    }
+  }, [pairBluetoothPrinter]);
 
   const handlePrint = useCallback(async () => {
     if (!receipt || printLoading) return;
 
     setPrintLoading(true);
     try {
-      const receiptDoc = buildReceiptPdfDocument({
+      const fileName = `receipt-${receipt?.invoice_number || 'unknown'}.pdf`;
+      const result = await printReceipt({
         receipt,
-        currentStatus: receipt?.status,
+        fileName,
         receiptFormat,
-        pdfFlavor: 'pos',
         thermalWidthMm,
+        currentStatus: receipt?.status,
+        pdfFlavor: 'pos',
       });
 
-      if (!receiptDoc) {
-        toast.error('No receipt data available to print.');
-        return;
-      }
-
-      const fileName = `receipt-${receipt?.invoice_number || 'unknown'}.pdf`;
-      const blob = await pdf(receiptDoc).toBlob();
-      const result = await printReceiptBlob(blob, fileName);
-
-      if (result === 'downloaded') {
-        toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
-      } else if (result === 'shared') {
-        toast.info('Choose Print from the share menu to send to your printer.');
+      const message = getPrintResultMessage(result);
+      if (message) {
+        toast.info(message);
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
@@ -214,6 +224,32 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
                 sx={{ fontWeight: 'bold' }}
               />
             </Stack>
+
+            {bluetoothSupported && (
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  color={bluetoothPaired ? 'success' : 'default'}
+                  icon={<Iconify icon="mdi:bluetooth" width={16} />}
+                  label={
+                    bluetoothPaired
+                      ? `Bluetooth printer: ${printerName || 'Connected'}`
+                      : 'Bluetooth printer not paired'
+                  }
+                />
+                {!bluetoothPaired && (
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => void handlePairPrinter()}
+                    disabled={bluetoothStatus === 'connecting'}
+                  >
+                    Pair printer
+                  </Button>
+                )}
+              </Stack>
+            )}
 
             {/* Format Selection */}
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>

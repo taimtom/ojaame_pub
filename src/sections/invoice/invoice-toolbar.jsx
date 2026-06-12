@@ -4,7 +4,7 @@ import { PDFViewer, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 
 import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
 import { getPreferredThermalWidthMm } from 'src/utils/receipt-preferences';
-import { printReceiptBlob } from 'src/utils/print-receipt';
+import { getPrintResultMessage, printReceipt } from 'src/utils/print-receipt';
 import html2canvas from 'html2canvas';
 
 import Box from '@mui/material/Box';
@@ -167,27 +167,27 @@ export function InvoiceToolbar({
     }
 
     try {
-      const invoiceDocument = getReceiptPdfDocument();
-      if (!invoiceDocument) {
-        toast.error('No invoice data available to print.');
-        return;
-      }
-
       const fileName = `${invoiceFileLabel(invoice)}.pdf`;
-      const blob = await pdf(invoiceDocument).toBlob();
-      const result = await printReceiptBlob(blob, fileName);
+      const result = await printReceipt({
+        receipt: invoice,
+        fileName,
+        receiptFormat,
+        thermalWidthMm: getPreferredThermalWidthMm(),
+        currentStatus,
+        pdfFlavor,
+        preferBluetooth: receiptFormat === 'thermal',
+      });
 
-      if (result === 'downloaded') {
-        toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
-      } else if (result === 'shared') {
-        toast.info('Choose Print from the share menu to send to your printer.');
+      const message = getPrintResultMessage(result);
+      if (message) {
+        toast.info(message);
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
         toast.error('Failed to prepare invoice for printing.');
       }
     }
-  }, [invoice, getReceiptPdfDocument]);
+  }, [invoice, receiptFormat, currentStatus, pdfFlavor]);
 
   const handleShareNow = useCallback(async () => {
     if (!readyShareFile) return;

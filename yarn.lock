@@ -1467,6 +1467,11 @@
     "@babel/helper-string-parser" "^7.27.1"
     "@babel/helper-validator-identifier" "^7.28.5"
 
+"@canvas/image-data@^1.0.0":
+  version "1.1.0"
+  resolved "https://registry.npmjs.org/@canvas/image-data/-/image-data-1.1.0.tgz"
+  integrity sha512-QdObRRjRbcXGmM1tmJ+MrHcaz1MftF2+W7YI+MsphnsCrmtyfS0d5qJbk0MeSbUeyM/jCb0hmnkXPsy026L7dA==
+
 "@dnd-kit/accessibility@^3.1.0":
   version "3.1.0"
   resolved "https://registry.npmjs.org/@dnd-kit/accessibility/-/accessibility-3.1.0.tgz"
@@ -2493,6 +2498,22 @@
   version "0.1.1"
   resolved "https://registry.npmjs.org/@pkgr/core/-/core-0.1.1.tgz"
   integrity sha512-cq8o4cWH0ibXh9VGi5P20Tu9XF/0fFXl9EUinr9QfTM7a7p0oTA4iJRCQWppXR1Pg8dSM0UCItCkPwsk9qWWYA==
+
+"@point-of-sale/codepage-encoder@^3.0.0":
+  version "3.0.2"
+  resolved "https://registry.npmjs.org/@point-of-sale/codepage-encoder/-/codepage-encoder-3.0.2.tgz"
+  integrity sha512-Sx+0sE/XgPtMUNKScHpwTIZiHNd/+Mg0udACQJVwPsxH9kUAgIkRi9kRlmWBMCruwOJadjKLyKs8MO8Bh+VS/A==
+
+"@point-of-sale/receipt-printer-encoder@^3.0.3":
+  version "3.0.3"
+  resolved "https://registry.npmjs.org/@point-of-sale/receipt-printer-encoder/-/receipt-printer-encoder-3.0.3.tgz"
+  integrity sha512-2+xgs6rwNfrkEw9g4LkgQS6k29qnmo3+hOV7Z2xHNBFn8h4FrwquZwL/dBOTwgmQ9sWEYBkj/bQkg9Rz6lL99w==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
+    "@point-of-sale/codepage-encoder" "^3.0.0"
+    canvas-dither "^1.0.1"
+    canvas-flatten "^1.0.1"
+    resize-image-data "^0.3.1"
 
 "@popperjs/core@^2.11.8", "@popperjs/core@^2.9.0":
   version "2.11.8"
@@ -4181,6 +4202,16 @@ caniuse-lite@^1.0.30001782:
   version "1.0.30001792"
   resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001792.tgz"
   integrity sha512-hVLMUZFgR4JJ6ACt1uEESvQN1/dBVqPAKY0hgrV70eN3391K6juAfTjKZLKvOMsx8PxA7gsY1/tLMMTcfFLLpw==
+
+canvas-dither@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/canvas-dither/-/canvas-dither-1.0.1.tgz"
+  integrity sha512-wT1RnV2y9SauibcsfMMCagQTnXmyQq2nJXuX5tTEvo0sXm1vVbJ2r8QxSC3fRQMY3ZgZVq1j54cOvmO4u+Lu/A==
+
+canvas-flatten@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/canvas-flatten/-/canvas-flatten-1.0.1.tgz"
+  integrity sha512-UhHeKeWGS23Bm5teZiHk6NEOme1OKCpv6arFovV89dydt0Xz+U4HkPXAKBZS/hmpR15x5U9tDj1ieMQMTwvCAA==
 
 ccount@^2.0.0:
   version "2.0.1"
@@ -7863,6 +7894,13 @@ reselect@^4.1.8:
   version "4.1.8"
   resolved "https://registry.npmjs.org/reselect/-/reselect-4.1.8.tgz"
   integrity sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ==
+
+resize-image-data@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.npmjs.org/resize-image-data/-/resize-image-data-0.3.1.tgz"
+  integrity sha512-6hVRn2S6W1cdycreA6Vth5XRN2NnGs7/RnVpxNw/1OCK8aCoevRFH2WprmQRZDnnH3e6awLv2tTIPuv7/7xeGg==
+  dependencies:
+    "@canvas/image-data" "^1.0.0"
 
 resolve-from@^4.0.0:
   version "4.0.0"

@@ -18,6 +18,7 @@ import { AccountBilling } from '../account-billing';
 import { AccountChangePassword } from '../account-change-password';
 import { AccountThemeSettings } from '../account-theme-settings';
 import { AccountFinance } from '../account-finance';
+import { AccountPrinterSettings } from '../account-printer-settings';
 import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
 import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
@@ -37,6 +38,11 @@ const TABS = [
     value: 'finance',
     label: 'Finance',
     icon: <Iconify icon="solar:dollar-minimalistic-bold-duotone" width={24} />,
+  },
+  {
+    value: 'printer',
+    label: 'Printer',
+    icon: <Iconify icon="solar:printer-minimalistic-bold" width={24} />,
   },
 ];
 
@@ -95,6 +101,8 @@ export function AccountView() {
       {tabs.value === 'theme-settings' && <AccountThemeSettings />}
 
       {tabs.value === 'finance' && <AccountFinance />}
+
+      {tabs.value === 'printer' && <AccountPrinterSettings />}
     </DashboardContent>
   );
 }

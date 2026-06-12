@@ -52,8 +52,13 @@ import {
   sumPaymentLines,
 } from 'src/sections/quick-dashboard/quick-dashboard-payments';
 import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { normalizeReceiptFromSale } from 'src/utils/escpos/receipt-from-sale';
 import { getPreferredReceiptFormat } from 'src/utils/receipt-preferences';
-import { printReceiptBlob } from 'src/utils/print-receipt';
+import {
+  autoPrintSaleReceipt,
+  getPrintResultMessage,
+  printReceipt,
+} from 'src/utils/print-receipt';
 
 // ── Offline product search cache (localStorage) ────────────────────────────
 const SEARCH_CACHE_KEY = 'qs_search_cache';
@@ -333,24 +338,7 @@ async function fetchSaleItemsForQuickDashboard(storeId, saleId) {
 }
 
 function buildQuickReceiptFallback(sale, items = []) {
-  return {
-    ...sale,
-    items: items.map((item) => ({
-      ...item,
-      // Keep renderer field compatibility
-      description: item.description || item.name,
-      product_name: item.product_name || item.name,
-      total: item.total != null ? Number(item.total) : Number(item.price || 0) * Number(item.quantity || 0),
-    })),
-    subtotal: Number(sale.subtotal ?? sale.total_amount ?? 0),
-    total_amount: Number(sale.total_amount ?? 0),
-    taxes: Number(sale.taxes ?? 0),
-    discount: Number(sale.discount ?? 0),
-    shipping: Number(sale.shipping ?? 0),
-    create_date: sale.create_date,
-    due_date: sale.due_date || sale.create_date,
-    payments: Array.isArray(sale.payments) ? sale.payments : [],
-  };
+  return normalizeReceiptFromSale(sale, items);
 }
 
 function saleStatusColor(status) {
@@ -1204,20 +1192,18 @@ export function QuickDashboardView() {
         }
 
         const receiptFormat = getPreferredReceiptFormat();
-        const receiptDoc = buildReceiptPdfDocument({
+        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
+        const result = await printReceipt({
           receipt,
-          currentStatus: receipt?.status,
+          fileName,
           receiptFormat,
           pdfFlavor: 'pos',
+          preferBluetooth: receiptFormat === 'thermal',
         });
-        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
-        const blob = await pdf(receiptDoc).toBlob();
-        const result = await printReceiptBlob(blob, fileName);
 
-        if (result === 'downloaded') {
-          toast.info('Print preview unavailable. Receipt PDF downloaded — open it to print.');
-        } else if (result === 'shared') {
-          toast.info('Choose Print from the share menu to send to your printer.');
+        const message = getPrintResultMessage(result);
+        if (message) {
+          toast.info(message);
         }
       } catch (error) {
         if (error?.name !== 'AbortError') {
@@ -1761,6 +1747,36 @@ export function QuickDashboardView() {
     }
   }, [advanceOnboarding, mutateProgress, onboarding]);
 
+  const tryAutoPrintAfterSale = useCallback(
+    async ({ saleMeta, cartLines = [], paymentLinesSnapshot = [] }) => {
+      if (!isOnline || !storeId || !saleMeta?.sale_id) return;
+
+      const fallbackItems = cartLines.map((line) => ({
+        description: line.name,
+        name: line.name,
+        product_name: line.name,
+        quantity: line.quantity,
+        price: line.unitPrice ?? line.price,
+        total: line.subtotal,
+      }));
+
+      const outcome = await autoPrintSaleReceipt({
+        storeId,
+        saleId: saleMeta.sale_id,
+        fallbackSale: {
+          ...saleMeta,
+          payments: paymentLinesSnapshot,
+        },
+        fallbackItems,
+      });
+
+      if (!outcome.skipped && outcome.error) {
+        toast.warning('Sale saved but the receipt could not be sent to the printer.');
+      }
+    },
+    [isOnline, storeId]
+  );
+
   const loadDraftForEdit = useCallback(
     async (sale) => {
       if (!storeId || !sale?.id) return;
@@ -1829,7 +1845,7 @@ export function QuickDashboardView() {
     }
     try {
       setCompleteDraftSubmitting(true);
-      await axiosInstance.post(
+      const { data: completedSale } = await axiosInstance.post(
         `/api/quick-dashboard/sale/${completeDraftSale.id}/complete`,
         {
           store_id: storeId,
@@ -1848,12 +1864,17 @@ export function QuickDashboardView() {
       finalizeSaleSuccess();
       await checkOnboardingSalesProgress();
       await Promise.all([fetchStats(), fetchRecent()]);
+      await tryAutoPrintAfterSale({
+        saleMeta: completedSale,
+        paymentLinesSnapshot: validLines,
+      });
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Failed to complete draft.');
     } finally {
       setCompleteDraftSubmitting(false);
     }
   }, [
+    checkOnboardingSalesProgress,
     completeDraftLines,
     completeDraftSale,
     editingDraftSale,
@@ -1861,6 +1882,7 @@ export function QuickDashboardView() {
     fetchStats,
     finalizeSaleSuccess,
     storeId,
+    tryAutoPrintAfterSale,
   ]);
 
   const submitSalePayload = async (payload, successMessage) => {
@@ -1868,12 +1890,13 @@ export function QuickDashboardView() {
       await enqueueSale(payload);
       await refreshOfflineCount();
       toast.warning(`${successMessage} saved offline — will sync when connected.`);
-      return;
+      return null;
     }
     try {
-      await axiosInstance.post('/api/quick-dashboard/sale', payload);
+      const { data } = await axiosInstance.post('/api/quick-dashboard/sale', payload);
       toast.success(successMessage);
       await Promise.all([fetchStats(), fetchRecent()]);
+      return data;
     } catch (networkErr) {
       const isNetworkFailure =
         !networkErr?.response
@@ -1885,9 +1908,9 @@ export function QuickDashboardView() {
         toast.warning(
           `Couldn't reach server. ${successMessage} saved offline — will sync when connected.`
         );
-      } else {
-        throw networkErr;
+        return null;
       }
+      throw networkErr;
     }
   };
 
@@ -1965,7 +1988,9 @@ export function QuickDashboardView() {
         } else if ((balanceDue > 0 || isFullCredit) && creditCustomerName.trim()) {
           completePayload.customer_name = creditCustomerName.trim();
         }
-        await axiosInstance.post(
+        const cartSnapshot = [...cart];
+        const paymentSnapshot = [...validLines];
+        const { data: completedSale } = await axiosInstance.post(
           `/api/quick-dashboard/sale/${editingDraftSale.id}/complete`,
           completePayload
         );
@@ -1973,11 +1998,25 @@ export function QuickDashboardView() {
         finalizeSaleSuccess();
         await checkOnboardingSalesProgress();
         await Promise.all([fetchStats(), fetchRecent()]);
+        await tryAutoPrintAfterSale({
+          saleMeta: completedSale,
+          cartLines: cartSnapshot,
+          paymentLinesSnapshot: paymentSnapshot,
+        });
       } else {
+        const cartSnapshot = [...cart];
+        const paymentSnapshot = [...validLines];
         const payload = buildSalePayload({ asCredit: isFullCredit });
-        await submitSalePayload(payload, successMessage);
+        const saleResult = await submitSalePayload(payload, successMessage);
         finalizeSaleSuccess();
         await checkOnboardingSalesProgress();
+        if (saleResult?.sale_id) {
+          await tryAutoPrintAfterSale({
+            saleMeta: saleResult,
+            cartLines: cartSnapshot,
+            paymentLinesSnapshot: paymentSnapshot,
+          });
+        }
       }
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sale failed. Please try again.');
