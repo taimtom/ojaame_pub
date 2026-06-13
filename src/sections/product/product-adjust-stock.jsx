@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -12,6 +12,8 @@ import MenuItem from '@mui/material/MenuItem';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
@@ -45,7 +47,8 @@ const AdjustSchema = zod.object({
 const PackAdjustSchema = zod.object({
   name: zod.string().min(1),
   reason: zod.string().min(1, { message: 'Please select a reason.' }),
-  packsToDeduct: zod.number().min(1, { message: 'Number of packs must be at least 1.' }),
+  lossMode: zod.enum(['units', 'packs']),
+  quantityLost: zod.number().min(1, { message: 'Quantity must be at least 1.' }),
   description: zod.string().optional(),
   addAsExpense: zod.boolean(),
 });
@@ -268,49 +271,79 @@ function SingleAdjustForm({ currentProduct, storeSlug }) {
   );
 }
 
-// ─── Pack form ───────────────────────────────────────────────────────────────
+// ─── Pack form (single units or whole packs) ───────────────────────────────
 
 function PackAdjustForm({ currentProduct, storeSlug }) {
   const router = useRouter();
 
-  const quantityPerPack  = currentProduct?.quantity_per_pack ?? 1;
+  const quantityPerPack = currentProduct?.quantity_per_pack ?? 1;
+  const costPricePerUnit = Number(currentProduct?.costPrice || 0);
   const costPricePerPack = currentProduct?.cost_price_per_pack ?? null;
-  const currentUnits     = currentProduct?.quantity ?? 0;
-  const currentPacks     = Math.floor(currentUnits / quantityPerPack);
+  const currentUnits = currentProduct?.quantity ?? 0;
+  const currentPacks = Math.floor(currentUnits / quantityPerPack);
 
   const defaultValues = useMemo(
-    () => ({ name: currentProduct?.name || '', reason: '', packsToDeduct: 1, description: '', addAsExpense: true }),
+    () => ({
+      name: currentProduct?.name || '',
+      reason: '',
+      lossMode: 'units',
+      quantityLost: 1,
+      description: '',
+      addAsExpense: true,
+    }),
     [currentProduct]
   );
 
   const methods = useForm({ resolver: zodResolver(PackAdjustSchema), defaultValues });
-  const { reset, handleSubmit, formState: { isSubmitting } } = methods;
+  const { reset, handleSubmit, setValue, control, formState: { isSubmitting } } = methods;
 
-  const packsToDeduct  = useWatch({ control: methods.control, name: 'packsToDeduct' });
-  const reason         = useWatch({ control: methods.control, name: 'reason' });
-  const addAsExpense   = useWatch({ control: methods.control, name: 'addAsExpense' });
+  const lossMode = useWatch({ control: methods.control, name: 'lossMode' });
+  const quantityLost = useWatch({ control: methods.control, name: 'quantityLost' });
+  const reason = useWatch({ control: methods.control, name: 'reason' });
+  const addAsExpense = useWatch({ control: methods.control, name: 'addAsExpense' });
 
-  useEffect(() => { if (currentProduct) reset(defaultValues); }, [currentProduct, defaultValues, reset]);
+  useEffect(() => {
+    if (currentProduct) reset(defaultValues);
+  }, [currentProduct, defaultValues, reset]);
 
-  const deductPacks    = Math.max(Number(packsToDeduct) || 0, 0);
-  const unitsToDeduct  = deductPacks * quantityPerPack;
-  const newUnits       = currentUnits - unitsToDeduct;
-  const overDeduct     = unitsToDeduct > currentUnits;
+  const qtyEntered = Math.max(Number(quantityLost) || 0, 0);
+  const isPackMode = lossMode === 'packs';
+  const unitsToDeduct = isPackMode ? qtyEntered * quantityPerPack : qtyEntered;
+  const packsEquivalent = isPackMode ? qtyEntered : qtyEntered / quantityPerPack;
+  const newUnits = currentUnits - unitsToDeduct;
+  const overDeduct = unitsToDeduct > currentUnits;
   const selectedReason = LOSS_REASONS.find((r) => r.value === reason);
-  const totalCost      = costPricePerPack != null ? deductPacks * costPricePerPack : null;
+  const totalCost =
+    costPricePerUnit > 0
+      ? unitsToDeduct * costPricePerUnit
+      : costPricePerPack != null && isPackMode
+        ? qtyEntered * costPricePerPack
+        : null;
+
+  const handleLossModeChange = (field, value) => {
+    if (value) {
+      field.onChange(value);
+      setValue('quantityLost', 1);
+    }
+  };
 
   const onSubmit = handleSubmit(async (data) => {
     try {
       const store_id = currentProduct?.store_id || localStorage.getItem('store_id');
-      const unitsLost = data.packsToDeduct * quantityPerPack;
+      const unitsLost =
+        data.lossMode === 'packs' ? data.quantityLost * quantityPerPack : data.quantityLost;
+
+      const defaultDescription =
+        data.lossMode === 'packs'
+          ? `${data.quantityLost} pack(s) ${data.reason} — ${unitsLost} unit(s) removed from stock`
+          : `${data.quantityLost} unit(s) ${data.reason} from pack stock (${quantityPerPack} per pack)`;
+
       await adjustProductStock(currentProduct.id, {
         product_id: currentProduct.id,
         store_id: Number(store_id),
         quantity: unitsLost,
         reason: data.reason,
-        description:
-          data.description ||
-          `${data.packsToDeduct} pack(s) ${data.reason} — ${unitsLost} unit(s) removed from stock`,
+        description: data.description || defaultDescription,
         add_as_expense: data.addAsExpense,
       });
       toast.success('Stock adjustment recorded!');
@@ -327,41 +360,43 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
   return (
     <Form methods={methods} onSubmit={onSubmit}>
       <Stack spacing={{ xs: 3, md: 5 }} sx={{ mx: 'auto', maxWidth: { xs: 720, xl: 880 } }}>
-        {/* Pack reference */}
         <Card>
-          <CardHeader title="Pack Configuration" subheader="Reference info for this pack product" sx={{ mb: 3 }} />
+          <CardHeader
+            title="Record Stock Loss"
+            subheader={`This is a pack product (${quantityPerPack} units per pack). Record loss by single unit or whole pack.`}
+            sx={{ mb: 3 }}
+          />
           <Divider />
-          <Stack spacing={2} sx={{ p: 3 }}>
+          <Stack spacing={3} sx={{ p: 3 }}>
+            <Field.Text name="name" label="Product name" InputProps={{ readOnly: true }} />
+
             <Box
               display="grid"
               gap={2}
               gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(3, 1fr)' }}
             >
-              <Stack spacing={0.5} sx={{ p: 2, borderRadius: 1.5, bgcolor: 'info.lighter', border: (t) => `1px solid ${t.palette.info.light}` }}>
-                <Typography variant="caption" sx={{ color: 'info.dark' }}>Units per Pack</Typography>
-                <Typography variant="h5" sx={{ color: 'info.dark' }}>{quantityPerPack}</Typography>
-              </Stack>
-              <Stack spacing={0.5} sx={{ p: 2, borderRadius: 1.5, bgcolor: 'warning.lighter', border: (t) => `1px solid ${t.palette.warning.light}` }}>
-                <Typography variant="caption" sx={{ color: 'warning.dark' }}>Cost per Pack</Typography>
-                <Typography variant="h5" sx={{ color: 'warning.dark' }}>
-                  {costPricePerPack != null ? fCurrency(costPricePerPack) : '—'}
-                </Typography>
-              </Stack>
-              <Stack spacing={0.5} sx={{ p: 2, borderRadius: 1.5, bgcolor: 'background.neutral', border: (t) => `1px solid ${t.palette.divider}` }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>Current Stock</Typography>
-                <Typography variant="h5">{currentUnits} units</Typography>
-                <Typography variant="caption" sx={{ color: 'text.disabled' }}>≈ {currentPacks} packs</Typography>
-              </Stack>
+              <ReadonlyInfo
+                icon="solar:layers-bold"
+                label="Units per pack"
+                value={quantityPerPack}
+              />
+              <ReadonlyInfo
+                icon="solar:box-bold"
+                label="Current stock"
+                value={`${currentUnits} units (≈ ${currentPacks} packs)`}
+              />
+              <ReadonlyInfo
+                icon="solar:dollar-minimalistic-bold"
+                label="Cost per unit"
+                value={
+                  costPricePerUnit > 0
+                    ? fCurrency(costPricePerUnit)
+                    : costPricePerPack != null
+                      ? fCurrency(costPricePerPack / quantityPerPack)
+                      : '—'
+                }
+              />
             </Box>
-          </Stack>
-        </Card>
-
-        {/* Adjustment form */}
-        <Card>
-          <CardHeader title="Record Stock Loss" subheader="Select a reason and enter the number of packs lost" sx={{ mb: 3 }} />
-          <Divider />
-          <Stack spacing={3} sx={{ p: 3 }}>
-            <Field.Text name="name" label="Product name" InputProps={{ readOnly: true }} />
 
             <Field.Select name="reason" label="Reason for loss *" InputLabelProps={{ shrink: true }}>
               {LOSS_REASONS.map((opt) => (
@@ -374,41 +409,103 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
               ))}
             </Field.Select>
 
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                What are you recording?
+              </Typography>
+              <Controller
+                name="lossMode"
+                control={control}
+                render={({ field }) => (
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    size="small"
+                    value={field.value}
+                    onChange={(_event, value) => handleLossModeChange(field, value)}
+                  >
+                    <ToggleButton value="units">
+                      Single units
+                      <Typography component="span" variant="caption" sx={{ display: 'block', opacity: 0.7 }}>
+                        e.g. 1 bottle burst
+                      </Typography>
+                    </ToggleButton>
+                    <ToggleButton value="packs">
+                      Whole packs
+                      <Typography component="span" variant="caption" sx={{ display: 'block', opacity: 0.7 }}>
+                        e.g. 1 full pack lost
+                      </Typography>
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                )}
+              />
+            </Box>
+
             <Field.Text
-              name="packsToDeduct"
-              label="Number of packs lost *"
+              name="quantityLost"
+              label={isPackMode ? 'Number of packs lost *' : 'Number of units lost *'}
               placeholder="0"
               type="number"
               InputLabelProps={{ shrink: true }}
-              helperText={`Each pack = ${quantityPerPack} unit(s)`}
+              helperText={
+                isPackMode
+                  ? `Each pack = ${quantityPerPack} unit(s). Max ${currentPacks} pack(s) in stock.`
+                  : `Loose units from opened packs. Max ${currentUnits} unit(s) in stock.`
+              }
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <Typography variant="body2" sx={{ color: 'text.disabled' }}>packs</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                      {isPackMode ? 'packs' : 'units'}
+                    </Typography>
                   </InputAdornment>
                 ),
               }}
             />
 
-            {deductPacks > 0 && (
+            {qtyEntered > 0 && (
               <Stack spacing={1.5}>
                 {overDeduct ? (
                   <Alert severity="error">
-                    Cannot deduct <strong>{unitsToDeduct} units</strong> ({deductPacks} packs) — only <strong>{currentUnits}</strong> in stock.
+                    {isPackMode ? (
+                      <>
+                        Cannot deduct <strong>{unitsToDeduct} units</strong> ({qtyEntered} pack
+                        {qtyEntered === 1 ? '' : 's'}) — only <strong>{currentUnits}</strong>{' '}
+                        units ({currentPacks} pack{currentPacks === 1 ? '' : 's'}) in stock.
+                      </>
+                    ) : (
+                      <>
+                        Cannot deduct <strong>{qtyEntered} units</strong> — only{' '}
+                        <strong>{currentUnits}</strong> in stock.
+                      </>
+                    )}
                   </Alert>
                 ) : (
                   <>
                     <ReadonlyInfo
-                      icon="solar:layers-bold"
+                      icon="solar:arrow-down-bold"
                       label="Units being removed"
-                      value={`${unitsToDeduct} units (${deductPacks} packs)`}
+                      value={
+                        isPackMode
+                          ? `${unitsToDeduct} units (${qtyEntered} pack${qtyEntered === 1 ? '' : 's'})`
+                          : `${unitsToDeduct} unit${unitsToDeduct === 1 ? '' : 's'}`
+                      }
                       color="error.main"
                     />
+                    {!isPackMode && qtyEntered > 0 && quantityPerPack > 1 && (
+                      <ReadonlyInfo
+                        icon="solar:layers-bold"
+                        label="Pack equivalent"
+                        value={`≈ ${packsEquivalent.toFixed(2)} pack(s)`}
+                      />
+                    )}
                     <ReadonlyInfo
                       icon="solar:box-bold"
                       label="Stock after adjustment"
-                      value={`${newUnits} units (≈ ${Math.floor(newUnits / quantityPerPack)} packs)`}
-                      color={newUnits === 0 ? 'error.main' : newUnits <= 5 ? 'warning.main' : 'success.main'}
+                      value={`${newUnits} units (≈ ${Math.floor(newUnits / quantityPerPack)} full packs)`}
+                      color={
+                        newUnits === 0 ? 'error.main' : newUnits <= 5 ? 'warning.main' : 'success.main'
+                      }
                     />
                     {selectedReason && (
                       <Alert
@@ -416,8 +513,18 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
                         icon={<Iconify icon={selectedReason.icon} width={20} />}
                         sx={{ py: 0.5 }}
                       >
-                        Recording <strong>{deductPacks} pack(s)</strong> ({unitsToDeduct} units) as{' '}
-                        <strong>{selectedReason.label}</strong>. This will be logged to stock history.
+                        {isPackMode ? (
+                          <>
+                            Recording <strong>{qtyEntered} pack(s)</strong> ({unitsToDeduct} units)
+                            as <strong>{selectedReason.label}</strong>.
+                          </>
+                        ) : (
+                          <>
+                            Recording <strong>{qtyEntered} unit(s)</strong> as{' '}
+                            <strong>{selectedReason.label}</strong>.
+                          </>
+                        )}{' '}
+                        This will be logged to stock history.
                       </Alert>
                     )}
                   </>
@@ -428,7 +535,11 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
             <Field.Text
               name="description"
               label="Note (optional)"
-              placeholder="e.g. 1 pack of pure water burst during storage"
+              placeholder={
+                isPackMode
+                  ? 'e.g. Whole pack fell off truck during delivery'
+                  : 'e.g. 1 bottle burst during transport from warehouse'
+              }
               multiline
               rows={2}
               InputLabelProps={{ shrink: true }}
@@ -454,7 +565,7 @@ function PackAdjustForm({ currentProduct, storeSlug }) {
             color="error"
             size="large"
             loading={isSubmitting}
-            disabled={overDeduct || deductPacks === 0}
+            disabled={overDeduct || qtyEntered === 0}
             startIcon={<Iconify icon="solar:danger-triangle-bold" />}
           >
             Record Loss
