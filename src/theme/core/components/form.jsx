@@ -9,7 +9,8 @@ const MuiFormLabel = {
   styleOverrides: {
     root: ({ theme }) => ({
       ...theme.typography.body2,
-      color: theme.vars.palette.text.disabled,
+      fontWeight: theme.typography.fontWeightMedium,
+      color: theme.vars.palette.text.secondary,
       [`&.${inputLabelClasses.shrink}`]: {
         ...theme.typography.body1,
         fontWeight: 600,

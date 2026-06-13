@@ -9,19 +9,18 @@ import { useSearchParams } from 'src/routes/hooks';
 import { useTabs } from 'src/hooks/use-tabs';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { _userAbout, _userPlans, _userPayment, _userInvoices, _userAddressBook } from 'src/_mock';
-
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { AccountGeneral } from '../account-general';
 import { AccountCompany } from '../account-company';
 import { AccountBilling } from '../account-billing';
-import { AccountSocialLinks } from '../account-social-links';
-import { AccountNotifications } from '../account-notifications';
 import { AccountChangePassword } from '../account-change-password';
 import { AccountThemeSettings } from '../account-theme-settings';
 import { AccountFinance } from '../account-finance';
+import { AccountPrinterSettings } from '../account-printer-settings';
+import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
+import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
 // ----------------------------------------------------------------------
 
@@ -29,12 +28,6 @@ const TABS = [
   { value: 'general', label: 'General', icon: <Iconify icon="solar:user-id-bold" width={24} /> },
   { value: 'company', label: 'Company', icon: <Iconify icon="solar:user-id-bold" width={24} /> },
   { value: 'billing', label: 'Billing', icon: <Iconify icon="solar:bill-list-bold" width={24} /> },
-  {
-    value: 'notifications',
-    label: 'Notifications',
-    icon: <Iconify icon="solar:bell-bing-bold" width={24} />,
-  },
-  { value: 'social', label: 'Social links', icon: <Iconify icon="solar:share-bold" width={24} /> },
   { value: 'security', label: 'Security', icon: <Iconify icon="ic:round-vpn-key" width={24} /> },
   {
     value: 'theme-settings',
@@ -46,6 +39,11 @@ const TABS = [
     label: 'Finance',
     icon: <Iconify icon="solar:dollar-minimalistic-bold-duotone" width={24} />,
   },
+  {
+    value: 'printer',
+    label: 'Printer',
+    icon: <Iconify icon="solar:printer-minimalistic-bold" width={24} />,
+  },
 ];
 
 // ----------------------------------------------------------------------
@@ -53,6 +51,7 @@ const TABS = [
 export function AccountView() {
   const tabs = useTabs('general');
   const searchParams = useSearchParams();
+  const onboarding = useOnboardingMode();
 
   // Auto-switch to the tab specified in the URL query param (e.g. ?tab=theme-settings)
   useEffect(() => {
@@ -86,23 +85,24 @@ export function AccountView() {
       {tabs.value === 'company' && <AccountCompany />}
 
       {tabs.value === 'billing' && (
-        <AccountBilling
-          plans={_userPlans}
-          cards={_userPayment}
-          invoices={_userInvoices}
-          addressBook={_userAddressBook}
-        />
+        <OnboardingSetupShell
+          subtitle={
+            onboarding
+              ? 'Start by adding a payment card to activate your subscription. Trial accounts skip this step automatically.'
+              : undefined
+          }
+        >
+          <AccountBilling cards={[]} addressBook={[]} />
+        </OnboardingSetupShell>
       )}
-
-      {tabs.value === 'notifications' && <AccountNotifications />}
-
-      {tabs.value === 'social' && <AccountSocialLinks socialLinks={_userAbout.socialLinks} />}
 
       {tabs.value === 'security' && <AccountChangePassword />}
 
       {tabs.value === 'theme-settings' && <AccountThemeSettings />}
 
       {tabs.value === 'finance' && <AccountFinance />}
+
+      {tabs.value === 'printer' && <AccountPrinterSettings />}
     </DashboardContent>
   );
 }

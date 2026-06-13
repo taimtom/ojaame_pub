@@ -15,11 +15,12 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { usePermissions } from 'src/hooks/use-permissions';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import { varAlpha } from 'src/theme/styles';
-import { useGetUsers, resendInvitation } from 'src/actions/user';
 import { useGetRoles } from 'src/actions/role';
+import { useGetUsers, resendInvitation } from 'src/actions/user';
 import { USER_STATUS_OPTIONS } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 
@@ -91,6 +92,8 @@ export function UserListView() {
   }, [usersError]);
 
   const { roles } = useGetRoles();
+  const { hasPermission } = usePermissions();
+  const canInviteUser = hasPermission('users.create');
 
   const filters = useSetState({ name: '', role: [], status: 'all' });
 
@@ -109,24 +112,28 @@ export function UserListView() {
 
   const handleDeleteRow = useCallback(
     (id) => {
+      const targetRow = tableData.find((row) => row.user_id === id);
+      if (targetRow?.role === 'merchant') {
+        toast.error('The owner account cannot be deleted.');
+        return;
+      }
+
       const deleteRow = tableData.filter((row) => row.user_id !== id);
-
       toast.success('Delete success!');
-
       setTableData(deleteRow);
-
       table.onUpdatePageDeleteRow(dataInPage.length);
     },
     [dataInPage.length, table, tableData]
   );
 
   const handleDeleteRows = useCallback(() => {
-    const deleteRows = tableData.filter((row) => !table.selected.includes(row.user_id));
+    // Exclude the owner from bulk deletion
+    const deleteRows = tableData.filter(
+      (row) => !table.selected.includes(row.user_id) || row.role === 'merchant'
+    );
 
     toast.success('Delete success!');
-
     setTableData(deleteRows);
-
     table.onUpdatePageDeleteRows({
       totalRowsInPage: dataInPage.length,
       totalRowsFiltered: dataFiltered.length,
@@ -170,14 +177,16 @@ export function UserListView() {
             { name: 'List' },
           ]}
           action={
-            <Button
-              component={RouterLink}
-              href={paths.dashboard.user.invite}
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-            >
-              Invite user
-            </Button>
+            canInviteUser ? (
+              <Button
+                component={RouterLink}
+                href={paths.dashboard.user.invite}
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+              >
+                Invite user
+              </Button>
+            ) : null
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

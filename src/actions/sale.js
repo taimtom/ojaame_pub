@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR Options (reuse these from your products script)
@@ -20,22 +21,26 @@ const swrOptions = {
  * @param {string | number} storeId - The store ID to filter sales.
  * @returns {object} - An object with sales data and loading/error states.
  */
-export function useGetSales(storeId) {
+export function useGetSales(storeId, queryParams = {}) {
   // Ensure your endpoints.sales.list is defined (e.g., '/api/sales/list/')
-  const key = storeId ? [endpoints.sales.list, { params: { store_id: storeId } }] : null;
+  const key = storeId ? [endpoints.sales.list, { params: { store_id: storeId, ...queryParams } }] : null;
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
     ...swrOptions,
     keepPreviousData: true,
   });
 
   const memoizedValue = useMemo(
-    () => ({
-      sales: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      sales: paged.items,
+      salesPagination: paged.pagination,
       salesLoading: isLoading,
       salesError: error,
       salesValidating: isValidating,
-      salesEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      salesEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 
@@ -74,21 +79,27 @@ export function useGetSale(saleId, storeId) {
  * @param {string|number} storeId - The store ID.
  * @returns {object} - An object with search results and status flags.
  */
-export function useSearchSales(query, storeId) {
+export function useSearchSales(query, storeId, queryParams = {}) {
   const key =
-    query && storeId ? [endpoints.sales.search, { params: { query, store_id: storeId } }] : null;
+    query && storeId
+      ? [endpoints.sales.search, { params: { query, q: query, store_id: storeId, ...queryParams } }]
+      : null;
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
     ...swrOptions,
     keepPreviousData: true,
   });
   const memoizedValue = useMemo(
-    () => ({
-      searchResults: data?.results || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      searchResults: paged.items,
+      searchPagination: paged.pagination,
       searchLoading: isLoading,
       searchError: error,
       searchValidating: isValidating,
-      searchEmpty: !isLoading && (!data || data.results.length === 0),
-    }),
+      searchEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 
@@ -101,19 +112,23 @@ export function useSearchSales(query, storeId) {
  * @param {string|number} storeId - The sale's unique identifier.
  * @returns {object} - An object containing the sales history and status flags.
  */
-export function useGetSalesHistory(storeId) {
+export function useGetSalesHistory(storeId, queryParams = {}) {
   // const key = saleId ? [endpoints.sales.history, { params: { sales_id: saleId } }] : null;
-  const key = storeId ? [endpoints.sales.history, { params: { store_id: storeId } }] : null;
+  const key = storeId ? [endpoints.sales.history, { params: { store_id: storeId, ...queryParams } }] : null;
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   const memoizedValue = useMemo(
-    () => ({
-      history: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      history: paged.items,
+      historyPagination: paged.pagination,
       historyLoading: isLoading,
       historyError: error,
       historyValidating: isValidating,
-      HistoryEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      HistoryEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 
@@ -128,18 +143,24 @@ export function useGetSalesHistory(storeId) {
  * @param {string|number} saleId - The sale's unique identifier.
  * @returns {object} - An object containing the sales history list and loading/error states.
  */
-export function useGetSalesHistoryList(storeId, saleId) {
-  const url = storeId && saleId ? `${endpoints.sales.saleslist}${storeId}/${saleId}/` : null;
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+export function useGetSalesHistoryList(storeId, saleId, queryParams = {}) {
+  const key = storeId && saleId
+    ? [`${endpoints.sales.saleslist}${storeId}/${saleId}/`, { params: { ...queryParams } }]
+    : null;
+  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      salesHistoryList: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      salesHistoryList: paged.items,
+      salesHistoryPagination: paged.pagination,
       salesHistoryListLoading: isLoading,
       salesHistoryListError: error,
       salesHistoryListValidating: isValidating,
-      salesHistoryEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      salesHistoryEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }
@@ -250,6 +271,23 @@ export async function removeSalePayment(saleId, paymentId) {
     return response.data;
   } catch (error) {
     console.error('Error removing sale payment:', error);
+    throw error;
+  }
+}
+
+/**
+ * markSaleAsPaid - Marks a credit sale as fully paid.
+ *
+ * @param {string|number} saleId - The ID of the credit sale to mark as paid.
+ * @returns {Promise<object>} - The updated sale data.
+ */
+export async function markSaleAsPaid(saleId) {
+  try {
+    const url = `/api/sales/${saleId}/mark-paid`;
+    const response = await axiosInstance.post(url);
+    return response.data;
+  } catch (error) {
+    console.error('Error marking sale as paid:', error);
     throw error;
   }
 }

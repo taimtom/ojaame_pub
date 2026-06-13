@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { usePathname } from 'src/routes/hooks';
-import { isExternalLink } from 'src/routes/utils';
+import { isExternalLink, removeLastSlash } from 'src/routes/utils';
 import { useActiveLink } from 'src/routes/hooks/use-active-link';
 
 import { NavItem } from './nav-item';
@@ -10,10 +10,27 @@ import { NavUl, NavLi, NavCollapse } from '../styles';
 
 // ----------------------------------------------------------------------
 
+function hasActiveDescendant(item, pathname) {
+  if (!item?.children?.length) {
+    return false;
+  }
+  const current = removeLastSlash(pathname);
+  return item.children.some((child) => {
+    const childPath = child.path ? removeLastSlash(child.path) : '';
+    if (childPath && !childPath.startsWith('#') && !isExternalLink(childPath)) {
+      if (current === childPath || current.startsWith(`${childPath}/`)) {
+        return true;
+      }
+    }
+    return hasActiveDescendant(child, current);
+  });
+}
+
 export function NavList({ data, render, depth, slotProps, enabledRootRedirect }) {
   const pathname = usePathname();
 
-  const active = useActiveLink(data.path, !!data.children);
+  const active =
+    useActiveLink(data.path, !!data.children) || hasActiveDescendant(data, pathname);
 
   const [openMenu, setOpenMenu] = useState(active);
 

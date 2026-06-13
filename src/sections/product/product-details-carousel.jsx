@@ -13,6 +13,12 @@ import {
   CarouselArrowNumberButtons,
 } from 'src/components/carousel';
 
+function imageEntrySrc(img) {
+  if (img == null) return '';
+  if (typeof img === 'string') return img;
+  return img.path || '';
+}
+
 export function ProductDetailsCarousel({ coverUrl, images, productName }) {
   // Build slides array from coverUrl and images.
   const slides = [];
@@ -25,11 +31,13 @@ export function ProductDetailsCarousel({ coverUrl, images, productName }) {
   }
   if (images && images.length > 0) {
     images.forEach((img, index) => {
+      const src = imageEntrySrc(img);
+      if (!src) return;
       // Skip if this image duplicates the coverUrl.
-      if (coverUrl && img.path === coverUrl) return;
+      if (coverUrl && src === coverUrl) return;
       slides.push({
-        src: img.path,
-        id: img.path || index,
+        src,
+        id: src || index,
         alt: `Product image ${index + 1}`,
       });
     });

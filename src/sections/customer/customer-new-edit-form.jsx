@@ -24,6 +24,7 @@ import { paramCase } from 'src/utils/change-case';
 import { useGetRoles } from 'src/actions/role';
 import { useGetStores } from 'src/actions/store';
 import { addCustomer, editCustomer } from 'src/actions/customer';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
 // import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -50,6 +51,8 @@ export const NewCustomerSchema = zod.object({
 
 export function CustomerNewEditForm({ currentUser }) {
   const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
 
   const { roles, rolesLoading } = useGetRoles();
   const { stores, storesLoading } = useGetStores();
@@ -109,8 +112,11 @@ export function CustomerNewEditForm({ currentUser }) {
             await addCustomer(data);
             toast.success('Customer added successfully!');
           }
-          // Navigate to the customer list page with the store slug.
-          router.push(paths.dashboard.customer.root(storeSlug));
+          if (onboarding) {
+            await advanceOnboarding();
+          } else {
+            router.push(paths.dashboard.customer.root(storeSlug));
+          }
         } catch (parseError) {
           console.error("Error parsing activeWorkspace:", parseError);
           toast.error("Failed to retrieve store information");

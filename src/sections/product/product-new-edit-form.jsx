@@ -1,7 +1,11 @@
 import { z as zod } from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+
+import MenuItem from '@mui/material/MenuItem';
+import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -25,8 +29,10 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { uploadFile } from 'src/actions/upload';
-import { useGetCategories } from 'src/actions/category';
-import { addProduct, editProduct } from 'src/actions/product';
+import { searchCatalogProducts } from 'src/actions/catalog';
+import { useGetCategories, addCategory } from 'src/actions/category';
+import { CategoryQuickAddDialog } from './category-quick-add-dialog';
+import { addProduct, editProduct, useGetProducts } from 'src/actions/product';
 import {
   _tags,
   PRODUCT_SIZE_OPTIONS,
@@ -56,17 +62,25 @@ export const NewProductSchema = zod
     sizes: zod.string().array().optional(),
     tags: zod.string().array().optional(),
     gender: zod.string().array().optional(),
-    price: zod.number().min(1, { message: 'Price should not be 0.00' }),
+    product_kind: zod.enum(['sellable', 'production_input']).default('sellable'),
+    price: zod.number().min(0, { message: 'Invalid price' }),
     category_id: zod.coerce.number().min(1, { message: 'Category is required' }),
-    costPrice: zod.number().optional(),
-    priceSale: zod.number().optional(),
+    costPrice: zod.number().nullable().optional(),
+    priceSale: zod.number().nullable().optional(),
     subDescription: zod.string().optional(),
-    taxes: zod.number().optional(),
+    taxes: zod.number().nullable().optional(),
     publish: zod.string().optional(),
+    show_on_store: zod.boolean().optional(),
     // Pack fields
     is_pack: zod.boolean().optional(),
-    quantity_per_pack: zod.number().optional(),
-    cost_price_per_pack: zod.number().optional(),
+    // Allow null so single items (non‑pack) can submit with these cleared
+    quantity_per_pack: zod.number().nullable().optional(),
+    cost_price_per_pack: zod.number().nullable().optional(),
+    pack_sell_price: zod.number().nullable().optional(),
+    // Variable pricing fields
+    allow_variable_price: zod.boolean().optional(),
+    variable_price_min: zod.number().nullable().optional(),
+    variable_price_max: zod.number().nullable().optional(),
     saleLabel: zod
       .object({
         enabled: zod.boolean(),
@@ -79,6 +93,15 @@ export const NewProductSchema = zod
         content: zod.string(),
       })
       .optional(),
+    sub_items: zod
+      .array(
+        zod.object({
+          component_product_id: zod.coerce.number().min(1),
+          quantity_per_unit: zod.coerce.number().positive(),
+        })
+      )
+      .optional()
+      .default([]),
   })
   .refine((data) => {
     if (data.is_pack) {
@@ -90,6 +113,18 @@ export const NewProductSchema = zod
     path: ['quantity_per_pack'],
   })
   .refine((data) => {
+    if (data.allow_variable_price) {
+      const { variable_price_min: min, variable_price_max: max } = data;
+      if (min == null || max == null) return false;
+      if (min < 0 || max < 0) return false;
+      if (min > max) return false;
+    }
+    return true;
+  }, {
+    message: 'When variable pricing is enabled, both min and max must be set and min must not exceed max.',
+    path: ['variable_price_max'],
+  })
+  .refine((data) => {
     if (data.is_pack && (data.cost_price_per_pack === undefined || data.cost_price_per_pack === null)) {
       return false;
     }
@@ -99,18 +134,49 @@ export const NewProductSchema = zod
     path: ['cost_price_per_pack'],
   })
   .refine((data) => {
-    if (data.costPrice !== undefined) {
+    if (!data.is_pack || data.pack_sell_price == null) return true;
+    return data.pack_sell_price >= (data.cost_price_per_pack ?? 0);
+  }, {
+    message: 'Pack sell price must be at least the cost price per pack.',
+    path: ['pack_sell_price'],
+  })
+  .refine((data) => {
+    if (data.product_kind === 'production_input') return true;
+    if (data.price < 1) return false;
+    return true;
+  }, {
+    message: 'Regular price must be at least 1 for sellable products.',
+    path: ['price'],
+  })
+  .refine((data) => {
+    if (data.product_kind !== 'production_input') return true;
+    return data.costPrice != null && data.costPrice >= 0;
+  }, {
+    message: 'Cost price is required for production input items.',
+    path: ['costPrice'],
+  })
+  .refine((data) => {
+    if (data.product_kind === 'production_input') return true;
+    if (data.costPrice != null) {
       if (data.costPrice > data.price) return false;
-      if (data.priceSale !== undefined && data.costPrice > data.priceSale) return false;
+      if (data.priceSale != null && data.costPrice > data.priceSale) return false;
     }
     return true;
   }, {
     message: 'Cost price must not be greater than regular price or sale price.',
     path: ['costPrice'],
+  })
+  .refine((data) => {
+    if (data.product_kind !== 'sellable' || !data.sub_items?.length) return true;
+    const ids = data.sub_items.map((r) => r.component_product_id);
+    return new Set(ids).size === ids.length;
+  }, {
+    message: 'Each ingredient can only appear once in sub-items.',
+    path: ['sub_items'],
   });
 
 
-export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
+export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateProduct }) {
   const router = useRouter();
   const { currencySymbol } = useCurrencyFormat();
   const { t, getLabel, isFieldVisible } = useBusinessType();
@@ -124,14 +190,32 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
   const [productType, setProductType] = useState(
     currentProduct?.is_pack ? 'pack' : 'single'
   );
+  const [catalogOptions, setCatalogOptions] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState(null);
 
   const [isPublish, setIsPublish] = useState(
     currentProduct?.publish === 'publish'
   );
+  const [isShowOnStore, setIsShowOnStore] = useState(
+    currentProduct?.show_on_store !== false
+  );
 
 
 
-  const { categories, categoriesLoading } = useGetCategories(storeId);
+  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const { products } = useGetProducts(storeId);
+
+  const ingredientOptions = useMemo(
+    () =>
+      (products || []).filter(
+        (p) =>
+          p.product_kind === 'production_input' &&
+          (!currentProduct || p.id !== currentProduct.id)
+      ),
+    [products, currentProduct]
+  );
 
 
   const defaultCategory =
@@ -148,9 +232,15 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       sku: currentProduct?.sku || '',
       coverUrl: currentProduct?.coverUrl || '',
       price: currentProduct?.price || 0,
-      quantity: currentProduct?.quantity || 0,
+      // For pack products the DB stores total units; display as number of packs
+      quantity:
+        currentProduct
+          ? currentProduct.is_pack && currentProduct.quantity_per_pack > 0
+            ? Math.round(currentProduct.quantity / currentProduct.quantity_per_pack)
+            : currentProduct.quantity ?? 0
+          : 1,
       costPrice: currentProduct?.costPrice || 0,
-      priceSale: currentProduct?.priceSale || 0,
+      priceSale: currentProduct?.priceSale || null,
       tags: currentProduct?.tags || [],
       taxes: currentProduct?.taxes || 0,
       gender: currentProduct?.gender || [],
@@ -160,10 +250,22 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       newLabel: currentProduct?.newLabel || { enabled: false, content: '' },
       saleLabel: currentProduct?.saleLabel || { enabled: false, content: '' },
       publish: currentProduct?.publish || 'draft',
+      show_on_store: currentProduct?.show_on_store !== false,
       // Pack fields
       is_pack: currentProduct?.is_pack || false,
       quantity_per_pack: currentProduct?.quantity_per_pack || null,
       cost_price_per_pack: currentProduct?.cost_price_per_pack || null,
+      pack_sell_price: currentProduct?.pack_sell_price ?? null,
+      // Variable pricing fields
+      allow_variable_price: currentProduct?.allow_variable_price || false,
+      variable_price_min: currentProduct?.variable_price_min ?? null,
+      variable_price_max: currentProduct?.variable_price_max ?? null,
+      product_kind:
+        currentProduct?.product_kind === 'production_input' ? 'production_input' : 'sellable',
+      sub_items: (currentProduct?.sub_items || currentProduct?.subItems || []).map((r) => ({
+        component_product_id: r.component_product_id,
+        quantity_per_unit: r.quantity_per_unit,
+      })),
     }),
     [currentProduct, defaultCategory]
   );
@@ -183,13 +285,99 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
 
   const values = watch();
 
+  const { fields, append, remove } = useFieldArray({
+    control: methods.control,
+    name: 'sub_items',
+  });
+
+  const handleCatalogSearch = useCallback(async (query) => {
+    const searchValue = (query || '').trim();
+    setCatalogLoading(true);
+    try {
+      const items = await searchCatalogProducts(searchValue, null, 12);
+      setCatalogOptions(items);
+    } catch (error) {
+      setCatalogOptions([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  const applyCatalogProduct = useCallback(
+    (catalogProduct) => {
+      if (!catalogProduct) return;
+
+      const metadata = catalogProduct.metadata || {};
+      const getNumeric = (val) => {
+        if (val === null || val === undefined || val === '') return null;
+        const num = Number(val);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      setValue('name', catalogProduct.name || '', { shouldValidate: true, shouldDirty: true });
+      setValue('description', catalogProduct.description || '', { shouldDirty: true });
+      setValue('taxes', Number(catalogProduct.default_tax_percent ?? 0), { shouldDirty: true });
+      setValue('code', catalogProduct.barcode || '', { shouldDirty: true });
+
+      if (catalogProduct.image_url && !values.coverUrl) {
+        setValue('coverUrl', catalogProduct.image_url, { shouldDirty: true });
+      }
+
+      const categoryById = categories.find((cat) => cat.id === catalogProduct.category_id);
+      const categoryByName = categories.find(
+        (cat) =>
+          catalogProduct.category_name &&
+          cat.name?.trim().toLowerCase() === catalogProduct.category_name.trim().toLowerCase()
+      );
+      const matchedCategory = categoryById || categoryByName;
+      if (matchedCategory) {
+        setValue('category_id', matchedCategory.id, { shouldValidate: true, shouldDirty: true });
+      }
+
+      const costCandidate = getNumeric(
+        metadata.default_cost_price ?? metadata.cost_price ?? metadata.costPrice
+      );
+      if (costCandidate !== null) {
+        setValue('costPrice', costCandidate, { shouldDirty: true });
+      }
+
+      const priceCandidate = getNumeric(
+        metadata.default_selling_price ?? metadata.selling_price ?? metadata.price
+      );
+      if (priceCandidate !== null) {
+        setValue('price', priceCandidate, { shouldValidate: true, shouldDirty: true });
+      }
+    },
+    [categories, setValue, values.coverUrl]
+  );
+
+  useEffect(() => {
+    if (values.product_kind === 'production_input') {
+      setProductType('single');
+      setValue('is_pack', false);
+      setValue('allow_variable_price', false);
+      setValue('variable_price_min', null);
+      setValue('variable_price_max', null);
+      setValue('priceSale', null);
+      setValue('sub_items', []);
+    }
+  }, [values.product_kind, setValue]);
+
   useEffect(() => {
     if (currentProduct) {
       reset(defaultValues);
       setIsPublish(currentProduct.publish === 'publish');
+      setIsShowOnStore(currentProduct.show_on_store !== false);
       setProductType(currentProduct.is_pack ? 'pack' : 'single');
     }
   }, [currentProduct, defaultValues, reset]);
+
+  // For new products: sync category_id once categories finish loading
+  useEffect(() => {
+    if (!currentProduct && defaultCategory) {
+      setValue('category_id', defaultCategory, { shouldValidate: true });
+    }
+  }, [defaultCategory, currentProduct, setValue]);
 
 
   useEffect(() => {
@@ -209,6 +397,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       if (!isPack) {
         setValue('quantity_per_pack', null);
         setValue('cost_price_per_pack', null);
+        setValue('pack_sell_price', null);
       }
     },
     [setValue]
@@ -221,7 +410,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
     values.is_pack && costPricePerPack > 0 && quantityPerPack > 0
       ? (costPricePerPack / quantityPerPack).toFixed(4)
       : null;
-
+  
   // Updated removal function compares images by URL.
   const handleRemoveFile = useCallback(
     (inputFile) => {
@@ -263,26 +452,39 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
 
       // Set publish state.
       data.publish = isPublish ? 'publish' : 'draft';
+      data.show_on_store =
+        data.product_kind === 'production_input' ? false : isShowOnStore;
 
-      // For pack products:
-      // - derive costPrice (cost per item) from pack cost / quantity per pack
-      // - expand quantity to total individual units (packs × items per pack)
-      if (data.is_pack && data.quantity_per_pack > 0) {
-        data.quantity *= data.quantity_per_pack;
-        if (data.cost_price_per_pack > 0) {
-          data.costPrice = parseFloat((data.cost_price_per_pack / data.quantity_per_pack).toFixed(4));
-        }
+      if (data.product_kind === 'production_input') {
+        const cp = Number(data.costPrice ?? 0);
+        data.price = cp > 0 ? cp : 0.01;
+        data.priceSale = null;
+        data.allow_variable_price = false;
+        data.variable_price_min = null;
+        data.variable_price_max = null;
+        data.is_pack = false;
+        data.quantity_per_pack = null;
+        data.cost_price_per_pack = null;
+        data.pack_sell_price = null;
+        data.sub_items = [];
       }
-      // For single products, clear pack-specific fields
+
+      // For single products, clear pack-specific fields.
+      // Pack expansion (quantity × quantity_per_pack, costPrice calculation) is
+      // handled exclusively by the backend to avoid double-multiplication.
       if (!data.is_pack) {
         data.quantity_per_pack = null;
         data.cost_price_per_pack = null;
+        data.pack_sell_price = null;
       }
 
       // Call your API to add or edit the product
       let response;
       if (currentProduct) {
         response = await editProduct(currentProduct.id, data);
+        if (mutateProduct) {
+          await mutateProduct();
+        }
       } else {
         const storedId = storeId || localStorage.getItem('store_id');
         if (!storedId) {
@@ -297,10 +499,10 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
        // Delay redirection for 5 seconds.
       setTimeout(() => {
         if (currentProduct) {
-          // Redirect to product list page after update.
-          router.push(paths.dashboard.product.root(storeSlug));
+          router.push(paths.dashboard.product.details(storeSlug, currentProduct.id));
+        } else if (response?.id != null) {
+          router.push(paths.dashboard.product.details(storeSlug, response.id));
         } else {
-          // Redirect to product root after creation.
           router.push(paths.dashboard.product.root(storeSlug));
         }
       }, 2000);
@@ -334,6 +536,16 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       }
       toast.error(message);
     }
+  }, (validationErrors) => {
+    // Scroll to the first invalid field so the user can see what's wrong
+    const firstKey = Object.keys(validationErrors)[0];
+    if (firstKey) {
+      const el = document.querySelector(`[name="${firstKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus?.();
+      }
+    }
   });
 
 
@@ -356,21 +568,87 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       <CardHeader title="Details" subheader="Title, short description, image..." sx={{ mb: 3 }} />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
+        {!currentProduct && (
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Autofill from suggestions</Typography>
+            <Autocomplete
+              size="medium"
+              value={selectedCatalogProduct}
+              options={catalogOptions}
+              loading={catalogLoading}
+              getOptionLabel={(option) => option.name || ''}
+              onOpen={() => {
+                if (!catalogOptions.length) {
+                  handleCatalogSearch('');
+                }
+              }}
+              onInputChange={(_, inputValue) => {
+                handleCatalogSearch(inputValue);
+              }}
+              onChange={(_, selected) => {
+                setSelectedCatalogProduct(selected);
+                applyCatalogProduct(selected);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search product name"
+                  placeholder="Type item name or barcode"
+                  helperText="Selecting a match auto-fills name, description, tax, category, and common defaults."
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {catalogLoading ? <CircularProgress size={18} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </Stack>
+        )}
+
         <Field.Text name="name" label={`${getLabel('product', 'name')} *`} />
 
-        {/* Pack / Single item toggle */}
         <Stack spacing={1}>
-          <Typography variant="subtitle2">Item Type</Typography>
+          <Typography variant="subtitle2">Inventory role</Typography>
           <ToggleButtonGroup
             exclusive
-            value={productType}
-            onChange={handleProductTypeChange}
+            value={values.product_kind || 'sellable'}
+            onChange={(_, v) => {
+              if (!v) return;
+              setValue('product_kind', v);
+            }}
             size="small"
           >
-            <ToggleButton value="single">Single Item</ToggleButton>
-            <ToggleButton value="pack">Pack</ToggleButton>
+            <ToggleButton value="sellable">For sale</ToggleButton>
+            <ToggleButton value="production_input">
+              {t('productionInput')} (not sold)
+            </ToggleButton>
           </ToggleButtonGroup>
+          <Typography variant="caption" color="text.secondary">
+            Production inputs are purchased and used in making finished goods; they do not appear in checkout or Quick
+            Sale. Use the Usage dashboard to deduct stock.
+          </Typography>
         </Stack>
+
+        {/* Pack / Single item toggle */}
+        {values.product_kind !== 'production_input' && (
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Item Type</Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={productType}
+              onChange={handleProductTypeChange}
+              size="small"
+            >
+              <ToggleButton value="single">Single Item</ToggleButton>
+              <ToggleButton value="pack">Pack</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+        )}
 
         {isFieldVisible('product', 'quantity') && (
           <Field.Text
@@ -401,13 +679,67 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
           </Stack>
         )}
 
-        <Field.Select native name="category_id" label={`${t('category')} *`} InputLabelProps={{ shrink: true }}>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </Field.Select>
+        {/* Searchable category select */}
+        <Controller
+          name="category_id"
+          control={methods.control}
+          render={({ field, fieldState }) => (
+            <Autocomplete
+              options={categories}
+              getOptionLabel={(opt) => (typeof opt === 'object' ? opt.name : categories.find((c) => c.id === opt)?.name || '')}
+              isOptionEqualToValue={(opt, val) => opt.id === (typeof val === 'object' ? val?.id : val)}
+              value={categories.find((c) => c.id === field.value) || null}
+              loading={categoriesLoading}
+              onChange={(_e, newVal) => {
+                if (newVal?.__isAddNew) {
+                  setQuickAddOpen(true);
+                } else {
+                  field.onChange(newVal ? newVal.id : '');
+                }
+              }}
+              filterOptions={(opts, state) => {
+                const filtered = opts.filter((o) =>
+                  o.name.toLowerCase().includes(state.inputValue.toLowerCase())
+                );
+                filtered.push({ id: '__add__', name: `+ Add "${state.inputValue || 'new category'}"`, __isAddNew: true });
+                return filtered;
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={option.id} style={option.__isAddNew ? { color: 'var(--palette-primary-main)', fontWeight: 600 } : {}}>
+                  {option.name}
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={`${t('category')} *`}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {categoriesLoading ? <CircularProgress size={16} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          )}
+        />
+
+        <CategoryQuickAddDialog
+          open={quickAddOpen}
+          storeId={storeId}
+          onClose={() => setQuickAddOpen(false)}
+          onCreated={async (newCat) => {
+            await mutateCategories();
+            methods.setValue('category_id', newCat.id, { shouldValidate: true });
+          }}
+        />
         {/* Product Code and SKU side by side */}
         {(isFieldVisible('product', 'code') || isFieldVisible('product', 'sku')) && (
           <Stack direction="row" spacing={2}>
@@ -461,12 +793,23 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
     </Card>
   );
 
+  const isProductionInput = values.product_kind === 'production_input';
+
   const renderPricing = (
     <Card>
-      <CardHeader title="Pricing" subheader="Price related inputs" sx={{ mb: 3 }} />
+      <CardHeader
+        title="Pricing"
+        subheader={isProductionInput ? 'Cost only (not sold to customers)' : 'Price related inputs'}
+        sx={{ mb: 3 }}
+      />
       <Divider />
       <Stack spacing={3} sx={{ p: 3 }}>
-        {values.is_pack ? (
+        {isProductionInput && (
+          <Alert severity="info" sx={{ py: 0.75 }}>
+            Selling price is not used. Stock is reduced via the <strong>Usage dashboard</strong>, not sales.
+          </Alert>
+        )}
+        {!isProductionInput && values.is_pack ? (
           <Stack spacing={2}>
             <Field.Text
               name="cost_price_per_pack"
@@ -490,6 +833,22 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
               </Alert>
             )}
           </Stack>
+        ) : isProductionInput ? (
+          <Field.Text
+            name="costPrice"
+            label={`${t('productionInput')} cost *`}
+            placeholder="0.00"
+            type="number"
+            InputLabelProps={{ shrink: true }}
+            helperText="Stored as unit cost; not shown as a selling price."
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                </InputAdornment>
+              ),
+            }}
+          />
         ) : (
           <Field.Text
             name="costPrice"
@@ -506,61 +865,198 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
             }}
           />
         )}
-         <Field.Text
-          name="price"
-          label={values.is_pack ? `Selling ${t('price')} per Item *` : `Regular ${t('price')} *`}
-          placeholder="0.00"
-          type="number"
-          InputLabelProps={{ shrink: true }}
-          helperText={values.is_pack ? 'The price charged to customers per individual item' : undefined}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <Field.Text
-          name="priceSale"
-          label={`Sale ${t('price')}`}
-          placeholder="0.00"
-          type="number"
-          InputLabelProps={{ shrink: true }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              id="toggle-taxes"
-              checked={includeTaxes}
-              onChange={handleChangeIncludeTaxes}
+        {!isProductionInput && (
+          <>
+            <Field.Text
+              name="price"
+              label={values.is_pack ? `Selling ${t('price')} per Item *` : `Regular ${t('price')} *`}
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              helperText={values.is_pack ? 'The price charged to customers per individual item' : undefined}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
             />
-          }
-          label="Price includes taxes"
-        />
-        {!includeTaxes && (
-          <Field.Text
-            name="taxes"
-            label="Tax (%)"
-            placeholder="0.00"
-            type="number"
-            InputLabelProps={{ shrink: true }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box component="span" sx={{ color: 'text.disabled' }}>%</Box>
-                </InputAdornment>
-              ),
-            }}
-          />
+            {values.is_pack && (
+              <Field.Text
+                name="pack_sell_price"
+                label={`Optional pack ${t('price')} (whole pack)`}
+                placeholder="0.00"
+                type="number"
+                InputLabelProps={{ shrink: true }}
+                helperText="Default when selling a full pack on Quick Dashboard; must be at least cost per pack."
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+            {/* Sale price field hidden — use variable pricing or on-the-fly discount instead */}
+            {/* <Field.Text
+              name="priceSale"
+              label={`Sale ${t('price')}`}
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                  </InputAdornment>
+                ),
+              }}
+            /> */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={values.allow_variable_price || false}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setValue('allow_variable_price', enabled);
+                    if (!enabled) {
+                      setValue('variable_price_min', null);
+                      setValue('variable_price_max', null);
+                    }
+                  }}
+                />
+              }
+              label="Allow variable pricing"
+            />
+            {values.allow_variable_price && (
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                <Field.Text
+                  name="variable_price_min"
+                  label="Min variable price"
+                  placeholder="0.00"
+                  type="number"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <Field.Text
+                  name="variable_price_max"
+                  label="Max variable price"
+                  placeholder="0.00"
+                  type="number"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ color: 'text.disabled' }}>{currencySymbol}</Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Stack>
+            )}
+            <FormControlLabel
+              control={
+                <Switch
+                  id="toggle-taxes"
+                  checked={includeTaxes}
+                  onChange={handleChangeIncludeTaxes}
+                />
+              }
+              label="Price includes taxes"
+            />
+            {!includeTaxes && (
+              <Field.Text
+                name="taxes"
+                label="Tax (%)"
+                placeholder="0.00"
+                type="number"
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ color: 'text.disabled' }}>%</Box>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          </>
         )}
+      </Stack>
+    </Card>
+  );
+
+  const renderSubItems = (
+    <Card>
+      <CardHeader
+        title="Sub-items (ingredients)"
+        subheader="Amount of each production-input product used per 1 unit sold"
+        sx={{ mb: 3 }}
+      />
+      <Divider />
+      <Stack spacing={2} sx={{ p: 3 }}>
+        {!ingredientOptions.length && (
+          <Alert severity="info" sx={{ py: 0.75 }}>
+            Create <strong>production input</strong> products in this store first, then add them here as
+            ingredients.
+          </Alert>
+        )}
+        {fields.map((field, index) => (
+          <Stack
+            key={field.id}
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            alignItems={{ xs: 'stretch', sm: 'flex-start' }}
+          >
+            <Field.Select
+              name={`sub_items.${index}.component_product_id`}
+              label="Ingredient"
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1, minWidth: 200 }}
+            >
+              <MenuItem value="">
+                <em>Select ingredient</em>
+              </MenuItem>
+              {ingredientOptions.map((p) => (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.name}
+                </MenuItem>
+              ))}
+            </Field.Select>
+            <Field.Text
+              name={`sub_items.${index}.quantity_per_unit`}
+              label="Qty per unit sold"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: 0.0001, step: 'any' }}
+              sx={{ width: { xs: 1, sm: 180 } }}
+            />
+            <Button color="error" variant="outlined" onClick={() => remove(index)} sx={{ mt: { sm: 1 } }}>
+              Remove
+            </Button>
+          </Stack>
+        ))}
+        <Button
+          variant="outlined"
+          startIcon={<Iconify icon="eva:plus-fill" />}
+          onClick={() =>
+            append({
+              component_product_id: ingredientOptions[0]?.id ?? '',
+              quantity_per_unit: 1,
+            })
+          }
+          disabled={!ingredientOptions.length}
+        >
+          Add ingredient
+        </Button>
       </Stack>
     </Card>
   );
@@ -739,9 +1235,31 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
           />
         }
         label="Publish"
-        sx={{ pl: 3, flexGrow: 1 }}
+        sx={{ pl: 3 }}
       />
-      <LoadingButton type="submit" variant="contained" size="large" loading={isSubmitting}>
+      {values.product_kind !== 'production_input' && (
+        <FormControlLabel
+          control={
+            <Switch
+              checked={isShowOnStore}
+              onChange={(e) => {
+                setIsShowOnStore(e.target.checked);
+                setValue('show_on_store', e.target.checked);
+              }}
+              inputProps={{ id: 'show-on-store-switch' }}
+            />
+          }
+          label="Show on online store"
+          sx={{ pl: 1 }}
+        />
+      )}
+      <LoadingButton
+        type="submit"
+        variant="contained"
+        size="large"
+        loading={isSubmitting}
+        sx={{ ml: 'auto' }}
+      >
         {!currentProduct ? `Create ${t('product')}` : 'Save changes'}
       </LoadingButton>
     </Stack>
@@ -752,6 +1270,7 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug  }) {
       <Stack spacing={{ xs: 3, md: 5 }} sx={{ mx: 'auto', maxWidth: { xs: 720, xl: 880 } }}>
         {renderDetails}
         {renderPricing}
+        {values.product_kind === 'sellable' && renderSubItems}
         {renderProperties}
         {renderActions}
       </Stack>

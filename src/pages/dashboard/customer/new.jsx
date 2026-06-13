@@ -24,7 +24,7 @@ export default function Page() {
         <title> {metadata.title}</title>
       </Helmet>
 
-      <CustomerCreateView />
+      <CustomerCreateView storeSlug={currentStoreSlug} storeId={numericStoreId} />
     </>
   );
 }

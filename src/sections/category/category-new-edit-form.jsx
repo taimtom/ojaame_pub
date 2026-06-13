@@ -14,13 +14,12 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { toast } from 'src/components/snackbar';
-import { Form, Field, schemaHelper } from 'src/components/hook-form';
+import { Form, Field } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
 
 export const NewCategorySchema = zod.object({
   name: zod.string().min(1, { message: 'Name is required!' }),
-  description: schemaHelper.editor({ message: { required_error: 'Description is required!' } }),
 });
 
 // ----------------------------------------------------------------------
@@ -32,7 +31,6 @@ export function CategoryNewEditForm() {
     resolver: zodResolver(NewCategorySchema),
     defaultValues: {
       name: '',
-      description: '',
     },
   });
 
@@ -94,7 +92,6 @@ export function CategoryNewEditForm() {
           <Divider />
           <Stack spacing={3} sx={{ p: 3 }}>
             <Field.Text name="name" label="Category name" />
-            <Field.Text name="description" label="Description" multiline rows={4} />
           </Stack>
         </Card>
 

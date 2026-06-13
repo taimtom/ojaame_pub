@@ -1,4 +1,5 @@
 import { paramCase } from 'src/utils/change-case';
+import { getStoreSiteUrl } from 'src/utils/store-site-url';
 
 import { _id, _postTitles } from 'src/_mock/assets';
 
@@ -24,9 +25,9 @@ export const paths = {
   about: '/about-us',
   contact: '/contact-us',
   faqs: '/faqs',
-  publicStore: (slug) => `/site/${slug}`,
-  publicStoreProducts: (slug) => `/site/${slug}/products`,
-  publicStoreProduct: (slug, productId) => `/site/${slug}/products/${productId}`,
+  publicStore: (slug) => getStoreSiteUrl(slug),
+  publicStoreProducts: (slug) => getStoreSiteUrl(slug, { path: '/products' }),
+  publicStoreProduct: (slug, productId) => getStoreSiteUrl(slug, { path: `/products/${productId}` }),
   page403: '/error/403',
   page404: '/error/404',
   page500: '/error/500',
@@ -108,6 +109,9 @@ export const paths = {
   dashboard: {
     root: ROOTS.DASHBOARD,
     quickDashboard: `${ROOTS.DASHBOARD}/quick-dashboard`,
+    serviceLog: `${ROOTS.DASHBOARD}/service-log`,
+    quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
+    usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,
     mail: `${ROOTS.DASHBOARD}/mail`,
     chat: `${ROOTS.DASHBOARD}/chat`,
     blank: `${ROOTS.DASHBOARD}/blank`,
@@ -164,11 +168,17 @@ export const paths = {
 
     service: {
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service`,
-      new:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/service/new`,
+      details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/service/${id}/edit`,
       demo: {
         edit: `${ROOTS.DASHBOARD}/service/${MOCK_ID}/edit`,
       },
+    },
+    digitalProduct: {
+      root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product`,
+      new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product/new`,
+      edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/digital-product/${id}/edit`,
     },
     product: {
       // root: `${ROOTS.DASHBOARD}/product`,
@@ -179,15 +189,21 @@ export const paths = {
       // history: `${ROOTS.DASHBOARD}/product/history`,
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product`,
       new: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/new`,
+      bulkAdd: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/bulk-add`,
       details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}`,
       movement: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/movement`,
       edit: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/edit`,
       addqty: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/addqty`,
+      adjust: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/adjust`,
+      changePrice: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/change-price`,
       history: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/history`,
       demo: {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,
         edit: `${ROOTS.DASHBOARD}/product/${MOCK_ID}/edit`,
       },
+    },
+    transfer: {
+      root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/transfer`,
     },
     pos: {
       root:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/pos`,
@@ -288,6 +304,28 @@ export const paths = {
         edit: `${ROOTS.DASHBOARD}/job/${MOCK_ID}/edit`,
       },
     },
+    reports: {
+      // Store-level reports (scoped by storeParam)
+      storeRoot: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports`,
+      generalReport: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/general`,
+      inventory: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/inventory`,
+      financial: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/financial`,
+      profitAndLoss: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/profit-loss`,
+      cashFlow: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/cash-flow`,
+      balanceSheet: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/balance-sheet`,
+      trialBalance: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/trial-balance`,
+      salesTrends: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/sales-trends`,
+      endOfDay: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/end-of-day`,
+      customers: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/customers`,
+      customerDetail: (storeParam, customerId) =>
+        `${ROOTS.DASHBOARD}/${storeParam}/reports/customers/${customerId}`,
+
+      // Company-level reports (not scoped to a single store)
+      companyRoot: `${ROOTS.DASHBOARD}/company-reports`,
+    },
+    notifications: `${ROOTS.DASHBOARD}/notifications`,
+    helpSupport: `${ROOTS.DASHBOARD}/help-support`,
+
     order: {
       root: `${ROOTS.DASHBOARD}/order`,
       details: (id) => `${ROOTS.DASHBOARD}/order/${id}`,

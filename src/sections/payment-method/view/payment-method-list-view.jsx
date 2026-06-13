@@ -19,13 +19,14 @@ import { RouterLink } from 'src/routes/components';
 import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { usePermissions } from 'src/hooks/use-permissions';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import { paramCase } from 'src/utils/change-case';
 
 import { PRODUCT_STOCK_OPTIONS } from 'src/_mock';
+import { deletePaymentMethod, useGetPaymentMethods } from 'src/actions/paymentmethod';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetPaymentMethods, deletePaymentMethod } from 'src/actions/paymentmethod';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -89,6 +90,10 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
 
 
   const { paymentMethods, paymentMethodsLoading } = useGetPaymentMethods(numericStoreId);
+  const { hasPermission } = usePermissions();
+  const canCreatePaymentMethod = hasPermission('payment_methods.create');
+  const canUpdatePaymentMethod = hasPermission('payment_methods.update');
+  const canDeletePaymentMethod = hasPermission('payment_methods.delete');
 
   const filters = useSetState({ publish: [], stock: [] });
 
@@ -158,6 +163,7 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
         setFilterButtonEl={setFilterButtonEl}
         filteredResults={dataFiltered.length}
         onOpenConfirmDeleteRows={confirmRows.onTrue}
+        canDeletePaymentMethod={canDeletePaymentMethod}
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,24 +234,36 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      getActions: (params) => [
+      getActions: (params) => {
+        const actions = [];
 
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:pen-bold" />}
-          label="Edit"
-          onClick={() => handleEditRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:trash-bin-trash-bold" />}
-          label="Delete"
-          onClick={() => {
-            handleDeleteRow(params.row.id);
-          }}
-          sx={{ color: 'error.main' }}
-        />,
-      ],
+        if (canUpdatePaymentMethod) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:pen-bold" />}
+              label="Edit"
+              onClick={() => handleEditRow(params.row.id)}
+            />
+          );
+        }
+
+        if (canDeletePaymentMethod) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              label="Delete"
+              onClick={() => {
+                handleDeleteRow(params.row.id);
+              }}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+
+        return actions;
+      },
     },
   ];
 
@@ -264,7 +282,7 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
             { name: 'Payment Method', href: paths.dashboard.paymentMethod.root(storeSlug) },
             { name: 'List' },
           ]}
-          action={
+          action={canCreatePaymentMethod ? (
             <Button
               component={RouterLink}
               href={paths.dashboard.paymentMethod.new(storeSlug)}
@@ -273,7 +291,7 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
             >
               New Payment Method
             </Button>
-          }
+          ) : null}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
@@ -286,7 +304,7 @@ export function PaymentMethodListView({storeSlug: propStoreSlug }) {
           }}
         >
           <DataGrid
-            checkboxSelection
+            checkboxSelection={canDeletePaymentMethod}
             disableRowSelectionOnClick
             rows={dataFiltered}
             columns={columns}
@@ -345,6 +363,7 @@ function CustomToolbar({
   filteredResults,
   setFilterButtonEl,
   onOpenConfirmDeleteRows,
+  canDeletePaymentMethod,
 }) {
   return (
     <>
@@ -363,7 +382,7 @@ function CustomToolbar({
           alignItems="center"
           justifyContent="flex-end"
         >
-          {!!selectedRowIds.length && (
+          {!!selectedRowIds.length && canDeletePaymentMethod && (
             <Button
               size="small"
               color="error"

@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
     discount: 'Discount',
     shipping: 'Shipping',
     taxes: 'Taxes',
+    productionInput: 'Production input',
   },
   fields: {
     product: {
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG = {
         quantity: 'Quantity',
         price: 'Price',
         category: 'Category',
+        code: 'Barcode',
       },
     },
     service: {
@@ -48,6 +50,12 @@ const DEFAULT_CONFIG = {
     serviceManagement: 'Service Management',
     pointOfSales: 'Point of Sales',
     salesInvoice: 'Sales Invoice',
+    usageDashboard: 'Usage dashboard',
+    quickDashboard: 'Quick Dashboard',
+    serviceLog: 'Service Log',
+    quickRestock: 'Quick Restock',
+    salesAndOrdersSection: 'Sales & Orders',
+    inventorySection: 'Inventory',
   },
 };
 
@@ -86,6 +94,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -134,6 +143,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Aisle',
+          code: 'Barcode',
         },
       },
     },
@@ -174,6 +184,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Stock',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -215,6 +226,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -230,6 +242,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Service Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },
@@ -264,6 +277,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -279,6 +293,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Visit Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },
@@ -313,6 +328,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -327,6 +343,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== RESTAURANT ==========
   [createKey('Tourism & Hospitality', 'Restaurants', 'Restaurant')]: {
     terminology: {
+      productionInput: 'Ingredient',
       product: 'Menu Item',
       service: 'Service',
       invoice: 'Check',
@@ -354,6 +371,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -362,6 +380,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Order Entry',
       salesInvoice: 'Checks',
+      usageDashboard: 'Ingredient usage',
     },
   },
 
@@ -394,6 +413,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Portions',
           price: 'Menu Price',
           category: 'Menu Category',
+          code: 'Barcode',
         },
       },
       service: {
@@ -442,6 +462,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -483,6 +504,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -537,6 +559,7 @@ const BUSINESS_TYPE_CONFIGS = {
           batch_number: 'Batch Number',
           harvest_date: 'Harvest Date',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -551,6 +574,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== MANUFACTURING ==========
   [createKey('Manufacturing (Light & Heavy)', 'Food processing (flour, sugar, beverages)', 'Food manufacturing')]: {
     terminology: {
+      productionInput: 'Raw material',
       product: 'Product',
       service: 'Service',
       invoice: 'Invoice',
@@ -580,6 +604,7 @@ const BUSINESS_TYPE_CONFIGS = {
           category: 'Category',
           batch_number: 'Batch Number',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -588,6 +613,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Sales Entry',
       salesInvoice: 'Invoices',
+      usageDashboard: 'Raw material usage',
     },
   },
 
@@ -621,6 +647,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -629,6 +656,175 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Project Entry',
       salesInvoice: 'Invoices',
+    },
+  },
+
+  // ========== TRANSPORTATION & LOGISTICS ==========
+  [createKey('Transportation & Logistics', 'Courier services', 'Courier company')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Delivery Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Delivery Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Delivery Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Delivery Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
+    },
+  },
+
+  [createKey('Transportation & Logistics', 'Courier services', 'Package delivery')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Delivery Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Delivery Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Delivery Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Delivery Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
+    },
+  },
+
+  [createKey('Transportation & Logistics', 'Courier services', 'Express delivery')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Express Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Express Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Express Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Express Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
     },
   },
 };

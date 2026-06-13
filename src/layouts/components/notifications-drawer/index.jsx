@@ -9,10 +9,16 @@ import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
 import SvgIcon from '@mui/material/SvgIcon';
 import Tooltip from '@mui/material/Tooltip';
+import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { useBoolean } from 'src/hooks/use-boolean';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -20,20 +26,22 @@ import { varHover } from 'src/components/animate';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
 
+import {
+  useGetNotifications,
+  useGetNotificationSummary,
+  markAllNotificationsAsRead,
+} from 'src/actions/notifications';
+
 import { NotificationItem } from './notification-item';
 
 // ----------------------------------------------------------------------
 
-const TABS = [
-  { value: 'all', label: 'All', count: 22 },
-  { value: 'unread', label: 'Unread', count: 12 },
-  { value: 'archived', label: 'Archived', count: 10 },
-];
-
-// ----------------------------------------------------------------------
-
-export function NotificationsDrawer({ data = [], sx, ...other }) {
+export function NotificationsDrawer({ sx, ...other }) {
   const drawer = useBoolean();
+  const router = useRouter();
+  const { user } = useAuthContext();
+
+  const storeId = user?.store_id || null;
 
   const [currentTab, setCurrentTab] = useState('all');
 
@@ -41,12 +49,30 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
     setCurrentTab(newValue);
   }, []);
 
-  const [notifications, setNotifications] = useState(data);
+  const { summary } = useGetNotificationSummary(storeId);
+  const { notifications, notificationsLoading } = useGetNotifications({
+    storeId,
+    tab: currentTab,
+    limit: 20,
+  });
 
-  const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
+  const TABS = [
+    { value: 'all', label: 'All', count: summary.total },
+    { value: 'unread', label: 'Unread', count: summary.unread },
+    { value: 'archived', label: 'Archived', count: summary.archived },
+  ];
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((notification) => ({ ...notification, isUnRead: false })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead(storeId);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleViewAll = () => {
+    drawer.onFalse();
+    router.push(paths.dashboard.notifications);
   };
 
   const renderHead = (
@@ -55,7 +81,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         Notifications
       </Typography>
 
-      {!!totalUnRead && (
+      {!!summary.unread && (
         <Tooltip title="Mark all as read">
           <IconButton color="primary" onClick={handleMarkAllAsRead}>
             <Iconify icon="eva:done-all-fill" />
@@ -101,11 +127,30 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
   const renderList = (
     <Scrollbar>
       <Box component="ul">
-        {notifications?.map((notification) => (
-          <Box component="li" key={notification.id} sx={{ display: 'flex' }}>
-            <NotificationItem notification={notification} />
-          </Box>
-        ))}
+        {notificationsLoading
+          ? [...Array(5)].map((_, i) => (
+              <Box key={i} component="li" sx={{ display: 'flex', p: 2.5, borderBottom: (theme) => `dashed 1px ${theme.vars.palette.divider}` }}>
+                <Skeleton variant="circular" width={40} height={40} sx={{ mr: 2, flexShrink: 0 }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Skeleton variant="text" width="70%" />
+                  <Skeleton variant="text" width="40%" />
+                </Box>
+              </Box>
+            ))
+          : notifications.map((notification) => (
+              <Box component="li" key={notification.id} sx={{ display: 'flex' }}>
+                <NotificationItem notification={notification} />
+              </Box>
+            ))}
+
+        {!notificationsLoading && notifications.length === 0 && (
+          <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
+            <Iconify icon="solar:bell-off-bold-duotone" width={48} sx={{ color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+              No notifications
+            </Typography>
+          </Stack>
+        )}
       </Box>
     </Scrollbar>
   );
@@ -121,7 +166,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         sx={sx}
         {...other}
       >
-        <Badge badgeContent={totalUnRead} color="error">
+        <Badge badgeContent={summary.unread || 0} color="error">
           <SvgIcon>
             {/* https://icon-sets.iconify.design/solar/bell-bing-bold-duotone/ */}
             <path
@@ -151,7 +196,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         {renderList}
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth size="large">
+          <Button fullWidth size="large" onClick={handleViewAll}>
             View all
           </Button>
         </Box>
