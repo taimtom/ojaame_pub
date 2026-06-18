@@ -1,4 +1,4 @@
-import { hasAnyPermission, hasPermission } from './permissions';
+import { hasPermission, hasAnyPermission } from './permissions';
 
 /**
  * Transfer workflow action permissions.

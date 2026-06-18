@@ -1,7 +1,5 @@
-import { pdf } from '@react-pdf/renderer';
-
 import axiosInstance from 'src/utils/axios';
-import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { buildReceiptPdfBlob, downloadReceiptBlob } from 'src/utils/receipt-output';
 import { normalizeReceiptFromSale } from 'src/utils/escpos/receipt-from-sale';
 import {
   canUseBluetoothPrint,
@@ -15,21 +13,13 @@ import {
   printReceiptViaBluetooth,
 } from 'src/utils/bluetooth-printer';
 
+// Re-export for consumers that need download/share helpers.
+export { downloadReceiptBlob, shareReceiptFile } from 'src/utils/receipt-output';
+
 // ----------------------------------------------------------------------
 
 function isMobileDevice() {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-}
-
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
 }
 
 function printPdfBlobDesktop(blob) {
@@ -95,7 +85,7 @@ export async function printReceiptBlob(blob, fileName = 'receipt.pdf') {
     await printPdfBlobDesktop(blob);
     return 'printed';
   } catch {
-    downloadBlob(blob, fileName);
+    downloadReceiptBlob(blob, fileName);
     return 'downloaded';
   }
 }
@@ -108,21 +98,14 @@ async function printReceiptPdf({
   currentStatus,
   pdfFlavor,
 }) {
-  const format = receiptFormat ?? getPreferredReceiptFormat();
-  const widthMm = thermalWidthMm ?? getPreferredThermalWidthMm();
-  const receiptDoc = buildReceiptPdfDocument({
+  const blob = await buildReceiptPdfBlob({
     receipt,
+    receiptFormat: receiptFormat ?? getPreferredReceiptFormat(),
+    thermalWidthMm: thermalWidthMm ?? getPreferredThermalWidthMm(),
     currentStatus: currentStatus ?? receipt?.status,
-    receiptFormat: format,
     pdfFlavor: pdfFlavor ?? 'pos',
-    thermalWidthMm: widthMm,
   });
 
-  if (!receiptDoc) {
-    throw new Error('No receipt data available to print.');
-  }
-
-  const blob = await pdf(receiptDoc).toBlob();
   return printReceiptBlob(blob, fileName);
 }
 

@@ -3,7 +3,7 @@ import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder';
 import { fDate } from 'src/utils/format-time';
 import { normalizeThermalWidthMm } from 'src/utils/receipt-preferences';
 
-import { lineItemTotal } from './receipt-from-sale';
+import { lineItemTotal, resolveReceiptSubtotal } from './receipt-from-sale';
 import { fCurrencyEscPos } from './format-currency-escpos';
 
 // ----------------------------------------------------------------------
@@ -60,6 +60,14 @@ export function buildReceiptEscPos(receipt, options = {}) {
   const currentStatus = options.currentStatus ?? status ?? '';
   const paperWidthMm = normalizeThermalWidthMm(options.paperWidthMm ?? 80);
   const columns = columnsForWidth(paperWidthMm);
+  const resolvedSubtotal = resolveReceiptSubtotal({
+    items,
+    subtotal,
+    total_amount,
+    taxes,
+    discount,
+    shipping,
+  });
 
   const encoder = new ReceiptPrinterEncoder({
     language: 'esc-pos',
@@ -118,7 +126,7 @@ export function buildReceiptEscPos(receipt, options = {}) {
     .bold(false)
     .line(dividerLine(columns));
 
-  encoder.line(`Subtotal:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(subtotal).length))}${fCurrencyEscPos(subtotal)}`);
+  encoder.line(`Subtotal:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(resolvedSubtotal).length))}${fCurrencyEscPos(resolvedSubtotal)}`);
 
   if (Number(discount) > 0) {
     encoder.line(`Discount:${' '.repeat(Math.max(1, columns - 9 - fCurrencyEscPos(discount).length))}-${fCurrencyEscPos(discount)}`);

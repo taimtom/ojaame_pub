@@ -3,6 +3,7 @@ import { Page, View, Text, Font, Image, Document, StyleSheet } from '@react-pdf/
 
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { lineItemTotal, resolveReceiptSubtotal } from 'src/utils/escpos/receipt-from-sale';
 
 // ----------------------------------------------------------------------
 
@@ -13,18 +14,6 @@ Font.register({
     { src: '/fonts/Roboto-Bold.ttf' }
   ],
 });
-
-/** Match invoice-details line totals (fractional qty, persisted total). */
-function lineItemTotal(item) {
-  if (item?.total != null && item.total !== '') {
-    const t = Number(item.total);
-    if (!Number.isNaN(t)) return t;
-  }
-  const p = Number(item?.price);
-  const q = Number(item?.quantity);
-  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
-  return 0;
-}
 
 // 1 mm ≈ 2.83465 pt; A4 height for multi-page thermal strips.
 const MM_TO_PT = 2.83465;
@@ -231,6 +220,11 @@ export function ThermalReceiptPDF({ receipt, currentStatus, paperWidthMm = 80 })
     user_fullname,
   } = receipt || {};
 
+  const resolvedSubtotal = useMemo(
+    () => resolveReceiptSubtotal({ items, subtotal, total_amount, taxes, discount, shipping }),
+    [items, subtotal, total_amount, taxes, discount, shipping]
+  );
+
   const styles = useStyles(widthMm);
 
   const renderHeader = (
@@ -305,7 +299,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus, paperWidthMm = 80 })
     <View>
       <View style={styles.summaryRow}>
         <Text style={styles.summaryLabel}>Subtotal:</Text>
-        <Text style={styles.summaryValue}>{fCurrency(subtotal)}</Text>
+        <Text style={styles.summaryValue}>{fCurrency(resolvedSubtotal)}</Text>
       </View>
       {discount > 0 && (
         <View style={styles.summaryRow}>

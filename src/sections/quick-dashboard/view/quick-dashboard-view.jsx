@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { pdf } from '@react-pdf/renderer';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -51,7 +50,6 @@ import {
   QuickDashboardPayments,
   sumPaymentLines,
 } from 'src/sections/quick-dashboard/quick-dashboard-payments';
-import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
 import { normalizeReceiptFromSale } from 'src/utils/escpos/receipt-from-sale';
 import { getPreferredReceiptFormat } from 'src/utils/receipt-preferences';
 import {
@@ -59,6 +57,9 @@ import {
   getPrintResultMessage,
   printReceipt,
 } from 'src/utils/print-receipt';
+import { ReceiptShareDialog } from 'src/components/receipt/receipt-share-dialog';
+import { ReceiptOutputFlowDialogs } from 'src/components/receipt/receipt-output-flow-dialogs';
+import { useReceiptOutputFlow } from 'src/hooks/use-receipt-output-flow';
 
 // ── Offline product search cache (localStorage) ────────────────────────────
 const SEARCH_CACHE_KEY = 'qs_search_cache';
@@ -896,6 +897,7 @@ export function QuickDashboardView() {
   const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
 
   const [storeId, setStoreId] = useState(() => getStoreIdFromStorage());
+  const { runWithReceiptOutput, activeReceipt, dialogs } = useReceiptOutputFlow({ storeId });
 
   // ── Offline sync ───────────────────────────────────────────────
   const {
@@ -937,6 +939,8 @@ export function QuickDashboardView() {
   const [saleItemsCache, setSaleItemsCache] = useState({});
   const [loadingSaleId, setLoadingSaleId] = useState(null);
   const [sharingSaleId, setSharingSaleId] = useState(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareReceipt, setShareReceipt] = useState(null);
   const [collectingSaleId, setCollectingSaleId] = useState(null);
   const [printingSaleId, setPrintingSaleId] = useState(null);
 
@@ -1043,16 +1047,23 @@ export function QuickDashboardView() {
     }
   }, [expandedSaleId, saleItemsCache, storeId]);
 
-  const downloadBlob = useCallback((blob, fileName) => {
-    const blobUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = blobUrl;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(blobUrl);
-  }, []);
+  const fetchSaleReceipt = useCallback(
+    async (sale) => {
+      try {
+        const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${sale.id}/`);
+        return normalizeReceiptFromSale(detailRes.data);
+      } catch {
+        let fallbackItems = saleItemsCache[sale.id];
+        if (!fallbackItems) {
+          const itemRes = await axiosInstance.get(`/api/quick-dashboard/sale/${sale.id}/items`);
+          fallbackItems = itemRes.data?.items || [];
+          setSaleItemsCache((prev) => ({ ...prev, [sale.id]: fallbackItems }));
+        }
+        return buildQuickReceiptFallback(sale, fallbackItems || []);
+      }
+    },
+    [saleItemsCache, storeId]
+  );
 
   const handleShareSale = useCallback(
     async (sale) => {
@@ -1060,53 +1071,30 @@ export function QuickDashboardView() {
       setSharingSaleId(sale.id);
 
       try {
-        let receipt = null;
-
-        try {
-          const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${sale.id}/`);
-          receipt = detailRes.data;
-        } catch {
-          let fallbackItems = saleItemsCache[sale.id];
-          if (!fallbackItems) {
-            const itemRes = await axiosInstance.get(`/api/quick-dashboard/sale/${sale.id}/items`);
-            fallbackItems = itemRes.data?.items || [];
-            setSaleItemsCache((prev) => ({ ...prev, [sale.id]: fallbackItems }));
-          }
-          receipt = buildQuickReceiptFallback(sale, fallbackItems || []);
-        }
-
-        const receiptFormat = getPreferredReceiptFormat();
-        const receiptDoc = buildReceiptPdfDocument({
+        const receipt = await fetchSaleReceipt(sale);
+        runWithReceiptOutput(
           receipt,
-          currentStatus: receipt?.status,
-          receiptFormat,
-          pdfFlavor: 'pos',
-        });
-
-        const blob = await pdf(receiptDoc).toBlob();
-        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
-        const shareFile = new File([blob], fileName, { type: 'application/pdf' });
-
-        if (navigator.share && navigator.canShare?.({ files: [shareFile] })) {
-          await navigator.share({
-            title: receipt?.invoice_number || sale.invoice_number || 'Sales Receipt',
-            text: 'Sales receipt',
-            files: [shareFile],
-          });
-        } else {
-          downloadBlob(blob, fileName);
-          toast.info('Native share is unavailable here. Receipt PDF downloaded.');
-        }
+          (outputReceipt) => {
+            setShareReceipt(outputReceipt);
+            setShareDialogOpen(true);
+            setSharingSaleId(null);
+          },
+          () => {
+            setSharingSaleId(null);
+          }
+        );
       } catch (error) {
-        if (error?.name !== 'AbortError') {
-          toast.error('Could not prepare receipt for sharing.');
-        }
-      } finally {
         setSharingSaleId(null);
+        toast.error('Could not load receipt for sharing.');
       }
     },
-    [downloadBlob, saleItemsCache, sharingSaleId, storeId]
+    [fetchSaleReceipt, runWithReceiptOutput, sharingSaleId]
   );
+
+  const handleCloseShareDialog = useCallback(() => {
+    setShareDialogOpen(false);
+    setShareReceipt(null);
+  }, []);
 
   const openCollectBalance = useCallback(
     (sale) => {
@@ -1176,44 +1164,43 @@ export function QuickDashboardView() {
       setPrintingSaleId(sale.id);
 
       try {
-        let receipt = null;
+        const receipt = await fetchSaleReceipt(sale);
 
-        try {
-          const detailRes = await axiosInstance.get(`/api/sales/detail/${storeId}/${sale.id}/`);
-          receipt = detailRes.data;
-        } catch {
-          let fallbackItems = saleItemsCache[sale.id];
-          if (!fallbackItems) {
-            const itemRes = await axiosInstance.get(`/api/quick-dashboard/sale/${sale.id}/items`);
-            fallbackItems = itemRes.data?.items || [];
-            setSaleItemsCache((prev) => ({ ...prev, [sale.id]: fallbackItems }));
-          }
-          receipt = buildQuickReceiptFallback(sale, fallbackItems || []);
-        }
-
-        const receiptFormat = getPreferredReceiptFormat();
-        const fileName = `${receipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
-        const result = await printReceipt({
+        runWithReceiptOutput(
           receipt,
-          fileName,
-          receiptFormat,
-          pdfFlavor: 'pos',
-          preferBluetooth: receiptFormat === 'thermal',
-        });
+          async (outputReceipt) => {
+            try {
+              const receiptFormat = getPreferredReceiptFormat();
+              const fileName = `${outputReceipt?.invoice_number || sale.invoice_number || `sale-${sale.id}`}.pdf`;
+              const result = await printReceipt({
+                receipt: outputReceipt,
+                fileName,
+                receiptFormat,
+                pdfFlavor: 'pos',
+                preferBluetooth: receiptFormat === 'thermal',
+              });
 
-        const message = getPrintResultMessage(result);
-        if (message) {
-          toast.info(message);
-        }
+              const message = getPrintResultMessage(result);
+              if (message) {
+                toast.info(message);
+              }
+            } catch (error) {
+              if (error?.name !== 'AbortError') {
+                toast.error('Could not prepare receipt for printing.');
+              }
+            } finally {
+              setPrintingSaleId(null);
+            }
+          },
+          () => setPrintingSaleId(null)
+        );
+
       } catch (error) {
-        if (error?.name !== 'AbortError') {
-          toast.error('Could not prepare receipt for printing.');
-        }
-      } finally {
         setPrintingSaleId(null);
+        toast.error('Could not prepare receipt for printing.');
       }
     },
-    [printingSaleId, saleItemsCache, storeId]
+    [fetchSaleReceipt, printingSaleId, runWithReceiptOutput]
   );
 
   useEffect(() => {
@@ -3071,6 +3058,21 @@ export function QuickDashboardView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ReceiptShareDialog
+        open={shareDialogOpen}
+        onClose={handleCloseShareDialog}
+        receipt={shareReceipt}
+        loading={sharingSaleId != null && !shareReceipt}
+        receiptFormat={getPreferredReceiptFormat()}
+        pdfFlavor="pos"
+      />
+
+      <ReceiptOutputFlowDialogs
+        receipt={activeReceipt}
+        storeId={storeId}
+        dialogs={dialogs}
+      />
     </DashboardContent>
   );
 }

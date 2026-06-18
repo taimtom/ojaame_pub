@@ -86,6 +86,7 @@ export default defineConfig({
       '@mui/material',
       '@mui/system',
       '@mui/system/createTheme',
+      'pdfjs-dist',
     ],
   },
   resolve: {

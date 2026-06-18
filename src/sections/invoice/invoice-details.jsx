@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -74,7 +74,6 @@ function resolveInvoiceContactEmail(invoice) {
 }
 
 export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'invoice' }) {
-  const invoiceCaptureRef = useRef(null);
   const contactEmail = resolveInvoiceContactEmail(invoice);
 
   const computedSubtotal = useMemo(
@@ -212,12 +211,11 @@ export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'inv
         currentStatus={currentStatus || ''}
         onChangeStatus={handleChangeStatus}
         statusOptions={INVOICE_STATUS_OPTIONS}
-        shareCaptureRef={invoiceCaptureRef}
         receiptFormat={receiptFormat}
         pdfFlavor={pdfFlavor}
       />
 
-      <Card ref={invoiceCaptureRef} sx={{ pt: 5, px: 5 }}>
+      <Card sx={{ pt: 5, px: 5 }}>
         <Box
           rowGap={5}
           display="grid"

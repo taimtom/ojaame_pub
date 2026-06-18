@@ -1,10 +1,10 @@
-import { InvoicePDF } from 'src/sections/invoice/invoice-pdf';
 import { A4ReceiptPDF } from 'src/sections/pos/receipt-a4';
+import { InvoicePDF } from 'src/sections/invoice/invoice-pdf';
 import { ThermalReceiptPDF } from 'src/sections/pos/receipt-thermal';
 
 import {
-  getPreferredThermalWidthMm,
   normalizeThermalWidthMm,
+  getPreferredThermalWidthMm,
 } from './receipt-preferences';
 
 // ----------------------------------------------------------------------

@@ -18,6 +18,8 @@ import {
   normalizeThermalWidthMm,
   getPreferredThermalWidthMm,
   setPreferredThermalWidthMm,
+  getPreferredShareFormat,
+  setPreferredShareFormat,
 } from 'src/utils/receipt-preferences';
 
 import { toast } from 'src/components/snackbar';
@@ -39,6 +41,7 @@ export function AccountPrinterSettings() {
   } = useBluetoothPrinter();
 
   const [thermalWidthMm, setThermalWidthMm] = useState(() => getPreferredThermalWidthMm());
+  const [shareFormat, setShareFormat] = useState(() => getPreferredShareFormat());
 
   const handlePair = async () => {
     try {
@@ -69,6 +72,13 @@ export function AccountPrinterSettings() {
       const width = normalizeThermalWidthMm(value);
       setPreferredThermalWidthMm(width);
       setThermalWidthMm(width);
+    }
+  };
+
+  const handleShareFormatChange = (_event, value) => {
+    if (value !== null) {
+      setPreferredShareFormat(value);
+      setShareFormat(value);
     }
   };
 
@@ -153,6 +163,24 @@ export function AccountPrinterSettings() {
               </Box>
             </>
           )}
+
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Default share format
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              When sharing receipts, choose PDF or image (PNG) by default.
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={shareFormat}
+              onChange={handleShareFormatChange}
+            >
+              <ToggleButton value="pdf">PDF</ToggleButton>
+              <ToggleButton value="png">Image</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
         </Stack>
       </CardContent>
     </Card>

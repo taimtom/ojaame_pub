@@ -5,6 +5,7 @@ export const THERMAL_WIDTH_STORAGE_KEY = 'pos_thermal_width_mm';
 export const BLUETOOTH_PRINTER_ID_KEY = 'pos_bluetooth_printer_id';
 export const BLUETOOTH_PRINTER_NAME_KEY = 'pos_bluetooth_printer_name';
 export const AUTO_PRINT_BLUETOOTH_KEY = 'pos_auto_print_bluetooth';
+export const SHARE_FORMAT_STORAGE_KEY = 'pos_share_format';
 
 export const THERMAL_WIDTH_OPTIONS_MM = [80, 58];
 export const DEFAULT_THERMAL_WIDTH_MM = 58;
@@ -120,4 +121,23 @@ export function setAutoPrintBluetooth(enabled) {
 
 export function canUseBluetoothPrint() {
   return Boolean(getBluetoothPrinterId());
+}
+
+export function getPreferredShareFormat() {
+  if (typeof window === 'undefined') return 'pdf';
+  try {
+    const raw = window.localStorage.getItem(SHARE_FORMAT_STORAGE_KEY);
+    return raw === 'png' ? 'png' : 'pdf';
+  } catch {
+    return 'pdf';
+  }
+}
+
+export function setPreferredShareFormat(format) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SHARE_FORMAT_STORAGE_KEY, format === 'png' ? 'png' : 'pdf');
+  } catch {
+    /* quota / private mode */
+  }
 }

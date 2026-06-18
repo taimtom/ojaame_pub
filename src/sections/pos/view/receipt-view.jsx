@@ -37,6 +37,9 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ReceiptShareDialog } from 'src/components/receipt/receipt-share-dialog';
+import { ReceiptOutputFlowDialogs } from 'src/components/receipt/receipt-output-flow-dialogs';
+import { useReceiptOutputFlow } from 'src/hooks/use-receipt-output-flow';
 
 import { InvoiceDetails } from '../../invoice/invoice-details';
 
@@ -45,6 +48,11 @@ import { InvoiceDetails } from '../../invoice/invoice-details';
 export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, storeNameSlug, storeId }) {
   const router = useRouter();
   const view = useBoolean();
+  const shareDialog = useBoolean();
+  const { runWithReceiptOutput, activeReceipt, dialogs } = useReceiptOutputFlow({
+    storeId: receipt?.store_id || storeId,
+  });
+  const [shareReceipt, setShareReceipt] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState(() => getPreferredReceiptFormat());
   const [thermalWidthMm, setThermalWidthMm] = useState(() => getPreferredThermalWidthMm());
   const [printLoading, setPrintLoading] = useState(false);
@@ -73,30 +81,41 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
   const handlePrint = useCallback(async () => {
     if (!receipt || printLoading) return;
 
-    setPrintLoading(true);
-    try {
-      const fileName = `receipt-${receipt?.invoice_number || 'unknown'}.pdf`;
-      const result = await printReceipt({
-        receipt,
-        fileName,
-        receiptFormat,
-        thermalWidthMm,
-        currentStatus: receipt?.status,
-        pdfFlavor: 'pos',
-      });
+    runWithReceiptOutput(receipt, async (outputReceipt) => {
+      setPrintLoading(true);
+      try {
+        const fileName = `receipt-${outputReceipt?.invoice_number || 'unknown'}.pdf`;
+        const result = await printReceipt({
+          receipt: outputReceipt,
+          fileName,
+          receiptFormat,
+          thermalWidthMm,
+          currentStatus: outputReceipt?.status,
+          pdfFlavor: 'pos',
+        });
 
-      const message = getPrintResultMessage(result);
-      if (message) {
-        toast.info(message);
+        const message = getPrintResultMessage(result);
+        if (message) {
+          toast.info(message);
+        }
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          toast.error('Failed to prepare receipt for printing.');
+        }
+      } finally {
+        setPrintLoading(false);
       }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        toast.error('Failed to prepare receipt for printing.');
-      }
-    } finally {
-      setPrintLoading(false);
-    }
-  }, [receipt, printLoading, receiptFormat, thermalWidthMm]);
+    });
+  }, [receipt, printLoading, receiptFormat, thermalWidthMm, runWithReceiptOutput]);
+
+  const handleShare = useCallback(() => {
+    if (!receipt) return;
+
+    runWithReceiptOutput(receipt, (outputReceipt) => {
+      setShareReceipt(outputReceipt);
+      shareDialog.onTrue();
+    });
+  }, [receipt, runWithReceiptOutput, shareDialog]);
 
   const handleFormatChange = (event, newFormat) => {
     if (newFormat !== null) {
@@ -317,6 +336,14 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
                   {printLoading ? 'Preparing…' : 'Print'}
                 </Button>
 
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:share-bold" />}
+                  onClick={handleShare}
+                >
+                  Share
+                </Button>
+
                 <Tooltip title="View PDF">
                   <IconButton onClick={view.onTrue}>
                     <Iconify icon="solar:eye-bold" />
@@ -361,6 +388,25 @@ export function ReceiptView({ receipt, receiptLoading, receiptError, storeSlug, 
           </Box>
         </Box>
       </Dialog>
+
+      <ReceiptShareDialog
+        open={shareDialog.value}
+        onClose={() => {
+          shareDialog.onFalse();
+          setShareReceipt(null);
+        }}
+        receipt={shareReceipt || receipt}
+        receiptFormat={receiptFormat}
+        pdfFlavor="pos"
+        thermalWidthMm={thermalWidthMm}
+        currentStatus={(shareReceipt || receipt)?.status}
+      />
+
+      <ReceiptOutputFlowDialogs
+        receipt={activeReceipt || receipt}
+        storeId={receipt?.store_id || storeId}
+        dialogs={dialogs}
+      />
     </>
   );
 }

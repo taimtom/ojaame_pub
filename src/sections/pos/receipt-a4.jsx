@@ -3,6 +3,7 @@ import { Page, View, Text, Font, Image, Document, StyleSheet } from '@react-pdf/
 
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { resolveReceiptSubtotal } from 'src/utils/escpos/receipt-from-sale';
 
 // ----------------------------------------------------------------------
 
@@ -199,6 +200,11 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     user_fullname,
   } = receipt || {};
 
+  const resolvedSubtotal = useMemo(
+    () => resolveReceiptSubtotal({ items, subtotal, total_amount, taxes, discount, shipping }),
+    [items, subtotal, total_amount, taxes, discount, shipping]
+  );
+
   const styles = useStyles();
 
   // Calculate payment totals
@@ -336,7 +342,7 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     <View style={styles.summarySection}>
       <View style={[styles.container, styles.mb4]}>
         <Text style={styles.body1}>Subtotal</Text>
-        <Text style={styles.body1}>{fCurrency(subtotal)}</Text>
+        <Text style={styles.body1}>{fCurrency(resolvedSubtotal)}</Text>
       </View>
       {discount > 0 && (
         <View style={[styles.container, styles.mb4]}>

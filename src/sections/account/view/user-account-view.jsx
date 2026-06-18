@@ -8,9 +8,10 @@ import { useSearchParams } from 'src/routes/hooks';
 
 import { useTabs } from 'src/hooks/use-tabs';
 
-import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { DashboardContent } from 'src/layouts/dashboard';
 
 import { AccountGeneral } from '../account-general';
 import { AccountCompany } from '../account-company';
@@ -19,6 +20,7 @@ import { AccountChangePassword } from '../account-change-password';
 import { AccountThemeSettings } from '../account-theme-settings';
 import { AccountFinance } from '../account-finance';
 import { AccountPrinterSettings } from '../account-printer-settings';
+import { AccountReceiptSettings } from '../account-receipt-settings';
 import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
 import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
@@ -43,6 +45,11 @@ const TABS = [
     value: 'printer',
     label: 'Printer',
     icon: <Iconify icon="solar:printer-minimalistic-bold" width={24} />,
+  },
+  {
+    value: 'receipt',
+    label: 'Receipts',
+    icon: <Iconify icon="mdi:receipt-text-outline" width={24} />,
   },
 ];
 
@@ -103,6 +110,8 @@ export function AccountView() {
       {tabs.value === 'finance' && <AccountFinance />}
 
       {tabs.value === 'printer' && <AccountPrinterSettings />}
+
+      {tabs.value === 'receipt' && <AccountReceiptSettings />}
     </DashboardContent>
   );
 }
