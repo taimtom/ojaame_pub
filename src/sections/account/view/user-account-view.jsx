@@ -29,6 +29,10 @@ import { AccountReceiptSettings } from '../account-receipt-settings';
 import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
 import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import { usePlanFeatures } from 'src/hooks/use-plan-features';
+import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { canAccessCompanyBillingSettings } from 'src/utils/user-role';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
@@ -65,14 +69,27 @@ export function AccountView() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { hasPlanFeature } = usePlanFeatures();
+  const { user } = useAuthContext();
+  const { isOwner } = useGetSubscriptionStatus();
+
+  const canAccessCompanyBilling = canAccessCompanyBillingSettings({
+    role: user?.role,
+    isOwner,
+  });
 
   const tabs = useTabs('general');
   const searchParams = useSearchParams();
   const onboarding = useOnboardingMode();
 
-  const visibleTabs = TABS.filter(
-    (tab) => tab.value !== 'finance' || hasPlanFeature('finance_settings')
-  );
+  const visibleTabs = TABS.filter((tab) => {
+    if (tab.value === 'finance' && !hasPlanFeature('finance_settings')) {
+      return false;
+    }
+    if ((tab.value === 'company' || tab.value === 'billing') && !canAccessCompanyBilling) {
+      return false;
+    }
+    return true;
+  });
 
   const handleSectionChange = (event) => {
     tabs.setValue(event.target.value);
@@ -82,15 +99,29 @@ export function AccountView() {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'finance' && !hasPlanFeature('finance_settings')) {
-      tabs.setValue('billing');
+      tabs.setValue('general');
       return;
     }
-    if (tabParam && TABS.some((t) => t.value === tabParam)) {
+    if (
+      (tabParam === 'company' || tabParam === 'billing') &&
+      !canAccessCompanyBilling
+    ) {
+      tabs.setValue('general');
+      return;
+    }
+    if (tabParam && visibleTabs.some((t) => t.value === tabParam)) {
       tabs.setValue(tabParam);
     }
     // Only run on mount / when query param changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, hasPlanFeature]);
+  }, [searchParams, hasPlanFeature, canAccessCompanyBilling, visibleTabs]);
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.value === tabs.value)) {
+      tabs.setValue(visibleTabs[0]?.value || 'general');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleTabs]);
 
   return (
     <DashboardContent>
@@ -113,7 +144,7 @@ export function AccountView() {
           onChange={handleSectionChange}
           sx={{ mb: { xs: 3, md: 5 } }}
           SelectProps={{
-            renderValue: (selected) => TABS.find((tab) => tab.value === selected)?.label,
+            renderValue: (selected) => visibleTabs.find((tab) => tab.value === selected)?.label,
           }}
         >
           {visibleTabs.map((tab) => (
@@ -134,9 +165,9 @@ export function AccountView() {
       )}
 
       {tabs.value === 'general' && <AccountGeneral />}
-      {tabs.value === 'company' && <AccountCompany />}
+      {tabs.value === 'company' && canAccessCompanyBilling && <AccountCompany />}
 
-      {tabs.value === 'billing' && (
+      {tabs.value === 'billing' && canAccessCompanyBilling && (
         <OnboardingSetupShell
           subtitle={
             onboarding

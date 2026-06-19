@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
             email: state.user?.email,
             displayName: state.user?.lastName,
             photoURL: state.user?.picture,
-            role: state.user?.role ?? 'admin',
+            role: state.user?.role ?? null,
           }
         : null,
 

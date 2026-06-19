@@ -19,6 +19,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { AnimateAvatar } from 'src/components/animate';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { formatUserRole } from 'src/utils/user-role';
 
 import { AccountButton } from './account-button';
 import { SignOutButton } from './sign-out-button';
@@ -104,6 +105,12 @@ export function AccountDrawer({ data = [], sx, ...other }) {
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }} noWrap>
               {user?.email}
             </Typography>
+
+            {user?.role && (
+              <Label color="default" variant="soft" sx={{ mt: 1 }}>
+                {formatUserRole(user.role)}
+              </Label>
+            )}
           </Stack>
 
           <Stack
