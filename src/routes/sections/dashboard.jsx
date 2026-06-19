@@ -9,6 +9,7 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { AuthGuard, PermissionGuard } from 'src/auth/guard';
 import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 import { PlanFeatureGuard } from 'src/components/plan/plan-feature-guard';
+import { SubscriptionInactiveStaffView } from 'src/sections/error';
 
 function withPlanFeature(feature, title, element) {
   return <PlanFeatureGuard feature={feature} title={title}>{element}</PlanFeatureGuard>;
@@ -211,6 +212,7 @@ export const dashboardRoutes = [
         ),
       },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'subscription-inactive', element: <SubscriptionInactiveStaffView /> },
       { path: 'service-log', element: withPlanFeature('service_log', 'Service Log', <ServiceLogPage />) },
       { path: 'quick-restock', element: <QuickRestockPage /> },
       {

@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 
 import { useGetSubscriptionStatus } from 'src/actions/billing';
-import { NotFoundView } from 'src/sections/error';
+import { SubscriptionInactiveStaffView } from 'src/sections/error';
 
 // ---------------------------------------------------------------------------
 
@@ -12,6 +12,7 @@ const ALLOWED_PATHS = [
   '/app/service-log',
   '/app/usage-dashboard',
   '/app/quick-sale',
+  '/app/subscription-inactive',
   '/app/user/account',
   '/app/user/notifications',
   '/app/notifications',
@@ -35,8 +36,7 @@ export function SubscriptionGuard({ children }) {
         // Owner: redirect to billing settings page
         return <Navigate to="/app/user/account?tab=billing" replace />;
       }
-      // Staff: show 404 page
-      return <NotFoundView />;
+      return <SubscriptionInactiveStaffView />;
     }
   }
 

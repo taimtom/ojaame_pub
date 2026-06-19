@@ -109,6 +109,7 @@ export const paths = {
   dashboard: {
     root: ROOTS.DASHBOARD,
     quickDashboard: `${ROOTS.DASHBOARD}/quick-dashboard`,
+    subscriptionInactive: `${ROOTS.DASHBOARD}/subscription-inactive`,
     serviceLog: `${ROOTS.DASHBOARD}/service-log`,
     quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
     usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,

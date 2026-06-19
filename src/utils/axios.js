@@ -17,9 +17,9 @@ axiosInstance.interceptors.response.use(
     if (httpStatus === 402 && detail === 'subscription_deactivated_owner') {
       window.location.href = '/app/user/account?tab=billing';
     }
-    // Subscription deactivation: staff → redirect to 404
+    // Subscription deactivation: staff → show subscription inactive page
     if (httpStatus === 403 && detail === 'subscription_deactivated_staff') {
-      window.location.href = '/404';
+      window.location.href = '/app/subscription-inactive';
     }
 
     // Attach the HTTP status so catch blocks can branch on it
