@@ -9,6 +9,8 @@ import { usePermissions } from 'src/hooks/use-permissions';
 import { useBusinessType } from 'src/hooks/use-business-type';
 
 import { isItemVisible, isSectionVisible } from 'src/config/nav-permissions';
+import { isNavItemAllowedByPlan } from 'src/config/plan-features';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 import { CONFIG } from 'src/config-global';
 import axiosInstance from 'src/utils/axios';
 
@@ -70,6 +72,7 @@ export const useNavData = () => {
   const navigate = useNavigate();
   const { getNavLabel, t } = useBusinessType();
   const { userPermissions } = usePermissions();
+  const { hasPlanFeature } = usePlanFeatures();
 
   // 1. Hydrate currentStore from URL or localStorage.
   // A valid storeParam must end with a numeric ID (e.g. "my-store-42").
@@ -188,8 +191,13 @@ export const useNavData = () => {
         // Use permissionKey (stable) when available, otherwise fall back to the
         // display title. This keeps permission checks working when the title is
         // rendered dynamically via the business-type registry.
-        const itemVisible = isItemVisible(userPermissions, item.permissionKey || item.title);
+        const itemKey = item.permissionKey || item.title;
+        const itemVisible = isItemVisible(userPermissions, itemKey);
         if (!itemVisible) {
+          return null;
+        }
+
+        if (!isNavItemAllowedByPlan(itemKey, hasPlanFeature)) {
           return null;
         }
 

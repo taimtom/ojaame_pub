@@ -54,12 +54,28 @@ function tierLabel(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
+const PLAN_HIGHLIGHTS = {
+  basic: [
+    'Full POS, inventory & customers',
+    'Essential reports',
+    'Up to 3 team members per store',
+    'Roles & per-user permissions',
+  ],
+  standard: [
+    'Everything in Basic',
+    'Unlimited team size',
+    'Custom roles',
+    'Advanced & company reports',
+    'Integrations, store website & more',
+  ],
+};
+
 // ----------------------------------------------------------------------
 
 export function AccountBillingPlan() {
   const { summary, summaryLoading, summaryError, mutate } = useGetSubscriptionSummary();
   const { plans } = useGetSubscriptionPlans();
-  const { nextBillingDate, inTrial, trialDaysRemaining } = useGetSubscriptionStatus();
+  const { nextBillingDate, inTrial, trialDaysRemaining, mutateStatus } = useGetSubscriptionStatus();
   const [adjusting, setAdjusting] = useState(null);
   const [changingPlan, setChangingPlan] = useState(false);
   const [pendingTier, setPendingTier] = useState(null);
@@ -72,6 +88,7 @@ export function AccountBillingPlan() {
   const seatPrice = summary?.seat_price ?? 1000;
   const currentTier = summary?.plan_tier ?? 'basic';
   const isEnterprise = currentTier === 'enterprise';
+  const maxSeatsPerStore = summary?.max_seats_per_store ?? null;
 
   const handleSeatChange = useCallback(
     async (delta, scope, storeId) => {
@@ -108,7 +125,7 @@ export function AccountBillingPlan() {
     setChangingPlan(true);
     try {
       await changePlan({ plan_tier: pendingTier });
-      await mutate();
+      await Promise.all([mutate(), mutateStatus?.()]);
       toast.success(`Plan updated to ${tierLabel(pendingTier)}.`);
       setPendingTier(null);
     } catch (err) {
@@ -116,7 +133,7 @@ export function AccountBillingPlan() {
     } finally {
       setChangingPlan(false);
     }
-  }, [pendingTier, mutate]);
+  }, [pendingTier, mutate, mutateStatus]);
 
   const isUnpaid = summary?.status === 'unpaid';
   const isAttention = summary?.paystack_status === 'attention';
@@ -239,6 +256,13 @@ export function AccountBillingPlan() {
                       <Typography variant="body2" color="text.secondary">
                         {fCurrency(plan.base_fee)}/mo + {fCurrency(plan.seat_price)}/seat
                       </Typography>
+                      <Stack component="ul" sx={{ m: 0, pl: 2, mt: 1 }} spacing={0.25}>
+                        {(PLAN_HIGHLIGHTS[plan.plan_tier] || []).map((item) => (
+                          <Typography key={item} component="li" variant="caption" color="text.secondary">
+                            {item}
+                          </Typography>
+                        ))}
+                      </Stack>
                       {!selected && (
                         <Button
                           size="small"
@@ -272,9 +296,20 @@ export function AccountBillingPlan() {
 
           <BillingRow
             label="Total seats"
-            secondary="sum across all stores"
+            secondary={
+              maxSeatsPerStore
+                ? `sum across all stores (max ${maxSeatsPerStore} per store on Basic)`
+                : 'sum across all stores'
+            }
             value={summary.total_seats ?? '—'}
           />
+
+          {maxSeatsPerStore && (
+            <Alert severity="info" sx={{ mt: 1, borderRadius: 1 }}>
+              Basic includes up to {maxSeatsPerStore} seats per store (owner +{' '}
+              {maxSeatsPerStore - 1} staff). Upgrade to Standard for unlimited team size.
+            </Alert>
+          )}
 
           <Divider sx={{ my: 1 }} />
 
@@ -326,21 +361,32 @@ export function AccountBillingPlan() {
                   {store.paid_seats} seat{store.paid_seats !== 1 ? 's' : ''}
                 </Typography>
 
-                <Tooltip title={`Add seat (+${fCurrency(seatPrice)}/mo)`}>
-                  <Button
-                    size="small"
-                    variant="soft"
-                    color="primary"
-                    disabled={adjusting !== null}
-                    onClick={() => handleSeatChange(1, 'store', store.store_id)}
-                    sx={{ minWidth: 24, px: 0.5 }}
-                  >
+                <Tooltip
+                  title={
+                    maxSeatsPerStore && store.paid_seats >= maxSeatsPerStore
+                      ? `Basic plan limit: ${maxSeatsPerStore} seats per store`
+                      : `Add seat (+${fCurrency(seatPrice)}/mo)`
+                  }
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="soft"
+                      color="primary"
+                      disabled={
+                        adjusting !== null
+                        || (maxSeatsPerStore != null && store.paid_seats >= maxSeatsPerStore)
+                      }
+                      onClick={() => handleSeatChange(1, 'store', store.store_id)}
+                      sx={{ minWidth: 24, px: 0.5 }}
+                    >
                     {adjusting === `store-${store.store_id}-1` ? (
                       <CircularProgress size={12} />
                     ) : (
                       <Iconify icon="mingcute:add-line" width={12} />
                     )}
                   </Button>
+                  </span>
                 </Tooltip>
 
                 <Typography variant="body2" sx={{ ml: 1, minWidth: 80, textAlign: 'right' }}>

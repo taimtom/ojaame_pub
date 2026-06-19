@@ -34,6 +34,9 @@ export function useGetSubscriptionStatus() {
     subscriptionTotal: data?.subscription_total ?? 3000,
     inTrial: data?.in_trial ?? false,
     trialDaysRemaining: data?.trial_days_remaining ?? 0,
+    planTier: data?.plan_tier ?? 'basic',
+    features: data?.features ?? [],
+    limits: data?.limits ?? {},
     statusLoading: isLoading,
     mutateStatus: mutate,
   };

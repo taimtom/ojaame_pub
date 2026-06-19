@@ -8,6 +8,11 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AuthGuard, PermissionGuard } from 'src/auth/guard';
 import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
+import { PlanFeatureGuard } from 'src/components/plan/plan-feature-guard';
+
+function withPlanFeature(feature, title, element) {
+  return <PlanFeatureGuard feature={feature} title={title}>{element}</PlanFeatureGuard>;
+}
 
 
 // ----------------------------------------------------------------------
@@ -206,14 +211,18 @@ export const dashboardRoutes = [
         ),
       },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
-      { path: 'service-log', element: <ServiceLogPage /> },
+      { path: 'service-log', element: withPlanFeature('service_log', 'Service Log', <ServiceLogPage />) },
       { path: 'quick-restock', element: <QuickRestockPage /> },
       {
         path: 'usage-dashboard',
-        element: (
+        element: withPlanFeature(
+          'usage_dashboard',
+          'Usage dashboard',
+          (
           <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
             <UsageDashboardPage />
           </PermissionGuard>
+          )
         ),
       },
       { path: 'notifications', element: <NotificationsPage /> },
@@ -247,10 +256,14 @@ export const dashboardRoutes = [
           children: [
             {
               index: true,
-              element: (
+              element: withPlanFeature(
+                'store_transfers',
+                'Store Transfers',
+                (
                 <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
                   <TransferListPage />
                 </PermissionGuard>
+                )
               ),
             },
           ],
@@ -276,10 +289,22 @@ export const dashboardRoutes = [
         {
           path: 'digital-product',
           children: [
-            { index: true, element: <DigitalProductListPage /> },
-            { path: 'list', element: <DigitalProductListPage /> },
-            { path: 'new', element: <DigitalProductCreatePage /> },
-            { path: ':id/edit', element: <DigitalProductEditPage /> },
+            {
+              index: true,
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductListPage />),
+            },
+            {
+              path: 'list',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductListPage />),
+            },
+            {
+              path: 'new',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductCreatePage />),
+            },
+            {
+              path: ':id/edit',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductEditPage />),
+            },
           ],
         },
         {
@@ -377,50 +402,74 @@ export const dashboardRoutes = [
             },
             {
               path: 'profit-loss',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'Profit & Loss',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreProfitLossReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'cash-flow',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'Cash Flow',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreCashFlowReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'balance-sheet',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'Balance Sheet',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreBalanceSheetReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'trial-balance',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'Trial Balance',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreTrialBalanceReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'sales-trends',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'Sales Trends',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreSalesTrendsReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'end-of-day',
-              element: (
+              element: withPlanFeature(
+                'advanced_reports',
+                'End of period',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <EndOfDayReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
@@ -450,7 +499,7 @@ export const dashboardRoutes = [
           { index: true, element: <StoreListPage /> },
           { path: 'new', element: <StoreCreatePage /> },
           { path: ':id/account', element: <StoreAccountPage /> },
-          { path: ':id/website', element: <StoreWebsiteSettingsPage /> },
+          { path: ':id/website', element: withPlanFeature('store_website', 'Store Website', <StoreWebsiteSettingsPage />) },
           { path: 'list', element: <StoreListPage /> },
         ],
       },
@@ -487,6 +536,7 @@ export const dashboardRoutes = [
 
           {
             path: 'integration',
+            element: withPlanFeature('integrations', 'Integrations', <Outlet />),
             children: [
               { index: true, element: <IntegrationListPage /> },
               { path: 'list', element: <IntegrationListPage /> },
@@ -545,7 +595,7 @@ export const dashboardRoutes = [
               { index: true, element: <RoleListPage /> },
               { path: 'list', element: <RoleListPage /> },
               { path: ':id', element: <RoleDetailsPage /> },
-              { path: 'new', element: <RoleCreatePage /> },
+              { path: 'new', element: withPlanFeature('custom_roles', 'Custom roles', <RoleCreatePage />) },
               { path: ':id/edit', element: <RoleEditPage /> },
             ],
           },
@@ -584,10 +634,14 @@ export const dashboardRoutes = [
           },
           {
             path: 'company-reports',
-            element: (
+            element: withPlanFeature(
+              'company_reports',
+              'Company Reports',
+              (
               <PermissionGuard anyOf={['reports.create', 'reports.update']}>
                 <CompanyReportsPage />
               </PermissionGuard>
+              )
             ),
           },
           { path: 'file-manager', element: <FileManagerPage /> },

@@ -26,9 +26,12 @@ import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import RoleList from '../role-list';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 
 export function RoleListView() {
   const router = useRouter();
+  const { hasPlanFeature } = usePlanFeatures();
+  const canCreateCustomRole = hasPlanFeature('custom_roles');
 
   // 1) Fetch roles
   const {
@@ -153,14 +156,25 @@ export function RoleListView() {
           { name: 'List' },
         ]}
         action={
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.role.new}
-            variant="contained"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-          >
-            New Role
-          </Button>
+          canCreateCustomRole ? (
+            <Button
+              component={RouterLink}
+              href={paths.dashboard.role.new}
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+            >
+              New Role
+            </Button>
+          ) : (
+            <Button
+              component={RouterLink}
+              href={`${paths.dashboard.user.account}?tab=billing`}
+              variant="outlined"
+              startIcon={<Iconify icon="solar:lock-keyhole-bold-duotone" />}
+            >
+              Custom roles (Standard)
+            </Button>
+          )
         }
         sx={{ mb: 3 }}
       />

@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { paths } from 'src/routes/paths';
 import { useSearchParams } from 'src/routes/hooks';
@@ -23,6 +28,7 @@ import { AccountPrinterSettings } from '../account-printer-settings';
 import { AccountReceiptSettings } from '../account-receipt-settings';
 import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
 import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 
 // ----------------------------------------------------------------------
 
@@ -56,19 +62,35 @@ const TABS = [
 // ----------------------------------------------------------------------
 
 export function AccountView() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { hasPlanFeature } = usePlanFeatures();
+
   const tabs = useTabs('general');
   const searchParams = useSearchParams();
   const onboarding = useOnboardingMode();
 
+  const visibleTabs = TABS.filter(
+    (tab) => tab.value !== 'finance' || hasPlanFeature('finance_settings')
+  );
+
+  const handleSectionChange = (event) => {
+    tabs.setValue(event.target.value);
+  };
+
   // Auto-switch to the tab specified in the URL query param (e.g. ?tab=theme-settings)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
+    if (tabParam === 'finance' && !hasPlanFeature('finance_settings')) {
+      tabs.setValue('billing');
+      return;
+    }
     if (tabParam && TABS.some((t) => t.value === tabParam)) {
       tabs.setValue(tabParam);
     }
     // Only run on mount / when query param changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, hasPlanFeature]);
 
   return (
     <DashboardContent>
@@ -82,11 +104,34 @@ export function AccountView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Tabs value={tabs.value} onChange={tabs.onChange} sx={{ mb: { xs: 3, md: 5 } }}>
-        {TABS.map((tab) => (
-          <Tab key={tab.value} label={tab.label} icon={tab.icon} value={tab.value} />
-        ))}
-      </Tabs>
+      {isMobile ? (
+        <TextField
+          select
+          fullWidth
+          label="Settings section"
+          value={tabs.value}
+          onChange={handleSectionChange}
+          sx={{ mb: { xs: 3, md: 5 } }}
+          SelectProps={{
+            renderValue: (selected) => TABS.find((tab) => tab.value === selected)?.label,
+          }}
+        >
+          {visibleTabs.map((tab) => (
+            <MenuItem key={tab.value} value={tab.value}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {tab.icon}
+                {tab.label}
+              </Box>
+            </MenuItem>
+          ))}
+        </TextField>
+      ) : (
+        <Tabs value={tabs.value} onChange={tabs.onChange} sx={{ mb: { xs: 3, md: 5 } }}>
+          {visibleTabs.map((tab) => (
+            <Tab key={tab.value} label={tab.label} icon={tab.icon} value={tab.value} />
+          ))}
+        </Tabs>
+      )}
 
       {tabs.value === 'general' && <AccountGeneral />}
       {tabs.value === 'company' && <AccountCompany />}
@@ -107,7 +152,7 @@ export function AccountView() {
 
       {tabs.value === 'theme-settings' && <AccountThemeSettings />}
 
-      {tabs.value === 'finance' && <AccountFinance />}
+      {tabs.value === 'finance' && hasPlanFeature('finance_settings') && <AccountFinance />}
 
       {tabs.value === 'printer' && <AccountPrinterSettings />}
 

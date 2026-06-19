@@ -1,9 +1,16 @@
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
 
 // ----------------------------------------------------------------------
+
+async function revalidateSubscriptionCaches() {
+  await Promise.all([
+    globalMutate(endpoints.billing.status),
+    globalMutate(endpoints.subscription.summary),
+  ]);
+}
 
 const swrOptions = {
   revalidateIfStale: true,
@@ -79,6 +86,7 @@ export function useGetSubscriptionPlans() {
 
 export async function changePlan({ plan_tier }) {
   const res = await axiosInstance.post(endpoints.subscription.plan, { plan_tier });
+  await revalidateSubscriptionCaches();
   return res.data;
 }
 
@@ -90,6 +98,7 @@ export async function adjustSeats({ delta, scope, store_id }) {
     scope,
     store_id,
   });
+  await revalidateSubscriptionCaches();
   return res.data;
 }
 
