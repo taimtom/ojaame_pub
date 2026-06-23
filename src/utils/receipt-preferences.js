@@ -124,19 +124,23 @@ export function canUseBluetoothPrint() {
 }
 
 export function getPreferredShareFormat() {
-  if (typeof window === 'undefined') return 'pdf';
+  if (typeof window === 'undefined') return 'whatsapp';
   try {
     const raw = window.localStorage.getItem(SHARE_FORMAT_STORAGE_KEY);
-    return raw === 'png' ? 'png' : 'pdf';
+    if (raw === 'png') return 'whatsapp';
+    if (raw === 'pdf') return 'pdf';
+    if (raw === 'whatsapp') return 'whatsapp';
+    return 'whatsapp';
   } catch {
-    return 'pdf';
+    return 'whatsapp';
   }
 }
 
 export function setPreferredShareFormat(format) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(SHARE_FORMAT_STORAGE_KEY, format === 'png' ? 'png' : 'pdf');
+    const normalized = format === 'pdf' ? 'pdf' : 'whatsapp';
+    window.localStorage.setItem(SHARE_FORMAT_STORAGE_KEY, normalized);
   } catch {
     /* quota / private mode */
   }

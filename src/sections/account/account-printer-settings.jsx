@@ -169,7 +169,7 @@ export function AccountPrinterSettings() {
               Default share format
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              When sharing receipts, choose PDF or image (PNG) by default.
+              When sharing receipts to customers, choose WhatsApp image or PDF by default.
             </Typography>
             <ToggleButtonGroup
               exclusive
@@ -177,8 +177,8 @@ export function AccountPrinterSettings() {
               value={shareFormat}
               onChange={handleShareFormatChange}
             >
+              <ToggleButton value="whatsapp">WhatsApp image</ToggleButton>
               <ToggleButton value="pdf">PDF</ToggleButton>
-              <ToggleButton value="png">Image</ToggleButton>
             </ToggleButtonGroup>
           </Box>
         </Stack>

@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
@@ -13,6 +14,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import {
   buildReceiptFile,
+  buildReceiptShareCaption,
   downloadReceiptBlob,
   shareReceiptFile,
 } from 'src/utils/receipt-output';
@@ -35,7 +37,7 @@ export function ReceiptShareDialog({
   pdfFlavor = 'pos',
   thermalWidthMm,
   currentStatus,
-  shareText = 'Receipt',
+  shareText,
 }) {
   const [shareFormat, setShareFormat] = useState(() => getPreferredShareFormat());
   const [generating, setGenerating] = useState(false);
@@ -134,7 +136,7 @@ export function ReceiptShareDialog({
         blob: shareBlob,
         fileName: shareFileName,
         mimeType: shareMimeType,
-        text: shareText,
+        text: shareText ?? buildReceiptShareCaption(receipt),
       });
 
       if (result === 'shared') {
@@ -150,7 +152,7 @@ export function ReceiptShareDialog({
     } finally {
       setSharing(false);
     }
-  }, [shareBlob, shareFileName, shareMimeType, shareText, sharing, handleClose]);
+  }, [shareBlob, shareFileName, shareMimeType, shareText, receipt, sharing, handleClose]);
 
   const handleDownload = useCallback(() => {
     if (!shareBlob) return;
@@ -174,19 +176,24 @@ export function ReceiptShareDialog({
             onChange={handleFormatChange}
             disabled={isLoading}
           >
+            <ToggleButton value="whatsapp">
+              <Stack direction="row" alignItems="center" spacing={0.75}>
+                <Iconify icon="mdi:whatsapp" width={18} />
+                <span>WhatsApp</span>
+              </Stack>
+            </ToggleButton>
             <ToggleButton value="pdf">
               <Stack direction="row" alignItems="center" spacing={0.75}>
                 <Iconify icon="mdi:file-pdf-box" width={18} />
                 <span>PDF</span>
               </Stack>
             </ToggleButton>
-            <ToggleButton value="png">
-              <Stack direction="row" alignItems="center" spacing={0.75}>
-                <Iconify icon="mdi:image-outline" width={18} />
-                <span>Image</span>
-              </Stack>
-            </ToggleButton>
           </ToggleButtonGroup>
+
+          <Typography variant="body2" color="text.secondary">
+            WhatsApp format is optimized for sending to customers. They can view it directly in
+            chat.
+          </Typography>
 
           {isLoading ? (
             <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>

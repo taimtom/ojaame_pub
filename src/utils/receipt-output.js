@@ -6,6 +6,8 @@ import {
   getPreferredReceiptFormat,
   getPreferredThermalWidthMm,
 } from './receipt-preferences';
+import { fDate } from 'src/utils/format-time';
+import { fCurrency } from 'src/utils/format-number';
 
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -15,6 +17,21 @@ GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export function receiptFileLabel(receipt) {
   return receipt?.invoice_number || receipt?.invoiceNumber || receipt?.id || 'receipt';
+}
+
+export function buildReceiptShareCaption(receipt) {
+  if (!receipt) return 'Receipt';
+  const label = receiptFileLabel(receipt);
+  const total = receipt.total_amount;
+  const date = receipt.create_date;
+  const parts = [`Receipt ${label}`];
+  if (total != null && total !== '') {
+    parts.push(fCurrency(total));
+  }
+  if (date) {
+    parts.push(fDate(date));
+  }
+  return parts.join(' — ');
 }
 
 export function downloadReceiptBlob(blob, fileName) {
@@ -108,7 +125,7 @@ export async function pdfBlobToPngBlob(pdfBlob, { scale = 3 } = {}) {
 }
 
 /**
- * Build a receipt file as PDF or PNG (PNG is always derived from the PDF layout).
+ * Build a receipt file as PDF, WhatsApp PNG, or legacy thermal PNG.
  */
 export async function buildReceiptFile({
   receipt,
@@ -119,16 +136,33 @@ export async function buildReceiptFile({
   currentStatus,
 }) {
   const label = receiptFileLabel(receipt);
+
+  if (format === 'whatsapp') {
+    const pdfBlob = await buildReceiptPdfBlob({
+      receipt,
+      receiptFormat: 'whatsapp',
+      pdfFlavor,
+      currentStatus,
+    });
+    const pngBlob = await pdfBlobToPngBlob(pdfBlob, { scale: 4 });
+    return {
+      blob: pngBlob,
+      fileName: `${label}.png`,
+      mimeType: 'image/png',
+    };
+  }
+
+  const effectiveReceiptFormat = receiptFormat ?? getPreferredReceiptFormat();
   const pdfBlob = await buildReceiptPdfBlob({
     receipt,
-    receiptFormat,
+    receiptFormat: effectiveReceiptFormat,
     pdfFlavor,
     thermalWidthMm,
     currentStatus,
   });
 
   if (format === 'png') {
-    const pngBlob = await pdfBlobToPngBlob(pdfBlob);
+    const pngBlob = await pdfBlobToPngBlob(pdfBlob, { scale: 3 });
     return {
       blob: pngBlob,
       fileName: `${label}.png`,
