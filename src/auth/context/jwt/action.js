@@ -1,7 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import { setSession } from './utils';
-import { STORAGE_KEY } from './constant';
 
 /** **************************************
  * Sign in
@@ -38,7 +37,6 @@ export const signInWithGoogle = async (idToken) => {
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
     setSession(accessToken);
     return accessToken;
   } catch (error) {
@@ -78,7 +76,7 @@ export const signUp = async ({
       throw new Error('Access token not found in response');
     }
 
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign up:', error);
     // Check if the error response includes a "detail" property.

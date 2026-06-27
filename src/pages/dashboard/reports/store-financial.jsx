@@ -26,7 +26,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { ReportViewToggle } from 'src/components/report-view-toggle';
 import { useAuthContext } from 'src/auth/hooks';
-import { useStoreProfitLoss } from 'src/actions/reports';
+import { useStoreProfitLossSummary } from 'src/actions/reports';
 import {
   useStoreDailySales,
   useStoreMonthlySales,
@@ -80,7 +80,7 @@ export default function StoreFinancialReportPage() {
   const [expenseMode, setExpenseMode] = useState('list');
   const [paymentMode, setPaymentMode] = useState('list');
 
-  const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, 'this_month');
+  const { profitLoss, profitLossLoading } = useStoreProfitLossSummary(companyId, storeId, 'this_month');
   const { dailySales, dailySalesLoading } = useStoreDailySales(storeId);
   const { monthlySales, monthlySalesLoading } = useStoreMonthlySales(storeId);
   const { expenses, expensesLoading, expensesValidating } = useStoreExpenses(storeId, expensePeriod);

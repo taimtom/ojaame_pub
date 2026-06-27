@@ -8,6 +8,7 @@ import {
 } from './receipt-preferences';
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { shareContent } from 'src/utils/platform';
 
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -188,21 +189,16 @@ export async function shareReceiptFile({
   title,
   text = 'Receipt',
 }) {
-  const file = new File([blob], fileName, { type: mimeType });
+  const result = await shareContent({
+    blob,
+    fileName,
+    mimeType,
+    title: title || fileName.replace(/\.(png|pdf)$/i, ''),
+    text,
+  });
 
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({
-        title: title || fileName.replace(/\.(png|pdf)$/i, ''),
-        text,
-        files: [file],
-      });
-      return 'shared';
-    } catch (err) {
-      if (err?.name === 'AbortError') return 'cancelled';
-      throw err;
-    }
-  }
+  if (result === 'shared') return 'shared';
+  if (result === 'cancelled') return 'cancelled';
 
   downloadReceiptBlob(blob, fileName);
   return 'downloaded';

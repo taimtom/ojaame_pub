@@ -1,8 +1,7 @@
 import { paths } from 'src/routes/paths';
 
 import axios from 'src/utils/axios';
-
-import { STORAGE_KEY } from './constant';
+import { getAuthToken, removeAuthToken, setAuthToken } from 'src/utils/auth-storage';
 
 // ----------------------------------------------------------------------
 
@@ -149,10 +148,10 @@ export function tokenExpired(exp) {
   const currentTime = Date.now();
   const timeLeft = exp * 1000 - currentTime;
 
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
       alert('Token expired!');
-      sessionStorage.removeItem(STORAGE_KEY);
+      await removeAuthToken();
       window.location.href = paths.auth.jwt.signIn;
     } catch (error) {
       console.error('Error during token expiration:', error);
@@ -165,7 +164,7 @@ export function tokenExpired(exp) {
 export async function setSession(accessToken) {
   try {
     if (accessToken && isValidToken(accessToken)) {
-      sessionStorage.setItem(STORAGE_KEY, accessToken);
+      await setAuthToken(accessToken);
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
       const decodedToken = jwtDecode(accessToken);
@@ -176,7 +175,7 @@ export async function setSession(accessToken) {
       }
     } else {
       console.warn('Invalid or missing access token. Session will be cleared.');
-      sessionStorage.removeItem(STORAGE_KEY);
+      await removeAuthToken();
       delete axios.defaults.headers.common.Authorization;
     }
   } catch (error) {

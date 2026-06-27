@@ -37,7 +37,7 @@ import {
   useStoreStockValue,
   useStoreSalesTrend,
   useStoreCategoryPerformance,
-  useStoreProfitLoss,
+  useStoreProfitLossSummary,
   useStoreForecast,
 } from 'src/actions/reports';
 
@@ -166,7 +166,7 @@ export default function StoreGeneralReportPage() {
   const { stockValue, stockValueLoading } = useStoreStockValue(storeId);
   const { trend, trendLoading } = useStoreSalesTrend(storeId, period, month, year, date);
   const { categories, categoryLoading } = useStoreCategoryPerformance(storeId, period, month, year, date);
-  const { profitLoss, profitLossLoading } = useStoreProfitLoss(companyId, storeId, period, month, year, date);
+  const { profitLoss, profitLossLoading } = useStoreProfitLossSummary(companyId, storeId, period, month, year, date);
   const { forecast, forecastLoading } = useStoreForecast(storeId);
 
   const { dailySales, dailySalesLoading } = useStoreDailySales(storeId);

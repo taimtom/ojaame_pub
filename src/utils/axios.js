@@ -245,6 +245,7 @@ export const endpoints = {
   // Financial / company-level reports (query-param style: ?company_id=X)
   reports: {
     profitLoss: '/api/reports/profit-loss',
+    profitLossSummary: '/api/reports/profit-loss/summary',
     cashFlow: '/api/reports/cash-flow',
     tax: '/api/reports/tax',
     customers: '/api/reports/customers',

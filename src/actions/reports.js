@@ -133,6 +133,40 @@ export function useStoreCategoryPerformance(storeId, period = 'this_month', mont
 
 // ─── Reports API (company-scoped) ─────────────────────────────────────────────
 
+/**
+ * Lightweight income-statement summary (COGS / gross / net profit) available on
+ * all plan tiers. Use this for dashboards visible to Basic stores. The full P&L
+ * report (`useStoreProfitLoss`) remains gated behind the Standard plan.
+ */
+export function useStoreProfitLossSummary(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = reportScopeKey(companyId, storeId)
+    ? [
+        endpoints.reports.profitLossSummary,
+        {
+          params: periodParams(
+            reportScopeParams(companyId, storeId),
+            period,
+            month,
+            year,
+            date
+          ),
+        },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      profitLoss: data || null,
+      profitLossLoading: isLoading,
+      profitLossError: error,
+      refetchProfitLoss: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
 export function useStoreProfitLoss(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = reportScopeKey(companyId, storeId)
     ? [
