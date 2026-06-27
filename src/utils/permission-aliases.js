@@ -34,17 +34,17 @@ export const PERMISSION_ALIASES = {
 export function expandAliasPermissions(permissions) {
   if (!permissions?.length) return [];
   const expanded = new Set(permissions);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    expanded.forEach((name) => {
-      (PERMISSION_ALIASES[name] || []).forEach((alias) => {
-        if (!expanded.has(alias)) {
-          expanded.add(alias);
-          changed = true;
-        }
-      });
-    });
+  const queue = [...permissions];
+
+  while (queue.length > 0) {
+    const name = queue.shift();
+    for (const alias of PERMISSION_ALIASES[name] || []) {
+      if (!expanded.has(alias)) {
+        expanded.add(alias);
+        queue.push(alias);
+      }
+    }
   }
+
   return [...expanded];
 }

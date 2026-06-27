@@ -17,7 +17,7 @@ export const signInWithPassword = async ({ email, password }) => {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -37,7 +37,7 @@ export const signInWithGoogle = async (idToken) => {
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
-    setSession(accessToken);
+    await setSession(accessToken);
     return accessToken;
   } catch (error) {
     console.error('Error during Google sign in:', error);

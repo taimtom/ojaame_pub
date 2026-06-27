@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
       const accessToken = await getAuthToken();
 
       if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
+        await setSession(accessToken);
 
         const res = await axios.get(endpoints.auth.me);
         // If the API returns the user data directly, use:

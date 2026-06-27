@@ -1,10 +1,27 @@
 import axios from 'axios';
 
 import { CONFIG } from 'src/config-global';
+import { getAuthToken } from 'src/utils/auth-storage';
 
 // ----------------------------------------------------------------------
 
 const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
+
+// Attach the auth token from storage to every request. Storage is async
+// (Capacitor Preferences on native, sessionStorage on web), so this interceptor
+// reads it fresh each time instead of relying on axios.defaults being set in time.
+axiosInstance.interceptors.request.use(async (config) => {
+  try {
+    const token = await getAuthToken();
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (error) {
+    console.error('Error attaching auth token to request:', error);
+  }
+  return config;
+});
 
 axiosInstance.interceptors.response.use(
   (response) => response,
