@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   Alert,
@@ -60,6 +60,7 @@ function summarizeItems(row) {
 
 export function ConsignmentListView({ storeId, storeParam }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { userPermissions, hasPermission } = usePermissions();
 
   const [tab, setTab] = useState('borrowed');
@@ -122,6 +123,40 @@ export function ConsignmentListView({ storeId, storeParam }) {
   useEffect(() => {
     refreshKpis();
   }, [refreshKpis]);
+
+  useEffect(() => {
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      setDetailId(Number(idParam));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!detailConsignment) return;
+    setTab(detailConsignment.direction === 'lending' ? 'lent' : 'borrowed');
+    if (isDoneConsignment(detailConsignment)) {
+      setListFilter('done');
+    } else if (isActiveConsignment(detailConsignment)) {
+      setListFilter('active');
+    }
+  }, [detailConsignment]);
+
+  const openDetail = useCallback(
+    (id) => {
+      setDetailId(id);
+      const next = new URLSearchParams(searchParams);
+      next.set('id', String(id));
+      setSearchParams(next);
+    },
+    [searchParams, setSearchParams]
+  );
+
+  const closeDetail = useCallback(() => {
+    setDetailId(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete('id');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const reload = async () => {
     await mutateConsignments();
@@ -344,7 +379,7 @@ export function ConsignmentListView({ storeId, storeParam }) {
           <Card
             key={row.id}
             sx={{ cursor: 'pointer' }}
-            onClick={() => setDetailId(row.id)}
+            onClick={() => openDetail(row.id)}
           >
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
@@ -378,9 +413,10 @@ export function ConsignmentListView({ storeId, storeParam }) {
 
       <ConsignmentDetailDrawer
         open={Boolean(detailId)}
-        onClose={() => setDetailId(null)}
+        onClose={closeDetail}
         consignment={drawerConsignment}
         storeId={storeId}
+        storeParam={storeParam}
         submitting={submitting}
         onAction={handleDrawerAction}
         userPermissions={userPermissions}

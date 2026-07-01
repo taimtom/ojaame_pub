@@ -36,14 +36,14 @@ export function expandAliasPermissions(permissions) {
   const expanded = new Set(permissions);
   const queue = [...permissions];
 
-  while (queue.length > 0) {
-    const name = queue.shift();
-    for (const alias of PERMISSION_ALIASES[name] || []) {
+  for (let i = 0; i < queue.length; i += 1) {
+    const name = queue[i];
+    (PERMISSION_ALIASES[name] || []).forEach((alias) => {
       if (!expanded.has(alias)) {
         expanded.add(alias);
         queue.push(alias);
       }
-    }
+    });
   }
 
   return [...expanded];

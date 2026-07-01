@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -66,6 +66,7 @@ function KpiCard({ label, value, loading }) {
 }
 
 export default function StorePartnerReportDetailPage() {
+  const navigate = useNavigate();
   const { storeParam, partnerId } = useParams();
   const storeId = getStoreId(storeParam);
   const numericPartnerId = Number(partnerId);
@@ -133,6 +134,11 @@ export default function StorePartnerReportDetailPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openConsignment = (consignmentId) => {
+    if (!storeParam || !consignmentId) return;
+    navigate(paths.dashboard.consignment.details(storeParam, consignmentId));
   };
 
   const handleCollect = async () => {
@@ -361,13 +367,31 @@ export default function StorePartnerReportDetailPage() {
               </TableHead>
               <TableBody>
                 {(detail?.recent_consignments || []).map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.consignment_number}</TableCell>
+                  <TableRow
+                    key={row.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => openConsignment(row.id)}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" color="primary">
+                        {row.consignment_number}
+                      </Typography>
+                    </TableCell>
                     <TableCell>{row.direction}</TableCell>
-                    <TableCell>{row.status}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={row.status} />
+                    </TableCell>
                     <TableCell>{row.items_summary}</TableCell>
                   </TableRow>
                 ))}
+                {!detailLoading && !(detail?.recent_consignments || []).length && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">
+                      No consignments in this period.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>

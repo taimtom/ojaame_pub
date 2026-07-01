@@ -209,6 +209,7 @@ export const paths = {
     },
     consignment: {
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/consignment`,
+      details: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/consignment?id=${id}`,
     },
     pos: {
       root:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/pos`,

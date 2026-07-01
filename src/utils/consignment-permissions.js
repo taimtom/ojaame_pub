@@ -113,6 +113,33 @@ export function formatItemProgress(item, direction = 'borrowing') {
   return direction === 'lending' ? 'Not sent yet' : 'Pending';
 }
 
+export function getItemQuantityDetails(item) {
+  const qtySent = Number(item?.qty_sent || 0);
+  const qtyReceived = Number(item?.qty_received || 0);
+  const qtySold = Number(item?.qty_sold || 0);
+  const qtyReturned = Number(item?.qty_returned || 0);
+  const qtyDamaged = Number(item?.qty_damaged || 0);
+  const onHand = item?.qty_on_hand != null ? Number(item.qty_on_hand) : itemOnHand(item);
+
+  const rows = [
+    { label: 'Originally sent', value: qtySent },
+    { label: 'Received', value: qtyReceived },
+    { label: 'Sold', value: qtySold },
+  ];
+
+  if (qtyReturned > 0) {
+    rows.push({ label: 'Returned', value: qtyReturned });
+  }
+  if (qtyDamaged > 0) {
+    rows.push({ label: 'Damaged', value: qtyDamaged });
+  }
+  if (onHand > 0) {
+    rows.push({ label: 'Still on hand', value: onHand });
+  }
+
+  return rows;
+}
+
 export function itemOnHand(item) {
   return Math.max(
     0,
