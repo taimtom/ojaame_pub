@@ -20,9 +20,6 @@ export function getTransferActionAccess({
   const storeId = Number(currentStoreId);
   const isSourceStore = storeId === sourceId;
   const isDestStore = storeId === destId;
-  const isAssignedDriver =
-    transfer?.assigned_driver_user_id &&
-    Number(transfer.assigned_driver_user_id) === Number(currentUserId);
 
   const status = transfer?.status;
 
@@ -37,17 +34,21 @@ export function getTransferActionAccess({
       canUpdate &&
       (canManage || isSourceStore) &&
       ['created', 'packed'].includes(status),
+    canEdit:
+      canUpdate &&
+      (canManage || isSourceStore) &&
+      ['created', 'packed', 'picked_up'].includes(status),
     canPickup:
       canUpdate &&
-      (canManage || isAssignedDriver || isSourceStore) &&
+      (canManage || isSourceStore) &&
       status === 'packed',
     canInTransit:
       canUpdate &&
-      (canManage || isAssignedDriver) &&
+      (canManage || isSourceStore) &&
       status === 'picked_up',
     canDeliver:
       canUpdate &&
-      (canManage || isAssignedDriver) &&
+      (canManage || isSourceStore) &&
       ['picked_up', 'in_transit'].includes(status),
     canReceive:
       canUpdate &&
@@ -63,6 +64,7 @@ export function getTransferActionAccess({
 export const TRANSFER_ACTION_LABELS = {
   pack: 'Pack',
   assign: 'Assign driver',
+  edit: 'Edit transfer',
   pickup: 'Confirm pickup',
   transit: 'Mark in transit',
   deliver: 'Mark delivered',

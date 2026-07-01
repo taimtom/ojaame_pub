@@ -27,6 +27,47 @@ const STATUS_COLORS = {
   closed: 'primary',
 };
 
+const ITEM_STATUS_COLORS = {
+  pending: 'default',
+  packed: 'info',
+  partial_packed: 'warning',
+  received: 'success',
+  discrepancy: 'error',
+};
+
+function ItemMetric({ label, value, highlight }) {
+  return (
+    <Box
+      sx={{
+        px: 1,
+        py: 0.5,
+        borderRadius: 1,
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        minWidth: 56,
+        textAlign: 'center',
+      }}
+    >
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.2 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="subtitle2"
+        sx={{ lineHeight: 1.2, color: highlight ? 'error.main' : 'text.primary' }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+ItemMetric.propTypes = {
+  label: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  highlight: PropTypes.bool,
+};
+
 const EVIDENCE_VALUE_PROP_TYPE = PropTypes.oneOfType([
   PropTypes.string,
   PropTypes.number,
@@ -88,7 +129,7 @@ function TimelineEvent({ event, isLast }) {
         <Typography variant="caption" color="text.secondary">
           {fDateTime(event.created_at)}
           {event.actor_role ? ` · ${event.actor_role}` : ''}
-          {event.actor_user_id ? ` · user #${event.actor_user_id}` : ''}
+          {event.actor_name ? ` · ${event.actor_name}` : event.actor_user_id ? ` · user #${event.actor_user_id}` : ''}
         </Typography>
         {event.notes && (
           <Typography variant="body2" sx={{ mt: 0.5 }}>
@@ -107,6 +148,7 @@ TimelineEvent.propTypes = {
     created_at: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
     actor_role: PropTypes.string,
     actor_user_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    actor_name: PropTypes.string,
     notes: PropTypes.string,
     evidence_data: PropTypes.objectOf(EVIDENCE_VALUE_PROP_TYPE),
   }).isRequired,
@@ -125,7 +167,7 @@ export function TransferDetailDrawer({
   submitting,
   onAction,
   assignedDriverId,
-  onCreateDriver,
+  onManageDrivers,
 }) {
   if (!transfer) {
     return null;
@@ -143,6 +185,7 @@ export function TransferDetailDrawer({
   );
 
   const actionButtons = [
+    { key: 'edit', show: access.canEdit },
     { key: 'pack', show: access.canPack },
     { key: 'assign', show: access.canAssignDriver },
     { key: 'pickup', show: access.canPickup },
@@ -188,9 +231,15 @@ export function TransferDetailDrawer({
               {storeNameById?.(transfer.destination_store_id) ||
                 `Store #${transfer.destination_store_id}`}
             </Typography>
-            {transfer.assigned_driver_user_id && (
+            {transfer.requested_by_name && (
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                Driver: user #{transfer.assigned_driver_user_id}
+                Requested by: {transfer.requested_by_name}
+              </Typography>
+            )}
+            {transfer.assigned_driver && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                Driver: {transfer.assigned_driver.name}
+                {transfer.assigned_driver.phone ? ` · ${transfer.assigned_driver.phone}` : ''}
               </Typography>
             )}
           </Box>
@@ -199,21 +248,45 @@ export function TransferDetailDrawer({
             <Typography variant="overline" color="text.secondary">
               Items
             </Typography>
-            <Stack spacing={1} sx={{ mt: 1 }}>
+            <Stack spacing={1.5} sx={{ mt: 1 }}>
               {(transfer.items || []).map((item) => (
                 <Box
                   key={item.product_id}
-                  sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    bgcolor: 'background.neutral',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
                 >
-                  <Typography variant="subtitle2">
-                    {productNameById?.(item.product_id) || `Product #${item.product_id}`}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Req {item.requested_qty} · Packed {item.packed_qty} · Received{' '}
-                    {item.received_qty}
-                    {item.damaged_qty > 0 ? ` · Damaged ${item.damaged_qty}` : ''}
-                  </Typography>
-                  <Chip size="small" label={item.status} sx={{ mt: 0.5 }} />
+                  <Stack
+                    direction="row"
+                    alignItems="flex-start"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
+                    <Typography variant="subtitle2" sx={{ flex: 1, wordBreak: 'break-word' }}>
+                      {item.product_name ||
+                        productNameById?.(item.product_id) ||
+                        `Product #${item.product_id}`}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      variant="soft"
+                      label={String(item.status || '').replace(/_/g, ' ')}
+                      color={ITEM_STATUS_COLORS[item.status] || 'default'}
+                      sx={{ textTransform: 'capitalize', flexShrink: 0 }}
+                    />
+                  </Stack>
+                  <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+                    <ItemMetric label="Requested" value={item.requested_qty} />
+                    <ItemMetric label="Packed" value={item.packed_qty} />
+                    <ItemMetric label="Received" value={item.received_qty} />
+                    {item.damaged_qty > 0 && (
+                      <ItemMetric label="Damaged" value={item.damaged_qty} highlight />
+                    )}
+                  </Stack>
                 </Box>
               ))}
             </Stack>
@@ -224,17 +297,40 @@ export function TransferDetailDrawer({
               <Typography variant="overline" color="text.secondary">
                 Packages
               </Typography>
-              <Stack spacing={1} sx={{ mt: 1 }}>
+              <Stack spacing={1.5} sx={{ mt: 1 }}>
                 {transfer.packages.map((pkg) => (
                   <Box
                     key={pkg.package_code}
-                    sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1.5,
+                      bgcolor: 'background.neutral',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
                   >
-                    <Typography variant="subtitle2">{pkg.package_code}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {pkg.seal_code ? `Seal: ${pkg.seal_code} · ` : ''}
-                      Status: {pkg.status}
-                    </Typography>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      spacing={1}
+                    >
+                      <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
+                        {pkg.package_code}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        variant="soft"
+                        label={String(pkg.status || '').replace(/_/g, ' ')}
+                        color={STATUS_COLORS[pkg.status] || 'default'}
+                        sx={{ textTransform: 'capitalize', flexShrink: 0 }}
+                      />
+                    </Stack>
+                    {pkg.seal_code && (
+                      <Typography variant="caption" color="text.secondary">
+                        Seal: {pkg.seal_code}
+                      </Typography>
+                    )}
                   </Box>
                 ))}
               </Stack>
@@ -289,8 +385,8 @@ export function TransferDetailDrawer({
                 <Typography variant="caption" color="warning.main">
                   Select a driver in the list header before assigning.
                 </Typography>
-                <Button size="small" variant="text" onClick={onCreateDriver}>
-                  + Create driver
+                <Button size="small" variant="text" onClick={onManageDrivers}>
+                  Manage drivers
                 </Button>
               </Stack>
             )}
@@ -311,9 +407,18 @@ TransferDetailDrawer.propTypes = {
     source_store_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     destination_store_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     assigned_driver_user_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    assigned_driver_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    assigned_driver: PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      name: PropTypes.string,
+      phone: PropTypes.string,
+      email: PropTypes.string,
+    }),
+    requested_by_name: PropTypes.string,
     items: PropTypes.arrayOf(
       PropTypes.shape({
         product_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        product_name: PropTypes.string,
         requested_qty: PropTypes.number,
         packed_qty: PropTypes.number,
         received_qty: PropTypes.number,
@@ -334,6 +439,7 @@ TransferDetailDrawer.propTypes = {
         created_at: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
         actor_role: PropTypes.string,
         actor_user_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        actor_name: PropTypes.string,
         notes: PropTypes.string,
         evidence_data: PropTypes.objectOf(EVIDENCE_VALUE_PROP_TYPE),
       })
@@ -347,5 +453,5 @@ TransferDetailDrawer.propTypes = {
   submitting: PropTypes.bool,
   onAction: PropTypes.func,
   assignedDriverId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onCreateDriver: PropTypes.func,
+  onManageDrivers: PropTypes.func,
 };

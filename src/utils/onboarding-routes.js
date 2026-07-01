@@ -3,9 +3,15 @@ import { paths } from 'src/routes/paths';
 import {
   ONBOARDING_QUERY_PARAM,
   ONBOARDING_QUERY_VALUE,
+  ONBOARDING_STEP_KEYS,
 } from 'src/auth/onboarding-constants';
 
 // ----------------------------------------------------------------------
+
+export function getOnboardingStepIndex(stepKey) {
+  const idx = ONBOARDING_STEP_KEYS.indexOf(stepKey);
+  return idx >= 0 ? idx : 0;
+}
 
 export function withOnboardingQuery(path) {
   const separator = path.includes('?') ? '&' : '?';
@@ -32,6 +38,8 @@ export function getOnboardingPathForStep(step, progress) {
     case 'customers':
       if (!storeParam) return withOnboardingQuery(paths.dashboard.store.new);
       return withOnboardingQuery(paths.dashboard.customer.new(storeParam));
+    case 'receipt':
+      return withOnboardingQuery(`${paths.dashboard.user.account}?tab=printer`);
     case 'sales':
       if (!storeParam) return withOnboardingQuery(paths.dashboard.store.new);
       return withOnboardingQuery(paths.dashboard.quickDashboard);
@@ -88,6 +96,11 @@ export function pathMatchesOnboardingStep(pathname, searchParams, step, progress
       return storeParam
         ? path === normalizePath(paths.dashboard.customer.new(storeParam))
         : false;
+    case 'receipt':
+      return (
+        path === paths.dashboard.user.account &&
+        (searchParams?.get('tab') === 'printer' || searchParams?.get('tab') === 'receipt')
+      );
     case 'sales':
       return path === paths.dashboard.quickDashboard;
     case 'report':
@@ -104,14 +117,35 @@ export function currentPathWithSearch(pathname, searchParams) {
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
+export function getViewingOnboardingStep(pathname, searchParams, progress) {
+  if (!progress || progress.onboarding_completed) {
+    return null;
+  }
+
+  const furthestIndex =
+    progress.furthest_step_index ?? getOnboardingStepIndex(progress.current_step);
+
+  for (let i = 0; i <= furthestIndex; i += 1) {
+    const stepKey = ONBOARDING_STEP_KEYS[i];
+    if (pathMatchesOnboardingStep(pathname, searchParams, stepKey, progress)) {
+      return stepKey;
+    }
+  }
+
+  return progress.current_step;
+}
+
 export function isAllowedOnboardingPath(pathname, searchParams, progress) {
   if (!progress || progress.onboarding_completed || !progress.current_step) {
     return true;
   }
-  return pathMatchesOnboardingStep(
-    pathname,
-    searchParams,
-    progress.current_step,
-    progress
+
+  const furthestIndex =
+    progress.furthest_step_index ?? getOnboardingStepIndex(progress.current_step);
+
+  return ONBOARDING_STEP_KEYS.some(
+    (stepKey, idx) =>
+      idx <= furthestIndex &&
+      pathMatchesOnboardingStep(pathname, searchParams, stepKey, progress)
   );
 }

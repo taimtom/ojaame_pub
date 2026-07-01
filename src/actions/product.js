@@ -333,3 +333,64 @@ export function useGetProductMovements(storeId, productId, queryParams = {}) {
     [data, error, isLoading, isValidating]
   );
 }
+
+export function useGetSuppliers(companyId, queryParams = {}) {
+  const key = companyId
+    ? [endpoints.product.suppliers, { params: { company_id: companyId, ...queryParams } }]
+    : null;
+
+  const { data, isLoading, error, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(() => {
+    const paged = normalizePaginatedResponse(data);
+    return {
+      suppliers: paged.items,
+      suppliersPagination: paged.pagination,
+      suppliersLoading: isLoading,
+      suppliersError: error,
+      suppliersValidating: isValidating,
+      mutateSuppliers: mutate,
+    };
+  }, [data, error, isLoading, isValidating, mutate]);
+}
+
+export async function createSupplier(payload) {
+  const response = await axiosInstance.post(endpoints.product.suppliers, payload);
+  return response.data;
+}
+
+export function useGetRestockBatches(storeId, queryParams = {}) {
+  const key = storeId
+    ? [endpoints.product.restockBatches, { params: { store_id: storeId, ...queryParams } }]
+    : null;
+
+  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(() => {
+    const paged = normalizePaginatedResponse(data);
+    return {
+      restockBatches: paged.items,
+      restockBatchesPagination: paged.pagination,
+      restockBatchesLoading: isLoading,
+      restockBatchesError: error,
+      restockBatchesValidating: isValidating,
+      restockBatchesEmpty: !isLoading && paged.items.length === 0,
+    };
+  }, [data, error, isLoading, isValidating]);
+}
+
+export function useGetRestockBatch(batchId) {
+  const key = batchId ? `${endpoints.product.restockBatches}/${batchId}` : null;
+
+  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      restockBatch: data,
+      restockBatchLoading: isLoading,
+      restockBatchError: error,
+      restockBatchValidating: isValidating,
+    }),
+    [data, error, isLoading, isValidating]
+  );
+}

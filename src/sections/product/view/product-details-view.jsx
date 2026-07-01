@@ -28,6 +28,7 @@ import { Chart, useChart } from 'src/components/chart';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
+import { useGetStores } from 'src/actions/store';
 import { useGetProductMovements, useGetProductSalesHistory, publishProduct } from 'src/actions/product';
 
 import { ProductDetailsSkeleton } from '../product-skeleton';
@@ -39,6 +40,7 @@ import {
   ProductPurchaseHistoryTab,
   ProductSaleHistoryTab,
   ProductUsageHistoryTab,
+  ProductTransferHistoryTab,
 } from '../product-history-tab';
 
 // ----------------------------------------------------------------------
@@ -188,6 +190,9 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
 
   const { productMovements } = useGetProductMovements(storeId, product?.id);
   const { productSalesHistory } = useGetProductSalesHistory(storeId, product?.id);
+  const { stores } = useGetStores();
+
+  const hasMultipleStores = (stores?.length ?? 0) > 1;
 
   const isProductionInput = product?.product_kind === 'production_input';
 
@@ -460,6 +465,9 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
               value: 'sale_history',
               label: isProductionInput ? 'Usage History' : 'Sale History',
             },
+            ...(hasMultipleStores
+              ? [{ value: 'transfer_history', label: 'Transfer History' }]
+              : []),
           ].map((tab) => (
             <Tab key={tab.value} value={tab.value} label={tab.label} />
           ))}
@@ -483,6 +491,10 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
               productId={product?.id}
             />
           ))}
+
+        {tabs.value === 'transfer_history' && hasMultipleStores && (
+          <ProductTransferHistoryTab storeId={storeId} productId={product?.id} />
+        )}
       </Card>
     </DashboardContent>
   );

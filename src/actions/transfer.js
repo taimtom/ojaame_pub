@@ -47,6 +47,11 @@ export async function createTransferOrder(payload) {
   return response.data;
 }
 
+export async function updateTransferOrder(transferId, payload) {
+  const response = await axiosInstance.put(endpoints.transfer.details(transferId), payload);
+  return response.data;
+}
+
 export async function packTransferOrder(transferId, payload) {
   const response = await axiosInstance.post(endpoints.transfer.pack(transferId), payload);
   return response.data;
@@ -85,4 +90,37 @@ export async function closeTransferOrder(transferId, payload = {}) {
 export async function getTransferKpis() {
   const response = await axiosInstance.get(endpoints.transfer.kpis);
   return response.data;
+}
+
+export function useGetDrivers() {
+  const { data, isLoading, error, isValidating, mutate } = useSWR(
+    endpoints.transfer.drivers,
+    fetcher,
+    swrOptions
+  );
+
+  return useMemo(
+    () => ({
+      drivers: data || [],
+      driversLoading: isLoading,
+      driversError: error,
+      driversValidating: isValidating,
+      mutateDrivers: mutate,
+    }),
+    [data, error, isLoading, isValidating, mutate]
+  );
+}
+
+export async function createDriver(payload) {
+  const response = await axiosInstance.post(endpoints.transfer.drivers, payload);
+  return response.data;
+}
+
+export async function updateDriver(driverId, payload) {
+  const response = await axiosInstance.put(endpoints.transfer.driverDetails(driverId), payload);
+  return response.data;
+}
+
+export async function deleteDriver(driverId) {
+  await axiosInstance.delete(endpoints.transfer.driverDetails(driverId));
 }

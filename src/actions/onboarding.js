@@ -51,6 +51,11 @@ export async function completeReportView() {
   return res.data;
 }
 
+export async function completeReceiptSetup() {
+  const res = await axiosInstance.post(endpoints.onboarding.completeReceiptSetup);
+  return res.data;
+}
+
 export async function finishOnboarding() {
   const res = await axiosInstance.post(endpoints.onboarding.finish);
   return res.data;

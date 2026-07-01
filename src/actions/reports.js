@@ -340,6 +340,82 @@ export async function mergeCustomerAccounts(payload) {
   return response.data;
 }
 
+// ─── Partner report ────────────────────────────────────────────────────────────
+
+export function usePartnerReport(
+  storeId,
+  period = 'this_month',
+  month = undefined,
+  year = undefined,
+  date = undefined,
+  options = {}
+) {
+  const { q, sort = 'amount_you_owe', order = 'desc', page = 1, pageSize = 25 } = options;
+
+  const key = storeId
+    ? [
+        endpoints.reports.partners,
+        {
+          params: {
+            ...periodParams({ store_id: storeId, sort, order, page, page_size: pageSize }, period, month, year, date),
+            ...(q ? { q } : {}),
+          },
+        },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      report: data || null,
+      reportLoading: isLoading,
+      reportError: error,
+      refetchReport: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function usePartnerReportDetail(
+  storeId,
+  partnerId,
+  period = 'this_month',
+  month = undefined,
+  year = undefined,
+  date = undefined
+) {
+  const key =
+    storeId && partnerId
+      ? [
+          endpoints.reports.partnerDetail(partnerId),
+          { params: periodParams({ store_id: storeId }, period, month, year, date) },
+        ]
+      : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      detail: data || null,
+      detailLoading: isLoading,
+      detailError: error,
+      refetchDetail: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export async function payPartner(partnerId, payload) {
+  const response = await axiosInstance.post(endpoints.reports.payPartner(partnerId), payload);
+  return response.data;
+}
+
+export async function collectPartnerPayment(partnerId, payload) {
+  const response = await axiosInstance.post(endpoints.reports.collectPartnerPayment(partnerId), payload);
+  return response.data;
+}
+
 export function useStoreCashFlow(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = reportScopeKey(companyId, storeId)
     ? [endpoints.reports.cashFlow, { params: periodParams(reportScopeParams(companyId, storeId), period, month, year, date) }]

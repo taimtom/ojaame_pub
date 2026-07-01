@@ -22,6 +22,8 @@ import Link from '@mui/material/Link';
 
 import { Chart, useChart } from 'src/components/chart';
 import { EmptyContent } from 'src/components/empty-content';
+import { useGetStores } from 'src/actions/store';
+import { useGetTransfers } from 'src/actions/transfer';
 import { useGetProductMovements, useGetProductSalesHistory } from 'src/actions/product';
 
 // Status colours matching the existing product history table
@@ -42,6 +44,18 @@ const STATUS_COLORS = {
   stolen: 'error',
   lost: 'default',
   usage: 'warning',
+};
+
+// Status colours for transfer orders (separate lifecycle from stock movements)
+const TRANSFER_STATUS_COLORS = {
+  created: 'default',
+  packed: 'info',
+  picked_up: 'warning',
+  in_transit: 'warning',
+  delivered: 'success',
+  received: 'success',
+  reconciled_with_exception: 'error',
+  closed: 'primary',
 };
 
 // Which movement statuses count as "purchase" (stock additions)
@@ -453,6 +467,150 @@ export function ProductUsageHistoryTab({ storeId, productId }) {
           color={theme.palette.warning.main}
         />
       )}
+    </Box>
+  );
+}
+
+function TransferListView({ rows, loading }) {
+  const columns = [
+    {
+      field: 'created_at',
+      headerName: 'Date',
+      width: 160,
+      renderCell: ({ value }) => (
+        <Typography variant="body2">{value ? fDateTime(value) : '—'}</Typography>
+      ),
+    },
+    {
+      field: 'transfer_number',
+      headerName: 'Transfer',
+      width: 170,
+      renderCell: ({ value }) => (
+        <Typography variant="body2">{value || '—'}</Typography>
+      ),
+    },
+    {
+      field: 'direction',
+      headerName: 'Direction',
+      width: 110,
+      renderCell: ({ value }) => (
+        <Chip
+          size="small"
+          label={value === 'in' ? 'Stock In' : 'Stock Out'}
+          color={value === 'in' ? 'success' : 'error'}
+          variant="soft"
+        />
+      ),
+    },
+    {
+      field: 'counterparty',
+      headerName: 'From / To',
+      flex: 1,
+      minWidth: 160,
+      renderCell: ({ row, value }) => (
+        <Typography variant="body2">
+          {row.direction === 'in' ? `From ${value}` : `To ${value}`}
+        </Typography>
+      ),
+    },
+    {
+      field: 'requested_qty',
+      headerName: 'Requested',
+      width: 110,
+      type: 'number',
+      headerAlign: 'left',
+      align: 'left',
+    },
+    {
+      field: 'received_qty',
+      headerName: 'Received',
+      width: 110,
+      type: 'number',
+      headerAlign: 'left',
+      align: 'left',
+      renderCell: ({ value }) => (
+        <Typography variant="body2">{value != null ? value : '—'}</Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 150,
+      renderCell: ({ value }) => (
+        <Chip
+          size="small"
+          label={(value || '—').replace(/_/g, ' ')}
+          color={TRANSFER_STATUS_COLORS[value] || 'default'}
+          variant="soft"
+        />
+      ),
+    },
+  ];
+
+  return (
+    <Box sx={{ height: 420 }}>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        getRowHeight={() => 'auto'}
+        pageSizeOptions={[5, 10, 25]}
+        initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+        disableRowSelectionOnClick
+        slots={{
+          noRowsOverlay: () => <EmptyContent title="No transfer history yet" />,
+          noResultsOverlay: () => <EmptyContent title="No results found" />,
+        }}
+        sx={{ [`& .${gridClasses.cell}`]: { alignItems: 'center', display: 'inline-flex' } }}
+      />
+    </Box>
+  );
+}
+
+export function ProductTransferHistoryTab({ storeId, productId }) {
+  const { transfers, transfersLoading } = useGetTransfers(
+    storeId ? { store_id: Number(storeId), limit: 100 } : {}
+  );
+  const { stores } = useGetStores();
+
+  const storeNameById = (id) =>
+    (stores || []).find((s) => Number(s.id) === Number(id))?.storeName || `Store #${id}`;
+
+  const rows = useMemo(() => {
+    const result = [];
+    (transfers || []).forEach((transfer) => {
+      const line = (transfer.items || []).find(
+        (item) => Number(item.product_id) === Number(productId)
+      );
+      if (!line) return;
+
+      const isIncoming = Number(transfer.destination_store_id) === Number(storeId);
+      const counterpartyId = isIncoming
+        ? transfer.source_store_id
+        : transfer.destination_store_id;
+
+      result.push({
+        id: transfer.id,
+        created_at: transfer.created_at,
+        transfer_number: transfer.transfer_number,
+        direction: isIncoming ? 'in' : 'out',
+        counterparty: storeNameById(counterpartyId),
+        requested_qty: line.requested_qty,
+        received_qty: line.received_qty,
+        status: transfer.status,
+      });
+    });
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transfers, stores, storeId, productId]);
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Typography variant="h6">Transfer History</Typography>
+      </Stack>
+
+      <TransferListView rows={rows} loading={transfersLoading} />
     </Box>
   );
 }

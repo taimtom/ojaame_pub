@@ -26,8 +26,9 @@ import { AccountThemeSettings } from '../account-theme-settings';
 import { AccountFinance } from '../account-finance';
 import { AccountPrinterSettings } from '../account-printer-settings';
 import { AccountReceiptSettings } from '../account-receipt-settings';
+import { AccountReceiptOnboardingPanel } from '../account-receipt-onboarding-panel';
 import { OnboardingSetupShell } from 'src/components/onboarding/onboarding-setup-shell';
-import { useOnboardingMode } from 'src/hooks/use-onboarding-mode';
+import { useOnboardingMode, useOnboardingActive } from 'src/hooks/use-onboarding-mode';
 import { usePlanFeatures } from 'src/hooks/use-plan-features';
 import { useGetSubscriptionStatus } from 'src/actions/billing';
 import { canAccessCompanyBillingSettings } from 'src/utils/user-role';
@@ -80,6 +81,10 @@ export function AccountView() {
   const tabs = useTabs('general');
   const searchParams = useSearchParams();
   const onboarding = useOnboardingMode();
+  const { progress } = useOnboardingActive();
+  const isReceiptOnboardingStep = Boolean(
+    onboarding && progress?.current_step === 'receipt'
+  );
 
   const visibleTabs = TABS.filter((tab) => {
     if (tab.value === 'finance' && !hasPlanFeature('finance_settings')) {
@@ -112,9 +117,12 @@ export function AccountView() {
     if (tabParam && visibleTabs.some((t) => t.value === tabParam)) {
       tabs.setValue(tabParam);
     }
+    if (isReceiptOnboardingStep && tabParam !== 'receipt') {
+      tabs.setValue('printer');
+    }
     // Only run on mount / when query param changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, hasPlanFeature, canAccessCompanyBilling, visibleTabs]);
+  }, [searchParams, hasPlanFeature, canAccessCompanyBilling, visibleTabs, isReceiptOnboardingStep]);
 
   useEffect(() => {
     if (!visibleTabs.some((tab) => tab.value === tabs.value)) {
@@ -185,9 +193,23 @@ export function AccountView() {
 
       {tabs.value === 'finance' && hasPlanFeature('finance_settings') && <AccountFinance />}
 
-      {tabs.value === 'printer' && <AccountPrinterSettings />}
+      {tabs.value === 'printer' &&
+        (isReceiptOnboardingStep ? (
+          <OnboardingSetupShell subtitle="Pair a Bluetooth printer and set receipt preferences before your first sale. You can skip this step and configure later from Account settings.">
+            <AccountReceiptOnboardingPanel />
+          </OnboardingSetupShell>
+        ) : (
+          <AccountPrinterSettings />
+        ))}
 
-      {tabs.value === 'receipt' && <AccountReceiptSettings />}
+      {tabs.value === 'receipt' &&
+        (isReceiptOnboardingStep ? (
+          <OnboardingSetupShell subtitle="Pair a Bluetooth printer and set receipt preferences before your first sale. You can skip this step and configure later from Account settings.">
+            <AccountReceiptOnboardingPanel />
+          </OnboardingSetupShell>
+        ) : (
+          <AccountReceiptSettings />
+        ))}
     </DashboardContent>
   );
 }

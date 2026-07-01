@@ -40,6 +40,7 @@ const ICONS = {
   blank: icon('ic-blank'),
   kanban: icon('ic-kanban'),
   folder: icon('ic-folder'),
+  consignment: icon('ic-consignment'),
   course: icon('ic-course'),
   banking: icon('ic-banking'),
   booking: icon('ic-booking'),
@@ -239,6 +240,12 @@ export const useNavData = () => {
         icon: ICONS.customer,
         permissionKey: 'Customer Report',
       },
+      {
+        title: 'Partner Report',
+        path: callIfFunction(paths.dashboard.reports.partners, currentStore),
+        icon: ICONS.user,
+        permissionKey: 'Inventory',
+      },
     ],
   },
   /**
@@ -295,6 +302,7 @@ export const useNavData = () => {
           // { title: `Bulk add ${t('product')}`, path: callIfFunction(paths.dashboard.product.bulkAdd, currentStore) },
           { title: `${t('product')} Report`, path: callIfFunction(paths.dashboard.product.root, currentStore) },
           { title: `${t('product')} History`, path: callIfFunction(paths.dashboard.product.history, currentStore) },
+          { title: 'Restock History', path: callIfFunction(paths.dashboard.product.restockHistory, currentStore) },
         ],
       },
       {
@@ -311,6 +319,12 @@ export const useNavData = () => {
         title: 'Store Transfers',
         path: callIfFunction(paths.dashboard.transfer.root, currentStore),
         icon: ICONS.folder,
+        permissionKey: 'Inventory',
+      },
+      {
+        title: 'Consignment',
+        path: callIfFunction(paths.dashboard.consignment.root, currentStore),
+        icon: ICONS.consignment,
         permissionKey: 'Inventory',
       },
       { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },

@@ -191,6 +191,7 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     customer_state,
     customer_country,
     customer_phone,
+    company_name,
     store_name,
     store_address,
     store_state,
@@ -206,6 +207,9 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
   );
 
   const styles = useStyles();
+
+  const displayCompanyName = company_name || store_name || 'Your Store';
+  const showStoreName = Boolean(store_name && company_name);
 
   // Calculate payment totals
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -246,7 +250,10 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
       {/* Store details */}
       <View style={{ width: '50%' }}>
         <Text style={[styles.subtitle2, styles.mb4]}>From</Text>
-        <Text style={[styles.h4, styles.mb4]}>{store_name || 'Your Store'}</Text>
+        <Text style={[styles.h4, styles.mb4]}>{displayCompanyName}</Text>
+        {showStoreName ? (
+          <Text style={[styles.body2, styles.mb4]}>Store: {store_name}</Text>
+        ) : null}
         <Text style={styles.body2}>{store_address}</Text>
         <Text style={styles.body2}>
           {store_state && store_country ? `${store_state}, ${store_country}` : ''}

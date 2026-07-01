@@ -18,6 +18,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { agentApi } from 'src/lib/agentApi';
@@ -126,13 +127,32 @@ export default function AgentBusinessesPage() {
                           color={unlocked ? 'success' : 'default'}
                           size="small"
                         />
+                        {!unlocked && cnt >= th && biz.activation_pending_message && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Needs subscription payment
+                          </Typography>
+                        )}
+                        {!unlocked && cnt >= th && !biz.completed_signup && biz.setup_incomplete_message && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Needs payment setup
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={biz.completed_signup ? 'Yes' : 'No'}
-                          color={biz.completed_signup ? 'success' : 'default'}
-                          size="small"
-                        />
+                        <Tooltip
+                          title={
+                            !biz.completed_signup
+                              ? biz.setup_incomplete_message || 'Setup not finished'
+                              : ''
+                          }
+                          disableHoverListener={biz.completed_signup}
+                        >
+                          <Chip
+                            label={biz.completed_signup ? 'Yes' : 'No'}
+                            color={biz.completed_signup ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </Tooltip>
                       </TableCell>
                       <TableCell>
                         <Chip

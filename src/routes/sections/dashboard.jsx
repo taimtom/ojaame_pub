@@ -48,8 +48,10 @@ const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/ad
 const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/change-price'));
 const ProductBulkAddPage = lazy(() => import('src/pages/dashboard/product/bulk-add'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
+const ProductRestockHistoryPage = lazy(() => import('src/pages/dashboard/product/restock-history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
 const TransferListPage = lazy(() => import('src/pages/dashboard/transfer/list'));
+const ConsignmentListPage = lazy(() => import('src/pages/dashboard/consignment/list'));
 
 // Category
 const CategoryListPage = lazy(() => import('src/pages/dashboard/category/list'));
@@ -184,6 +186,8 @@ const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/report
 const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
 const StoreCustomerReportPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report'));
 const StoreCustomerReportDetailPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report-detail'));
+const StorePartnerReportPage = lazy(() => import('src/pages/dashboard/reports/store-partner-report'));
+const StorePartnerReportDetailPage = lazy(() => import('src/pages/dashboard/reports/store-partner-report-detail'));
 const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
 
 // ----------------------------------------------------------------------
@@ -243,6 +247,7 @@ export const dashboardRoutes = [
             { index: true, element: <ProductListPage /> },
             { path: 'list', element: <ProductListPage /> },
             { path: 'history', element: <ProductHistoryListPage /> },
+            { path: 'restock-history', element: <ProductRestockHistoryPage /> },
             { path: ':id', element: <ProductDetailsPage /> },
             { path: ':id/movement', element: <ProductHistoryMovementPage /> },
             { path: 'new', element: <ProductCreatePage /> },
@@ -264,6 +269,23 @@ export const dashboardRoutes = [
                 (
                 <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
                   <TransferListPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+          ],
+        },
+        {
+          path: 'consignment',
+          children: [
+            {
+              index: true,
+              element: withPlanFeature(
+                'consignment',
+                'Consignment',
+                (
+                <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+                  <ConsignmentListPage />
                 </PermissionGuard>
                 )
               ),
@@ -487,6 +509,22 @@ export const dashboardRoutes = [
               element: (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreCustomerReportDetailPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'partners',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
+                  <StorePartnerReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'partners/:partnerId',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
+                  <StorePartnerReportDetailPage />
                 </PermissionGuard>
               ),
             },

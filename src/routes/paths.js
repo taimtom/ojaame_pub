@@ -198,6 +198,7 @@ export const paths = {
       adjust: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/adjust`,
       changePrice: (storeParam, id) => `${ROOTS.DASHBOARD}/${storeParam}/product/${id}/change-price`,
       history: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/history`,
+      restockHistory: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/product/restock-history`,
       demo: {
         details: `${ROOTS.DASHBOARD}/product/${MOCK_ID}`,
         edit: `${ROOTS.DASHBOARD}/product/${MOCK_ID}/edit`,
@@ -205,6 +206,9 @@ export const paths = {
     },
     transfer: {
       root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/transfer`,
+    },
+    consignment: {
+      root: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/consignment`,
     },
     pos: {
       root:(storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/pos`,
@@ -320,6 +324,9 @@ export const paths = {
       customers: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/customers`,
       customerDetail: (storeParam, customerId) =>
         `${ROOTS.DASHBOARD}/${storeParam}/reports/customers/${customerId}`,
+      partners: (storeParam) => `${ROOTS.DASHBOARD}/${storeParam}/reports/partners`,
+      partnerDetail: (storeParam, partnerId) =>
+        `${ROOTS.DASHBOARD}/${storeParam}/reports/partners/${partnerId}`,
 
       // Company-level reports (not scoped to a single store)
       companyRoot: `${ROOTS.DASHBOARD}/company-reports`,

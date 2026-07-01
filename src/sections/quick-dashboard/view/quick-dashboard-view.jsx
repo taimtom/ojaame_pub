@@ -459,6 +459,15 @@ function ItemCard({ item, onAdd }) {
                 sx={{ height: 18, fontSize: 10 }}
               />
             )}
+            {item.has_consigned && (
+              <Chip
+                size="small"
+                label="Consignment"
+                color="info"
+                variant="outlined"
+                sx={{ height: 18, fontSize: 10 }}
+              />
+            )}
           </Stack>
         </Box>
         <Iconify icon="eva:plus-fill" width={18} sx={{ color: 'primary.main', flexShrink: 0 }} />
@@ -1245,8 +1254,10 @@ export function QuickDashboardView() {
 
   useEffect(() => {
     let timer;
-    if (!query.trim() || !storeId) {
+    if (!storeId) {
       setSearchResults([]);
+    } else if (!query.trim()) {
+      // Consigned-stock effect loads borrowed items when search is empty.
     } else if (!isOnline) {
       // Offline — filter cached products locally
       const cached = loadSearchCache();
@@ -1278,6 +1289,30 @@ export function QuickDashboardView() {
       }, 300);
     }
     return () => clearTimeout(timer);
+  }, [query, storeId, isOnline]);
+
+  // Show consigned (borrowed) stock in quick sale when search is empty
+  useEffect(() => {
+    if (!storeId || query.trim() || !isOnline) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        setSearching(true);
+        const res = await axiosInstance.get('/api/quick-dashboard/consigned-stock', {
+          params: { store_id: storeId, limit: 30 },
+        });
+        if (cancelled) return;
+        const normalized = (res.data?.results || []).map(normalizeQuickSearchProduct);
+        setSearchResults(normalized);
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [query, storeId, isOnline]);
 
   // ── Cart logic ─────────────────────────────────────────────────
@@ -2360,13 +2395,18 @@ export function QuickDashboardView() {
                   <Typography color="text.secondary" variant="body2">No results for &quot;{query}&quot;</Typography>
                 </Box>
               )}
-              {searchResults.length === 0 && !query && (
+              {searchResults.length === 0 && !searching && !query && (
                 <Box textAlign="center" py={5}>
                   <Iconify icon="solar:keyboard-bold" width={48} sx={{ color: 'text.disabled', mb: 1.5 }} />
                   <Typography color="text.secondary">
-                    Start typing to search products &amp; services
+                    Type to search, or receive consigned stock to sell borrowed items here
                   </Typography>
                 </Box>
+              )}
+              {searchResults.length > 0 && !query && (
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Consigned stock (ready to sell)
+                </Typography>
               )}
               <Stack spacing={1}>
                 {searchResults.map((item) => (

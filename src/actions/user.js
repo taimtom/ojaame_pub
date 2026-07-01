@@ -1,4 +1,4 @@
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
@@ -54,6 +54,15 @@ export const editUserDetails = async (userId, userData) => {
   const response = await axiosInstance.put(url, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return response.data;
+};
+
+// ----------------------------------------------------------------------
+// softDeleteUser - Soft-deletes a staff user (mutates email, deactivates).
+// ----------------------------------------------------------------------
+export const softDeleteUser = async (userId) => {
+  const response = await axiosInstance.post(endpoints.user.softDelete(userId));
+  await mutate([endpoints.user.list, { params: {} }]);
   return response.data;
 };
 

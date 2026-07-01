@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -84,7 +83,7 @@ export function ProductQuickAddForm({
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, quantity: defaultQuantity }));
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-  const [lastCreated, setLastCreated] = useState(null);
+  const [addedCount, setAddedCount] = useState(0);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const set = (key, value) => {
@@ -132,7 +131,7 @@ export function ProductQuickAddForm({
     return errs;
   };
 
-  const handleSubmit = async (andAddAnother) => {
+  const handleSubmit = async () => {
     const errs = validate();
     if (Object.keys(errs).length) {
       setErrors(errs);
@@ -191,14 +190,13 @@ export function ProductQuickAddForm({
       if (onCreated) {
         onCreated(buildCreatedProductSnapshot(form, productId));
       }
-      setLastCreated({ name: form.name, id: productId });
+      setAddedCount((prev) => prev + 1);
       if (onboarding) {
         await mutateProgress();
       }
-      if (andAddAnother) {
+      if (!embedded) {
         setForm({ ...EMPTY_FORM, quantity: defaultQuantity });
         setErrors({});
-        setLastCreated(null);
       }
     } catch (err) {
       const detail = err?.response?.data?.detail;
@@ -234,46 +232,6 @@ export function ProductQuickAddForm({
 
   return (
     <Stack spacing={embedded ? 2 : 3}>
-      {/* Success banner with quick actions */}
-      {!embedded && lastCreated && !submitting && (
-        <Alert
-          severity="success"
-          action={
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => {
-                  setLastCreated(null);
-                  setForm(EMPTY_FORM);
-                  setErrors({});
-                }}
-              >
-                Add Another
-              </Button>
-              <Button
-                size="small"
-                onClick={() => router.push(paths.dashboard.product.root(storeSlug))}
-              >
-                View Products
-              </Button>
-              {lastCreated.id != null && (
-                <Button
-                  size="small"
-                  onClick={() =>
-                    router.push(paths.dashboard.product.details(storeSlug, lastCreated.id))
-                  }
-                >
-                  View Item
-                </Button>
-              )}
-            </Stack>
-          }
-        >
-          &ldquo;{lastCreated.name}&rdquo; was created successfully.
-        </Alert>
-      )}
-
       <Card sx={{ p: embedded ? 0 : 3, boxShadow: embedded ? 'none' : undefined }}>
         <Stack spacing={3}>
           {/* Inventory role toggle */}
@@ -609,24 +567,13 @@ export function ProductQuickAddForm({
               variant="contained"
               size="large"
               disabled={submitting}
-              onClick={() => handleSubmit(false)}
+              onClick={() => handleSubmit()}
               startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
               sx={{ flex: 1 }}
             >
               {submitting ? 'Creating...' : embedded ? 'Create product' : 'Create Item'}
             </Button>
-            {!embedded && (
-              <Button
-                variant="outlined"
-                size="large"
-                disabled={submitting}
-                onClick={() => handleSubmit(true)}
-                sx={{ flex: 1 }}
-              >
-                Create &amp; Add Another
-              </Button>
-            )}
-            {onboarding && lastCreated && (
+            {onboarding && addedCount > 0 && (
               <Button
                 variant="contained"
                 color="success"
@@ -635,10 +582,16 @@ export function ProductQuickAddForm({
                 onClick={() => advanceOnboarding()}
                 sx={{ flex: 1 }}
               >
-                Continue setup
+                Next
               </Button>
             )}
           </Stack>
+
+          {!embedded && addedCount > 0 && (
+            <Typography variant="caption" color="text.secondary" textAlign="center">
+              {addedCount} item{addedCount === 1 ? '' : 's'} added this session
+            </Typography>
+          )}
 
           {!embedded && (
             <Box sx={{ textAlign: 'center' }}>

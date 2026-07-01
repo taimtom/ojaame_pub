@@ -111,16 +111,7 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
       discount: currentInvoice?.discount || 0,
       // invoice_from: currentInvoice?.invoice_from || null,
 
-      items: currentInvoice?.items || [
-        {
-          product_id: undefined,
-          service_id: undefined,
-          quantity: 1,
-          costPrice: undefined,
-          price: 0,
-          description: '',
-        },
-      ],
+      items: currentInvoice?.items || [],
       // Edit mode: start empty (existing payments are displayed read-only in the payments component)
       // New mode: start with one blank row (payments component initialises the amount)
       payments: currentInvoice ? [] : [{ payment_method_id: '', amount: 0, reference: '', notes: '' }],
@@ -245,8 +236,12 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
     const validPayments = (data.payments || []).filter(
       (p) => p.payment_method_id !== '' && p.payment_method_id != null && Number(p.amount) > 0
     );
+    const cleanItems = (data.items || []).map(
+      ({ _meta, total, item, costPrice, originalPrice, ...rest }) => rest
+    );
     return {
       ...data,
+      items: cleanItems,
       payments: validPayments,
       store_id: activeStore?.id || 0,
       invoice_from: activeStore ? `${activeStore.id} - ${activeStore.storeName}` : '',
@@ -353,7 +348,7 @@ export function InvoiceNewEditForm({ currentInvoice, storeId, storeSlug }) {
 
         <InvoiceNewEditStatusDate />
 
-        <InvoiceNewEditDetails />
+        <InvoiceNewEditDetails storeId={storeId} />
 
         <InvoiceNewEditPayments storeId={storeId} currentInvoice={currentInvoice} />
 

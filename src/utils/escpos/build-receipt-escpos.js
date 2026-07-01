@@ -48,6 +48,7 @@ export function buildReceiptEscPos(receipt, options = {}) {
     invoice_number,
     customer_name,
     customer_phone,
+    company_name,
     store_name,
     store_address,
     store_phone,
@@ -60,6 +61,8 @@ export function buildReceiptEscPos(receipt, options = {}) {
   const currentStatus = options.currentStatus ?? status ?? '';
   const paperWidthMm = normalizeThermalWidthMm(options.paperWidthMm ?? 80);
   const columns = columnsForWidth(paperWidthMm);
+  const displayCompanyName = company_name || store_name || 'Your Store';
+  const showStoreName = Boolean(store_name && company_name);
   const resolvedSubtotal = resolveReceiptSubtotal({
     items,
     subtotal,
@@ -79,8 +82,10 @@ export function buildReceiptEscPos(receipt, options = {}) {
     .codepage('cp437')
     .align('center')
     .bold(true)
-    .line(store_name || 'Your Store')
+    .line(displayCompanyName)
     .bold(false);
+
+  if (showStoreName) encoder.line(`Store: ${store_name}`);
 
   if (store_address) encoder.line(String(store_address));
   if (store_phone) encoder.line(`Tel: ${store_phone}`);

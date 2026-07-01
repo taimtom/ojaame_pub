@@ -30,6 +30,11 @@ import axiosInstance from 'src/utils/axios';
 import { bulkRestockProducts } from 'src/actions/product';
 import { ProductQuickAddDialog } from 'src/sections/product/product-quick-add-dialog';
 import { usePermissions } from 'src/hooks/use-permissions';
+import {
+  SupplierSelect,
+  buildSupplierPayload,
+  isSupplierValid,
+} from 'src/components/supplier';
 
 // ---------------------------------------------------------------------------
 
@@ -77,6 +82,7 @@ export function QuickRestockView() {
   const [submitting, setSubmitting] = useState(false);
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [qtyDrafts, setQtyDrafts] = useState({});
+  const [supplierValue, setSupplierValue] = useState({ supplier_id: null, supplier: null });
 
   const debounceRef = useRef(null);
 
@@ -234,6 +240,10 @@ export function QuickRestockView() {
       toast.error(`"${invalid.name}" has an invalid quantity.`);
       return;
     }
+    if (!isSupplierValid(supplierValue)) {
+      toast.error('Please select or enter supplier name and phone number.');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -245,18 +255,20 @@ export function QuickRestockView() {
           cost_price: Number(r.costPerUnit),
           add_as_expense: r.addAsExpense,
         })),
+        ...buildSupplierPayload(supplierValue),
       };
       const data = await bulkRestockProducts(payload);
       toast.success(data.message || 'Restock submitted successfully.');
       clearCart();
       setQuery('');
       setSearchResults([]);
+      setSupplierValue({ supplier_id: null, supplier: null });
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Failed to submit restock.');
     } finally {
       setSubmitting(false);
     }
-  }, [storeId, restockCart, clearCart]);
+  }, [storeId, restockCart, clearCart, supplierValue]);
 
   // ── Derived totals ──────────────────────────────────────────────────────────
 
@@ -567,6 +579,10 @@ export function QuickRestockView() {
                     </Box>
 
                     <Divider sx={{ my: 2 }} />
+
+                    <Stack spacing={2} sx={{ mb: 2 }}>
+                      <SupplierSelect value={supplierValue} onChange={setSupplierValue} />
+                    </Stack>
 
                     <Stack direction="row" alignItems="center" justifyContent="space-between">
                       <Box>

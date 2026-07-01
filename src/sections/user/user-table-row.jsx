@@ -22,7 +22,15 @@ import { UserQuickEditForm } from './user-quick-edit-form';
 
 // ----------------------------------------------------------------------
 
-export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRow, onResendInvite }) {
+export function UserTableRow({
+  row,
+  selected,
+  onEditRow,
+  onSelectRow,
+  onDeleteRow,
+  onResendInvite,
+  canDeleteUser = false,
+}) {
   const confirm = useBoolean();
 
   const popover = usePopover();
@@ -31,8 +39,9 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
 
   const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
 
-  // The owner (merchant) account is protected — cannot be deleted
-  const isOwner = row.role === 'merchant';
+  const isOwner = row.role === 'merchant' || row.role === 'owner';
+  const isDeleted = row.status === 'deleted';
+  const showDelete = canDeleteUser && !isOwner && !isDeleted;
 
   return (
     <>
@@ -77,6 +86,7 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
               (row.status === 'active' && 'success') ||
               (row.status === 'pending' && 'warning') ||
               (row.status === 'banned' && 'error') ||
+              (row.status === 'deleted' && 'default') ||
               'default'
             }
           >
@@ -110,7 +120,7 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          {!isOwner && (
+          {showDelete && (
             <MenuItem
               onClick={() => {
                 confirm.onTrue();
@@ -151,9 +161,16 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
         open={confirm.value}
         onClose={confirm.onFalse}
         title="Delete"
-        content="Are you sure want to delete?"
+        content="Are you sure you want to delete this user? Their account will be deactivated and their email will be freed for future use."
         action={
-          <Button variant="contained" color="error" onClick={onDeleteRow}>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              onDeleteRow();
+              confirm.onFalse();
+            }}
+          >
             Delete
           </Button>
         }

@@ -33,6 +33,8 @@ import { searchCatalogProducts } from 'src/actions/catalog';
 import { useGetCategories, addCategory } from 'src/actions/category';
 import { CategoryQuickAddDialog } from './category-quick-add-dialog';
 import { addProduct, editProduct, useGetProducts } from 'src/actions/product';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import {
   _tags,
   PRODUCT_SIZE_OPTIONS,
@@ -178,8 +180,13 @@ export const NewProductSchema = zod
 
 export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateProduct }) {
   const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
   const { currencySymbol } = useCurrencyFormat();
   const { t, getLabel, isFieldVisible } = useBusinessType();
+
+  const [addedCount, setAddedCount] = useState(0);
 
 
 
@@ -495,17 +502,22 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
         response = await addProduct(dataWithStore);
       }
       toast.success(currentProduct ? 'Update success!' : 'Create success!');
-      // router.push(paths.dashboard.product.root);
-       // Delay redirection for 5 seconds.
-      setTimeout(() => {
-        if (currentProduct) {
+      if (currentProduct) {
+        setTimeout(() => {
           router.push(paths.dashboard.product.details(storeSlug, currentProduct.id));
-        } else if (response?.id != null) {
-          router.push(paths.dashboard.product.details(storeSlug, response.id));
-        } else {
-          router.push(paths.dashboard.product.root(storeSlug));
+        }, 2000);
+      } else {
+        setAddedCount((prev) => prev + 1);
+        if (onboarding) {
+          await mutateProgress();
         }
-      }, 2000);
+        reset(defaultValues);
+        setIsPublish(false);
+        setIsShowOnStore(true);
+        setProductType('single');
+        setSelectedCatalogProduct(null);
+        setPropertiesOpen(false);
+      }
     }  catch (error) {
       console.error('Submission error:', error);
       let message = '';
@@ -1262,6 +1274,17 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
       >
         {!currentProduct ? `Create ${t('product')}` : 'Save changes'}
       </LoadingButton>
+      {onboarding && !currentProduct && addedCount > 0 && (
+        <Button
+          variant="contained"
+          color="success"
+          size="large"
+          disabled={isSubmitting}
+          onClick={() => advanceOnboarding()}
+        >
+          Next
+        </Button>
+      )}
     </Stack>
   );
 
@@ -1272,6 +1295,11 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
         {renderPricing}
         {values.product_kind === 'sellable' && renderSubItems}
         {renderProperties}
+        {!currentProduct && addedCount > 0 && (
+          <Typography variant="caption" color="text.secondary" textAlign="center">
+            {addedCount} item{addedCount === 1 ? '' : 's'} added this session
+          </Typography>
+        )}
         {renderActions}
       </Stack>
     </Form>

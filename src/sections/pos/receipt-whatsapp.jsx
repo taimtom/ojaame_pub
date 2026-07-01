@@ -201,6 +201,7 @@ export function WhatsappReceiptPDF({ receipt, currentStatus }) {
     invoice_number,
     customer_name,
     customer_phone,
+    company_name,
     store_name,
     store_address,
     store_phone,
@@ -216,6 +217,8 @@ export function WhatsappReceiptPDF({ receipt, currentStatus }) {
   const styles = useStyles();
 
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const displayCompanyName = company_name || store_name || 'Your Store';
+  const showStoreName = Boolean(store_name && company_name);
 
   return (
     <Document>
@@ -226,7 +229,10 @@ export function WhatsappReceiptPDF({ receipt, currentStatus }) {
       >
         <View style={styles.header}>
           <Image source="/logo/logo-single.png" style={styles.logo} />
-          <Text style={styles.companyName}>{store_name || 'Your Store'}</Text>
+          <Text style={styles.companyName}>{displayCompanyName}</Text>
+          {showStoreName ? (
+            <Text style={styles.companyDetails}>Store: {store_name}</Text>
+          ) : null}
           <Text style={styles.companyDetails}>{store_address}</Text>
           <Text style={styles.companyDetails}>Tel: {store_phone}</Text>
           {rc_cac_reg_number ? (

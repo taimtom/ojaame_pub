@@ -39,13 +39,14 @@ function statusChipProps(status) {
 
 function commissionTypeLabel(t) {
   if (t === 'signup_bonus') return 'Signup Bonus';
+  if (t === 'activation_bonus') return 'Activation Commission';
   if (t === 'monthly_token') return 'Monthly Token';
   if (t === 'subscription_renewal') return 'Subscription Renewal';
   return t ? String(t).replace(/_/g, ' ') : '—';
 }
 
 function commissionTypeColor(t) {
-  if (t === 'signup_bonus') return 'primary';
+  if (t === 'signup_bonus' || t === 'activation_bonus') return 'primary';
   if (t === 'monthly_token' || t === 'subscription_renewal') return 'success';
   return 'default';
 }

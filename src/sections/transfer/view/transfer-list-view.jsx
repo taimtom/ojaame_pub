@@ -1,5 +1,4 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import {
   Alert,
@@ -21,10 +20,8 @@ import {
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { toast } from 'src/components/snackbar';
-import { paths } from 'src/routes/paths';
 import { useGetProducts } from 'src/actions/product';
 import { useGetStores } from 'src/actions/store';
-import { useGetUsers } from 'src/actions/user';
 import { usePermissions } from 'src/hooks/use-permissions';
 import { useAuthContext } from 'src/auth/hooks';
 import { getTransferActionAccess } from 'src/utils/transfer-permissions';
@@ -38,11 +35,14 @@ import {
   packTransferOrder,
   pickupTransferOrder,
   receiveTransferOrder,
+  updateTransferOrder,
+  useGetDrivers,
   useGetTransfer,
   useGetTransfers,
 } from 'src/actions/transfer';
 
 import { TransferDetailDrawer } from '../transfer-detail-drawer';
+import { TransferDriversDialog } from '../transfer-drivers-dialog';
 
 const STATUS_COLORS = {
   created: 'default',
@@ -56,21 +56,29 @@ const STATUS_COLORS = {
 };
 
 export function TransferListView({ storeId }) {
-  const navigate = useNavigate();
   const { user } = useAuthContext();
   const { userPermissions, hasPermission } = usePermissions();
 
   const [openCreate, setOpenCreate] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editingTransfer, setEditingTransfer] = useState(null);
+  const [editItems, setEditItems] = useState([{ product_id: '', requested_qty: 1 }]);
+  const [editDriverId, setEditDriverId] = useState('');
+  const [openDriversDialog, setOpenDriversDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [kpis, setKpis] = useState(null);
   const [transferItems, setTransferItems] = useState([{ product_id: '', requested_qty: 1 }]);
+  const [sourceStoreId, setSourceStoreId] = useState(storeId);
   const [destinationStoreId, setDestinationStoreId] = useState('');
   const [assignedDriverId, setAssignedDriverId] = useState('');
+  const [createDriverId, setCreateDriverId] = useState('');
   const [detailTransferId, setDetailTransferId] = useState(null);
 
   const { stores } = useGetStores();
-  const { users } = useGetUsers();
+  const { drivers } = useGetDrivers();
   const { products } = useGetProducts(storeId);
+  const { products: sourceProducts } = useGetProducts(sourceStoreId);
+  const { products: editSourceProducts } = useGetProducts(editingTransfer?.source_store_id);
   const { transfers, transfersLoading, mutateTransfers } = useGetTransfers(
     storeId ? { store_id: Number(storeId), limit: 50 } : {}
   );
@@ -87,8 +95,8 @@ export function TransferListView({ storeId }) {
   );
 
   const destinationOptions = useMemo(
-    () => (stores || []).filter((store) => Number(store.id) !== Number(storeId)),
-    [stores, storeId]
+    () => (stores || []).filter((store) => Number(store.id) !== Number(sourceStoreId)),
+    [stores, sourceStoreId]
   );
 
   const canCreateTransfer =
@@ -104,6 +112,10 @@ export function TransferListView({ storeId }) {
       setKpis(null);
     }
   }, []);
+
+  useEffect(() => {
+    setSourceStoreId(storeId);
+  }, [storeId]);
 
   useEffect(() => {
     refreshKpis();
@@ -126,7 +138,7 @@ export function TransferListView({ storeId }) {
       }))
       .filter((row) => row.product_id && row.requested_qty > 0);
 
-    if (!storeId || !destinationStoreId || !normalizedRows.length) {
+    if (!sourceStoreId || !destinationStoreId || !normalizedRows.length) {
       toast.error('Add at least one valid item with quantity.');
       return;
     }
@@ -144,17 +156,23 @@ export function TransferListView({ storeId }) {
 
     setSubmitting(true);
     try {
-      await createTransferOrder({
-        source_store_id: Number(storeId),
+      const created = await createTransferOrder({
+        source_store_id: Number(sourceStoreId),
         destination_store_id: Number(destinationStoreId),
         priority: 'normal',
+        assigned_driver_id: createDriverId ? Number(createDriverId) : null,
         items: itemsPayload,
       });
       toast.success('Transfer order created.');
       setOpenCreate(false);
       setTransferItems([{ product_id: '', requested_qty: 1 }]);
+      setSourceStoreId(storeId);
       setDestinationStoreId('');
+      setCreateDriverId('');
       await reloadData();
+      if (created?.id) {
+        setDetailTransferId(created.id);
+      }
     } catch (error) {
       toast.error(error.message || 'Failed to create transfer order.');
     } finally {
@@ -171,6 +189,7 @@ export function TransferListView({ storeId }) {
     });
 
     const permissionMap = {
+      edit: access.canEdit,
       pack: access.canPack,
       assign: access.canAssignDriver,
       pickup: access.canPickup,
@@ -187,6 +206,11 @@ export function TransferListView({ storeId }) {
 
     setSubmitting(true);
     try {
+      if (action === 'edit') {
+        openEditModal(transfer);
+        setSubmitting(false);
+        return;
+      }
       if (action === 'pack') {
         await packTransferOrder(transfer.id, {
           packed_items: transfer.items.map((item) => ({
@@ -200,7 +224,7 @@ export function TransferListView({ storeId }) {
           toast.error('Select a driver first.');
           return;
         }
-        await assignTransferDriver(transfer.id, { driver_user_id: Number(assignedDriverId) });
+        await assignTransferDriver(transfer.id, { driver_id: Number(assignedDriverId) });
       } else if (action === 'pickup') {
         await pickupTransferOrder(transfer.id, {});
       } else if (action === 'transit') {
@@ -248,8 +272,101 @@ export function TransferListView({ storeId }) {
     );
   };
 
-  const handleCreateDriver = () => {
-    navigate(paths.dashboard.user.invite);
+  const handleSourceStoreChange = (newSourceId) => {
+    setSourceStoreId(newSourceId);
+    setTransferItems([{ product_id: '', requested_qty: 1 }]);
+    if (Number(destinationStoreId) === Number(newSourceId)) {
+      setDestinationStoreId('');
+    }
+  };
+
+  const openEditModal = (transfer) => {
+    setEditingTransfer(transfer);
+    setEditItems(
+      (transfer.items || []).length
+        ? transfer.items.map((item) => ({
+            product_id: item.product_id,
+            requested_qty: item.requested_qty,
+          }))
+        : [{ product_id: '', requested_qty: 1 }]
+    );
+    setEditDriverId(
+      transfer.assigned_driver_id ? String(transfer.assigned_driver_id) : ''
+    );
+    setOpenEdit(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingTransfer) return;
+
+    const normalizedRows = editItems
+      .filter((row) => row.product_id)
+      .map((row) => ({
+        product_id: Number(row.product_id),
+        requested_qty: Number(row.requested_qty),
+      }))
+      .filter((row) => row.product_id && row.requested_qty > 0);
+
+    if (!normalizedRows.length) {
+      toast.error('Add at least one valid item with quantity.');
+      return;
+    }
+
+    const combinedByProduct = normalizedRows.reduce((acc, row) => {
+      const key = String(row.product_id);
+      if (!acc[key]) {
+        acc[key] = { ...row };
+      } else {
+        acc[key].requested_qty += row.requested_qty;
+      }
+      return acc;
+    }, {});
+    const itemsPayload = Object.values(combinedByProduct);
+
+    setSubmitting(true);
+    try {
+      await updateTransferOrder(editingTransfer.id, {
+        assigned_driver_id: editDriverId ? Number(editDriverId) : null,
+        items: itemsPayload,
+      });
+      toast.success('Transfer order updated.');
+      setOpenEdit(false);
+      setEditingTransfer(null);
+      await reloadData();
+    } catch (error) {
+      toast.error(error.message || 'Failed to update transfer order.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addEditItemRow = () => {
+    setEditItems((prev) => [...prev, { product_id: '', requested_qty: 1 }]);
+  };
+
+  const removeEditItemRow = (index) => {
+    setEditItems((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const updateEditItemRow = (index, patch) => {
+    setEditItems((prev) =>
+      prev.map((row, idx) => (idx === index ? { ...row, ...patch } : row))
+    );
+  };
+
+  const openCreateModal = () => {
+    setSourceStoreId(storeId);
+    setTransferItems([{ product_id: '', requested_qty: 1 }]);
+    setDestinationStoreId('');
+    setCreateDriverId(assignedDriverId || '');
+    setOpenCreate(true);
+  };
+
+  const openDriversManager = () => {
+    setOpenDriversDialog(true);
   };
 
   if (!storeId) {
@@ -265,7 +382,7 @@ export function TransferListView({ storeId }) {
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h4">Store Transfers</Typography>
         {canCreateTransfer && (
-          <Button variant="contained" onClick={() => setOpenCreate(true)}>
+          <Button variant="contained" onClick={openCreateModal}>
             New transfer
           </Button>
         )}
@@ -281,14 +398,14 @@ export function TransferListView({ storeId }) {
           sx={{ minWidth: 220 }}
         >
           <MenuItem value="">None</MenuItem>
-          {(users || []).map((u) => (
-            <MenuItem key={u.user_id} value={u.user_id}>
-              {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email}
+          {(drivers || []).map((driver) => (
+            <MenuItem key={driver.id} value={driver.id}>
+              {driver.name} ({driver.phone})
             </MenuItem>
           ))}
         </TextField>
-        <Button variant="outlined" onClick={handleCreateDriver}>
-          + Create driver
+        <Button variant="outlined" onClick={openDriversManager}>
+          Manage drivers
         </Button>
       </Stack>
 
@@ -331,6 +448,7 @@ export function TransferListView({ storeId }) {
                   transfer,
                 });
                 const hasAnyAction =
+                  access.canEdit ||
                   access.canPack ||
                   access.canAssignDriver ||
                   access.canPickup ||
@@ -391,7 +509,12 @@ export function TransferListView({ storeId }) {
         submitting={submitting}
         onAction={handleTransition}
         assignedDriverId={assignedDriverId}
-        onCreateDriver={handleCreateDriver}
+        onManageDrivers={openDriversManager}
+      />
+
+      <TransferDriversDialog
+        open={openDriversDialog}
+        onClose={() => setOpenDriversDialog(false)}
       />
 
       <Dialog open={openCreate} onClose={() => setOpenCreate(false)} fullWidth maxWidth="sm">
@@ -399,10 +522,17 @@ export function TransferListView({ storeId }) {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
+              select
               label="Source store"
-              value={storeNameById(Number(storeId)) || storeId}
-              disabled
-            />
+              value={sourceStoreId}
+              onChange={(e) => handleSourceStoreChange(e.target.value)}
+            >
+              {(stores || []).map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.storeName}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               select
               label="Destination store"
@@ -415,6 +545,22 @@ export function TransferListView({ storeId }) {
                 </MenuItem>
               ))}
             </TextField>
+            <TextField
+              select
+              label="Driver (optional)"
+              value={createDriverId}
+              onChange={(e) => setCreateDriverId(e.target.value)}
+            >
+              <MenuItem value="">None</MenuItem>
+              {(drivers || []).map((driver) => (
+                <MenuItem key={driver.id} value={driver.id}>
+                  {driver.name} ({driver.phone})
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button variant="text" onClick={openDriversManager} sx={{ alignSelf: 'flex-start' }}>
+              Manage drivers
+            </Button>
             <Typography variant="subtitle2" color="text.secondary">
               Items (batch transfer)
             </Typography>
@@ -423,8 +569,8 @@ export function TransferListView({ storeId }) {
                 <Stack key={`transfer-item-${index}`} direction="row" spacing={1.5}>
                   <Autocomplete
                     disablePortal
-                    options={products || []}
-                    value={(products || []).find((p) => Number(p.id) === Number(row.product_id)) || null}
+                    options={sourceProducts || []}
+                    value={(sourceProducts || []).find((p) => Number(p.id) === Number(row.product_id)) || null}
                     onChange={(_, value) =>
                       updateItemRow(index, { product_id: value ? value.id : '' })
                     }
@@ -483,6 +629,116 @@ export function TransferListView({ storeId }) {
           <Button onClick={() => setOpenCreate(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleCreate} disabled={submitting}>
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openEdit} onClose={() => setOpenEdit(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit transfer order</DialogTitle>
+        <DialogContent>
+          {editingTransfer && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                label="Source store"
+                value={storeNameById(editingTransfer.source_store_id) || editingTransfer.source_store_id}
+                disabled
+              />
+              <TextField
+                label="Destination store"
+                value={
+                  storeNameById(editingTransfer.destination_store_id) ||
+                  editingTransfer.destination_store_id
+                }
+                disabled
+              />
+              <TextField
+                select
+                label="Driver (optional)"
+                value={editDriverId}
+                onChange={(e) => setEditDriverId(e.target.value)}
+              >
+                <MenuItem value="">None</MenuItem>
+                {(drivers || []).map((driver) => (
+                  <MenuItem key={driver.id} value={driver.id}>
+                    {driver.name} ({driver.phone})
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button variant="text" onClick={openDriversManager} sx={{ alignSelf: 'flex-start' }}>
+                Manage drivers
+              </Button>
+              {['packed', 'picked_up'].includes(editingTransfer.status) && (
+                <Alert severity="info">
+                  Changing items will reset this transfer to &quot;created&quot; and it will need to be packed again.
+                </Alert>
+              )}
+              <Typography variant="subtitle2" color="text.secondary">
+                Items (batch transfer)
+              </Typography>
+              <Stack spacing={1.5}>
+                {editItems.map((row, index) => (
+                  <Stack key={`edit-item-${index}`} direction="row" spacing={1.5}>
+                    <Autocomplete
+                      disablePortal
+                      options={editSourceProducts || []}
+                      value={
+                        (editSourceProducts || []).find(
+                          (p) => Number(p.id) === Number(row.product_id)
+                        ) || null
+                      }
+                      onChange={(_, value) =>
+                        updateEditItemRow(index, { product_id: value ? value.id : '' })
+                      }
+                      getOptionLabel={(option) =>
+                        option?.name
+                          ? `${option.name}${option?.sku ? ` (${option.sku})` : ''}`
+                          : ''
+                      }
+                      isOptionEqualToValue={(option, value) =>
+                        Number(option.id) === Number(value.id)
+                      }
+                      sx={{ flex: 1 }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label={`Product ${index + 1}`}
+                          placeholder="Search product name, SKU, or code"
+                        />
+                      )}
+                    />
+                    <TextField
+                      label="Qty"
+                      type="number"
+                      value={row.requested_qty}
+                      onChange={(e) =>
+                        updateEditItemRow(index, { requested_qty: e.target.value })
+                      }
+                      inputProps={{ min: 1 }}
+                      sx={{ width: 120 }}
+                    />
+                    <Button
+                      color="error"
+                      variant="outlined"
+                      onClick={() => removeEditItemRow(index)}
+                      disabled={editItems.length <= 1}
+                    >
+                      Remove
+                    </Button>
+                  </Stack>
+                ))}
+                <Box>
+                  <Button variant="text" onClick={addEditItemRow}>
+                    + Add another item
+                  </Button>
+                </Box>
+              </Stack>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEdit(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleUpdate} disabled={submitting}>
+            Save changes
           </Button>
         </DialogActions>
       </Dialog>

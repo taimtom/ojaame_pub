@@ -154,8 +154,83 @@ export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'inv
     </Box>
   );
 
+  const renderMobileList = (
+    <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 5 }}>
+      <Stack spacing={2}>
+        {invoice?.items?.map((row, index) => {
+          const itemName =
+            (row.product_id && row.product_name) ||
+            (row.service_id && row.service_name) ||
+            row.description ||
+            '';
+          const showDescription =
+            ((row.product_id && row.product_name) || (row.service_id && row.service_name)) &&
+            row.description &&
+            row.description.trim() !== '';
+
+          return (
+            <Box
+              key={index}
+              sx={{ p: 2, borderRadius: 1.5, bgcolor: 'background.neutral' }}
+            >
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
+                    {index + 1}. {itemName}
+                  </Typography>
+                  {showDescription && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary', wordBreak: 'break-word' }}>
+                      {row.description}
+                    </Typography>
+                  )}
+                </Box>
+                <Typography variant="subtitle2" sx={{ whiteSpace: 'nowrap' }}>
+                  {fCurrency(lineItemTotal(row))}
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mt: 1, color: 'text.secondary', typography: 'body2' }}
+              >
+                <span>Qty: {row.quantity}</span>
+                <span>Unit price: {fCurrency(row.price)}</span>
+              </Stack>
+            </Box>
+          );
+        })}
+      </Stack>
+
+      <Stack spacing={1} sx={{ mt: 3 }}>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Subtotal</Box>
+          <Box component="span" sx={{ typography: 'subtitle2' }}>{fCurrency(computedSubtotal)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Shipping</Box>
+          <Box component="span" sx={{ color: 'error.main' }}>- {fCurrency(invoice?.shipping)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Discount</Box>
+          <Box component="span" sx={{ color: 'error.main' }}>- {fCurrency(invoice?.discount)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Taxes</Box>
+          <Box component="span">{fCurrency(invoice?.taxes)}</Box>
+        </Stack>
+        <Divider sx={{ borderStyle: 'dashed' }} />
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'subtitle1' }}>
+          <Box component="span">Total</Box>
+          <Box component="span">{fCurrency(invoice?.total_amount)}</Box>
+        </Stack>
+      </Stack>
+    </Box>
+  );
+
   const renderList = (
-    <Scrollbar sx={{ mt: 5 }}>
+    <Scrollbar sx={{ mt: 5, display: { xs: 'none', md: 'block' } }}>
       <Table sx={{ minWidth: 960 }}>
         <TableHead>
           <TableRow>
@@ -215,7 +290,7 @@ export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'inv
         pdfFlavor={pdfFlavor}
       />
 
-      <Card sx={{ pt: 5, px: 5 }}>
+      <Card sx={{ pt: { xs: 3, md: 5 }, px: { xs: 2, md: 5 }, pb: { xs: 1, md: 0 } }}>
         <Box
           rowGap={5}
           display="grid"
@@ -244,14 +319,19 @@ export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'inv
             <Typography variant="h6">{invoice?.invoice_number}</Typography>
           </Stack>
 
-          {/* Invoice from (store details) */}
+          {/* Invoice from (company / store details) */}
           <Stack sx={{ typography: 'body2' }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Invoice from
             </Typography>
             <Typography variant="body2">
-              {invoice?.store_name || 'N/A'}
+              {invoice?.company_name || invoice?.store_name || 'N/A'}
             </Typography>
+            {invoice?.store_name && invoice?.company_name ? (
+              <Typography variant="body2">
+                Store: {invoice.store_name}
+              </Typography>
+            ) : null}
             <Typography variant="body2">
               {invoice?.store_address}, {invoice?.store_state}, {invoice?.store_country}
             </Typography>
@@ -301,6 +381,8 @@ export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'inv
             </Typography>
           </Stack>
         </Box>
+
+        {renderMobileList}
 
         {renderList}
 

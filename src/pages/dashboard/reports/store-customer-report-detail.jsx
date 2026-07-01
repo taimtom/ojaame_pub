@@ -22,8 +22,10 @@ import CardContent from '@mui/material/CardContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
+import Link from '@mui/material/Link';
 import CircularProgress from '@mui/material/CircularProgress';
 
+import { RouterLink } from 'src/routes/components';
 import { paths } from 'src/routes/paths';
 import { fCurrency } from 'src/utils/format-number';
 import { paramCase } from 'src/utils/change-case';
@@ -147,6 +149,28 @@ export default function StoreCustomerReportDetailPage() {
 
   const outstanding = detail?.outstanding_invoices || [];
   const totalOwing = useMemo(() => totalOutstanding(outstanding), [outstanding]);
+
+  const renderInvoiceLink = useCallback(
+    (row) => {
+      const label = row.invoice_number || '—';
+      if (!storeParam || row.sale_id == null || label === '—') {
+        return label;
+      }
+      return (
+        <Link
+          component={RouterLink}
+          href={paths.dashboard.invoice.details(storeParam, row.sale_id)}
+          variant="body2"
+          color="primary"
+          underline="hover"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {label}
+        </Link>
+      );
+    },
+    [storeParam]
+  );
 
   const targetAmount = useMemo(() => {
     if (collectMode === 'pay_all') return totalOwing;
@@ -362,7 +386,7 @@ export default function StoreCustomerReportDetailPage() {
                           : undefined,
                       }}
                     >
-                      <TableCell>{row.invoice_number}</TableCell>
+                      <TableCell>{renderInvoiceLink(row)}</TableCell>
                       <TableCell>{row.create_date?.slice(0, 10)}</TableCell>
                       <TableCell align="right">{fCurrency(row.total_amount)}</TableCell>
                       <TableCell align="right">{fCurrency(row.amount_paid)}</TableCell>
@@ -463,7 +487,7 @@ export default function StoreCustomerReportDetailPage() {
                 {!detailLoading &&
                   (detail?.transactions || []).map((row) => (
                     <TableRow key={row.sale_id}>
-                      <TableCell>{row.invoice_number}</TableCell>
+                      <TableCell>{renderInvoiceLink(row)}</TableCell>
                       <TableCell>{row.create_date?.slice(0, 10)}</TableCell>
                       <TableCell align="right">{fCurrency(row.total_amount)}</TableCell>
                       <TableCell align="right">{fCurrency(row.amount_paid)}</TableCell>

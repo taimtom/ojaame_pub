@@ -146,7 +146,7 @@ export function CustomerQuickAddForm({ storeId: storeIdProp }) {
     }
   };
 
-  const handleAddOne = async (andAddAnother = false) => {
+  const handleAddOne = async () => {
     const name = form.name.trim();
     const phone = form.phone.trim();
     if (!name || !phone) {
@@ -166,9 +166,7 @@ export function CustomerQuickAddForm({ storeId: storeIdProp }) {
       toast.success(`"${name}" added!`);
       setAddedCount((prev) => prev + 1);
       if (onboarding) await mutateProgress();
-      if (andAddAnother) {
-        setForm(EMPTY_FORM);
-      }
+      setForm(EMPTY_FORM);
     } catch (error) {
       toast.error(error?.message || 'Failed to add customer.');
     } finally {
@@ -276,20 +274,11 @@ export function CustomerQuickAddForm({ storeId: storeIdProp }) {
             variant="contained"
             size="large"
             disabled={submitting}
-            onClick={() => handleAddOne(false)}
+            onClick={() => handleAddOne()}
             startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
             sx={{ flex: 1 }}
           >
             {submitting ? 'Adding...' : 'Add customer'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="large"
-            disabled={submitting}
-            onClick={() => handleAddOne(true)}
-            sx={{ flex: 1 }}
-          >
-            Add &amp; add another
           </Button>
           {onboarding && addedCount > 0 && (
             <Button
@@ -300,7 +289,7 @@ export function CustomerQuickAddForm({ storeId: storeIdProp }) {
               onClick={() => advanceOnboarding()}
               sx={{ flex: 1 }}
             >
-              Continue setup
+              Next
             </Button>
           )}
         </Stack>

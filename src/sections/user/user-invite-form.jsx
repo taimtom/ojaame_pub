@@ -19,7 +19,6 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
-import { skipOnboardingStep } from 'src/actions/onboarding';
 import { inviteUser } from 'src/actions/user';
 import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 import { useGetRoles } from 'src/actions/role';
@@ -27,6 +26,7 @@ import { useGetStores } from 'src/actions/store';
 
 import { toast } from 'src/components/snackbar';
 import { Form, Field } from 'src/components/hook-form';
+import { OnboardingSkipButton } from 'src/components/onboarding/onboarding-skip-button';
 
 
 // ----------------------------------------------------------------------
@@ -82,7 +82,6 @@ export function UserNewInviteForm() {
   const onboarding = useOnboardingMode();
   const advanceOnboarding = useAdvanceOnboarding();
   const [seatLimitReached, setSeatLimitReached] = useState(false);
-  const [skipLoading, setSkipLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
   const { stores, storesLoading } = useGetStores();
@@ -247,25 +246,7 @@ export function UserNewInviteForm() {
             )}
 
             <Box mt={3} display="flex" justifyContent="flex-end" gap={1.5}>
-              {onboarding && (
-                <Button
-                  variant="outlined"
-                  disabled={skipLoading || isSubmitting}
-                  onClick={async () => {
-                    try {
-                      setSkipLoading(true);
-                      await skipOnboardingStep('staff');
-                      await advanceOnboarding();
-                    } catch (error) {
-                      toast.error(error?.message || 'Could not skip this step.');
-                    } finally {
-                      setSkipLoading(false);
-                    }
-                  }}
-                >
-                  {skipLoading ? 'Skipping...' : 'Skip for now'}
-                </Button>
-              )}
+              {onboarding && <OnboardingSkipButton step="staff" />}
               <LoadingButton
                 type="submit"
                 variant="contained"

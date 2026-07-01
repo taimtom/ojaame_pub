@@ -1181,7 +1181,7 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
                     disabled={submitting}
                     onClick={() => advanceOnboarding()}
                   >
-                    Continue setup ({sessionCreatedCount} added)
+                    Next ({sessionCreatedCount} added)
                   </Button>
                 )}
               </Stack>

@@ -20,7 +20,7 @@ import { useSetState } from 'src/hooks/use-set-state';
 
 import { varAlpha } from 'src/theme/styles';
 import { useGetRoles } from 'src/actions/role';
-import { useGetUsers, resendInvitation } from 'src/actions/user';
+import { useGetUsers, resendInvitation, softDeleteUser } from 'src/actions/user';
 import { USER_STATUS_OPTIONS } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 
@@ -94,6 +94,7 @@ export function UserListView() {
   const { roles } = useGetRoles();
   const { hasPermission } = usePermissions();
   const canInviteUser = hasPermission('users.create');
+  const canDeleteUser = hasPermission('users.delete');
 
   const filters = useSetState({ name: '', role: [], status: 'all' });
 
@@ -111,33 +112,65 @@ export function UserListView() {
   const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
 
   const handleDeleteRow = useCallback(
-    (id) => {
+    async (id) => {
       const targetRow = tableData.find((row) => row.user_id === id);
-      if (targetRow?.role === 'merchant') {
+      if (targetRow?.role === 'merchant' || targetRow?.role === 'owner') {
         toast.error('The owner account cannot be deleted.');
         return;
       }
+      if (targetRow?.status === 'deleted') {
+        toast.error('This user is already deleted.');
+        return;
+      }
 
-      const deleteRow = tableData.filter((row) => row.user_id !== id);
-      toast.success('Delete success!');
-      setTableData(deleteRow);
-      table.onUpdatePageDeleteRow(dataInPage.length);
+      try {
+        await softDeleteUser(id);
+        const deleteRow = tableData.map((row) =>
+          row.user_id === id ? { ...row, status: 'deleted' } : row
+        );
+        toast.success('Delete success!');
+        setTableData(deleteRow);
+        table.onUpdatePageDeleteRow(dataInPage.length);
+      } catch (error) {
+        const message =
+          error?.response?.data?.detail || error?.message || 'Failed to delete user';
+        toast.error(message);
+      }
     },
     [dataInPage.length, table, tableData]
   );
 
-  const handleDeleteRows = useCallback(() => {
-    // Exclude the owner from bulk deletion
-    const deleteRows = tableData.filter(
-      (row) => !table.selected.includes(row.user_id) || row.role === 'merchant'
+  const handleDeleteRows = useCallback(async () => {
+    const toDelete = tableData.filter(
+      (row) =>
+        table.selected.includes(row.user_id) &&
+        row.role !== 'merchant' &&
+        row.role !== 'owner' &&
+        row.status !== 'deleted'
     );
 
-    toast.success('Delete success!');
-    setTableData(deleteRows);
-    table.onUpdatePageDeleteRows({
-      totalRowsInPage: dataInPage.length,
-      totalRowsFiltered: dataFiltered.length,
-    });
+    if (!toDelete.length) {
+      toast.error('No deletable users selected.');
+      return;
+    }
+
+    try {
+      await Promise.all(toDelete.map((row) => softDeleteUser(row.user_id)));
+      const deletedIds = new Set(toDelete.map((row) => row.user_id));
+      const deleteRows = tableData.map((row) =>
+        deletedIds.has(row.user_id) ? { ...row, status: 'deleted' } : row
+      );
+      toast.success('Delete success!');
+      setTableData(deleteRows);
+      table.onUpdatePageDeleteRows({
+        totalRowsInPage: dataInPage.length,
+        totalRowsFiltered: dataFiltered.length,
+      });
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail || error?.message || 'Failed to delete users';
+      toast.error(message);
+    }
   }, [dataFiltered.length, dataInPage.length, table, tableData]);
 
   const handleEditRow = useCallback(
@@ -217,10 +250,11 @@ export function UserListView() {
                       (tab.value === 'active' && 'success') ||
                       (tab.value === 'pending' && 'warning') ||
                       (tab.value === 'banned' && 'error') ||
+                      (tab.value === 'deleted' && 'default') ||
                       'default'
                     }
                   >
-                    {['active', 'pending', 'banned', 'rejected'].includes(tab.value)
+                    {['active', 'pending', 'banned', 'deleted', 'rejected'].includes(tab.value)
                       ? tableData.filter((user) => user.status === tab.value).length
                       : tableData.length}
                   </Label>
@@ -257,11 +291,13 @@ export function UserListView() {
                 )
               }
               action={
-                <Tooltip title="Delete">
-                  <IconButton color="primary" onClick={confirm.onTrue}>
-                    <Iconify icon="solar:trash-bin-trash-bold" />
-                  </IconButton>
-                </Tooltip>
+                canDeleteUser ? (
+                  <Tooltip title="Delete">
+                    <IconButton color="primary" onClick={confirm.onTrue}>
+                      <Iconify icon="solar:trash-bin-trash-bold" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null
               }
             />
 
@@ -297,6 +333,7 @@ export function UserListView() {
                         onDeleteRow={() => handleDeleteRow(row.user_id)}
                         onEditRow={() => handleEditRow(row.user_id)}
                         onResendInvite={() => handleResendInvite(row.user_id)}
+                        canDeleteUser={canDeleteUser}
                       />
                     ))}
 

@@ -28,6 +28,7 @@ function formatNaira(v) {
 
 const COMMISSION_COLORS = {
   signup_bonus: 'primary',
+  activation_bonus: 'primary',
   monthly_token: 'success',
   subscription_renewal: 'success',
 };
@@ -40,6 +41,7 @@ function normStatus(s) {
 
 function commissionTypeLabel(t) {
   if (t === 'signup_bonus') return 'Signup Bonus';
+  if (t === 'activation_bonus') return 'Activation Commission';
   if (t === 'monthly_token') return 'Monthly Token';
   if (t === 'subscription_renewal') return 'Subscription Renewal';
   return t ? String(t).replace(/_/g, ' ') : '—';
@@ -109,8 +111,21 @@ export default function AgentBusinessDetailPage() {
           label={data.completed_signup ? 'Setup Complete' : 'Setup Incomplete'}
           color={data.completed_signup ? 'success' : 'default'}
           size="small"
+          title={!data.completed_signup ? data.setup_incomplete_message || undefined : undefined}
         />
       </Stack>
+
+      {data.setup_incomplete_message && (
+        <Alert severity="info" sx={{ mb: data.activation_pending_message ? 2 : 3 }}>
+          {data.setup_incomplete_message}
+        </Alert>
+      )}
+
+      {data.activation_pending_message && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {data.activation_pending_message}
+        </Alert>
+      )}
 
       <Grid container spacing={2} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
@@ -153,6 +168,16 @@ export default function AgentBusinessDetailPage() {
                   value={Math.min(100, (cnt / th) * 100)}
                   sx={{ mt: 1, height: 6, borderRadius: 1 }}
                 />
+              )}
+              {!unlocked && cnt >= th && !data.completed_signup && (
+                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                  Awaiting owner payment setup
+                </Typography>
+              )}
+              {!unlocked && cnt >= th && data.activation_pending_message && (
+                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                  Awaiting first subscription payment
+                </Typography>
               )}
             </CardContent>
           </Card>

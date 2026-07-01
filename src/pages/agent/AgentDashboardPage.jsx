@@ -172,7 +172,7 @@ export default function AgentDashboardPage() {
           </Stack>
           <Typography variant="caption" color="text.secondary" mt={1} display="block">
             Share this link with businesses — the referral code will be auto-filled when they sign
-            up.
+            up. Businesses you refer get <strong>7 days free</strong> to try Ojaame.
           </Typography>
         </CardContent>
       </Card>

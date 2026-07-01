@@ -1,6 +1,6 @@
 import { z as zod } from 'zod';
 import { useForm, useWatch } from 'react-hook-form';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
@@ -22,6 +22,11 @@ import { updateProductQuantity } from 'src/actions/product';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import {
+  SupplierSelect,
+  buildSupplierPayload,
+  isSupplierValid,
+} from 'src/components/supplier';
 
 // ----------------------------------------------------------------------
 
@@ -30,6 +35,7 @@ const SingleSchema = zod.object({
   quantity: zod.number().min(0),
   addQuantity: zod.number().min(1, { message: 'Quantity to add must be at least 1!' }),
   totalQuantity: zod.number().min(0).optional(),
+  costPrice: zod.number().min(0, { message: 'Cost price must be zero or more' }),
   description: zod.string().optional(),
   addAsExpense: zod.boolean(),
 });
@@ -73,7 +79,7 @@ function ReadonlyField({ label, value, icon, color }) {
 
 // ─── Single item form ────────────────────────────────────────────────────────
 
-function SingleItemForm({ currentProduct, storeSlug }) {
+function SingleItemForm({ currentProduct, storeSlug, supplierValue }) {
   const router = useRouter();
   const baseQuantity = currentProduct?.quantity ?? 0;
 
@@ -83,6 +89,7 @@ function SingleItemForm({ currentProduct, storeSlug }) {
       quantity: baseQuantity,
       addQuantity: 0,
       totalQuantity: baseQuantity,
+      costPrice: Number(currentProduct?.costPrice || 0),
       description: '',
       addAsExpense: false,
     }),
@@ -99,8 +106,9 @@ function SingleItemForm({ currentProduct, storeSlug }) {
   } = methods;
 
   const addQuantity = useWatch({ control: methods.control, name: 'addQuantity' });
+  const costPrice = useWatch({ control: methods.control, name: 'costPrice' });
   const addAsExpense = useWatch({ control: methods.control, name: 'addAsExpense' });
-  const restockCost = (Number(addQuantity) || 0) * Number(currentProduct?.costPrice || 0);
+  const restockCost = (Number(addQuantity) || 0) * Number(costPrice || 0);
 
   useEffect(() => {
     setValue('totalQuantity', baseQuantity + (Number(addQuantity) || 0));
@@ -112,6 +120,10 @@ function SingleItemForm({ currentProduct, storeSlug }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      if (!isSupplierValid(supplierValue)) {
+        toast.error('Please select or enter supplier name and phone number.');
+        return;
+      }
       const store_id = currentProduct?.store_id || localStorage.getItem('store_id');
       await updateProductQuantity(currentProduct.id, {
         product_id: currentProduct.id,
@@ -120,6 +132,8 @@ function SingleItemForm({ currentProduct, storeSlug }) {
         status: 'received',
         description: data.description || undefined,
         add_as_expense: data.addAsExpense,
+        cost_price: data.costPrice,
+        ...buildSupplierPayload(supplierValue),
       });
       toast.success('Stock updated successfully!');
       setTimeout(
@@ -155,6 +169,14 @@ function SingleItemForm({ currentProduct, storeSlug }) {
               type="number"
               InputLabelProps={{ shrink: true }}
               helperText="Enter how many individual units you are adding to stock"
+            />
+
+            <Field.Text
+              name="costPrice"
+              label="Cost per unit"
+              placeholder="0"
+              type="number"
+              InputLabelProps={{ shrink: true }}
             />
 
             <ReadonlyField
@@ -198,7 +220,7 @@ function SingleItemForm({ currentProduct, storeSlug }) {
 
 // ─── Pack item form ──────────────────────────────────────────────────────────
 
-function PackItemForm({ currentProduct, storeSlug }) {
+function PackItemForm({ currentProduct, storeSlug, supplierValue }) {
   const router = useRouter();
 
   const quantityPerPack = currentProduct?.quantity_per_pack ?? 1;
@@ -240,8 +262,16 @@ function PackItemForm({ currentProduct, storeSlug }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      if (!isSupplierValid(supplierValue)) {
+        toast.error('Please select or enter supplier name and phone number.');
+        return;
+      }
       const store_id = currentProduct?.store_id || localStorage.getItem('store_id');
       const unitsBeingAdded = data.packsToAdd * quantityPerPack;
+      const unitCost =
+        costPricePerPack != null && quantityPerPack
+          ? Number(costPricePerPack) / Number(quantityPerPack)
+          : Number(currentProduct?.costPrice || 0);
 
       await updateProductQuantity(currentProduct.id, {
         product_id: currentProduct.id,
@@ -252,6 +282,8 @@ function PackItemForm({ currentProduct, storeSlug }) {
           data.description ||
           `${data.packsToAdd} pack(s) received — ${unitsBeingAdded} unit(s) added to stock`,
         add_as_expense: data.addAsExpense,
+        cost_price: unitCost,
+        ...buildSupplierPayload(supplierValue),
       });
 
       toast.success('Stock updated successfully!');
@@ -459,10 +491,33 @@ function handleApiError(error) {
 
 export function ProductAddQuantityForm({ currentProduct, storeSlug, storeId }) {
   const isPack = currentProduct?.is_pack === true;
+  const [supplierValue, setSupplierValue] = useState({ supplier_id: null, supplier: null });
 
-  return isPack ? (
-    <PackItemForm currentProduct={currentProduct} storeSlug={storeSlug} storeId={storeId} />
-  ) : (
-    <SingleItemForm currentProduct={currentProduct} storeSlug={storeSlug} storeId={storeId} />
+  return (
+    <Stack spacing={3} sx={{ mx: 'auto', maxWidth: { xs: 720, xl: 880 } }}>
+      <Card>
+        <CardHeader title="Supplier" subheader="Who did you purchase this stock from?" sx={{ mb: 3 }} />
+        <Divider />
+        <Stack spacing={3} sx={{ p: 3 }}>
+          <SupplierSelect value={supplierValue} onChange={setSupplierValue} />
+        </Stack>
+      </Card>
+
+      {isPack ? (
+        <PackItemForm
+          currentProduct={currentProduct}
+          storeSlug={storeSlug}
+          storeId={storeId}
+          supplierValue={supplierValue}
+        />
+      ) : (
+        <SingleItemForm
+          currentProduct={currentProduct}
+          storeSlug={storeSlug}
+          storeId={storeId}
+          supplierValue={supplierValue}
+        />
+      )}
+    </Stack>
   );
 }
