@@ -63,7 +63,9 @@ const PLAN_HIGHLIGHTS = {
   ],
   standard: [
     'Everything in Basic',
-    'Unlimited team size',
+    '2 stores included',
+    '3 seats included (owner + 2)',
+    'Unlimited team size beyond included seats',
     'Custom roles',
     'Advanced & company reports',
     'Integrations, store website & more',
@@ -74,7 +76,7 @@ const PLAN_HIGHLIGHTS = {
 
 export function AccountBillingPlan() {
   const { summary, summaryLoading, summaryError, mutate } = useGetSubscriptionSummary();
-  const { plans } = useGetSubscriptionPlans();
+  const { plans, storePrice } = useGetSubscriptionPlans();
   const { nextBillingDate, inTrial, trialDaysRemaining, mutateStatus } = useGetSubscriptionStatus();
   const [adjusting, setAdjusting] = useState(null);
   const [changingPlan, setChangingPlan] = useState(false);
@@ -89,6 +91,9 @@ export function AccountBillingPlan() {
   const currentTier = summary?.plan_tier ?? 'basic';
   const isEnterprise = currentTier === 'enterprise';
   const maxSeatsPerStore = summary?.max_seats_per_store ?? null;
+  const freeStores = summary?.free_stores ?? (currentTier === 'standard' ? 2 : 1);
+  const includedSeats = summary?.included_seats ?? (currentTier === 'standard' ? 3 : null);
+  const isStandard = currentTier === 'standard';
 
   const handleSeatChange = useCallback(
     async (delta, scope, storeId) => {
@@ -111,13 +116,25 @@ export function AccountBillingPlan() {
     (planTier) => {
       const plan = plans.find((p) => p.plan_tier === planTier);
       if (!plan || !summary) return null;
-      const extraSeatFees = summary.store_breakdown?.reduce(
-        (sum, store) => sum + Math.max((store.paid_seats ?? 1) - 1, 0) * plan.seat_price,
-        0
-      );
-      return (plan.base_fee ?? 0) + (summary.store_fees ?? 0) + (extraSeatFees ?? 0);
+      const tierFreeStores = plan.free_stores ?? (planTier === 'standard' ? 2 : 1);
+      const estimatedStoreFees =
+        Math.max(0, (summary.store_count ?? 0) - tierFreeStores) * (storePrice ?? 3000);
+
+      let extraSeatFees = 0;
+      if (planTier === 'standard') {
+        const included = plan.included_seats ?? 3;
+        extraSeatFees =
+          Math.max(0, (summary.total_seats ?? 0) - included) * (plan.seat_price ?? 0);
+      } else {
+        extraSeatFees =
+          summary.store_breakdown?.reduce(
+            (sum, store) => sum + Math.max((store.paid_seats ?? 1) - 1, 0) * plan.seat_price,
+            0
+          ) ?? 0;
+      }
+      return (plan.base_fee ?? 0) + estimatedStoreFees + extraSeatFees;
     },
-    [plans, summary]
+    [plans, summary, storePrice]
   );
 
   const handleConfirmPlanChange = useCallback(async () => {
@@ -264,14 +281,31 @@ export function AccountBillingPlan() {
                         ))}
                       </Stack>
                       {!selected && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          sx={{ mt: 1, alignSelf: 'flex-start' }}
-                          onClick={() => setPendingTier(plan.plan_tier)}
-                        >
-                          Switch to {plan.label}
-                        </Button>
+                        plan.plan_tier === 'basic' &&
+                        (summary.store_count ?? 0) > 1 &&
+                        currentTier !== 'basic' ? (
+                          <Tooltip title="Basic supports one store only. Remove extra stores before switching.">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled
+                                sx={{ mt: 1, alignSelf: 'flex-start' }}
+                              >
+                                Switch to {plan.label}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={{ mt: 1, alignSelf: 'flex-start' }}
+                            onClick={() => setPendingTier(plan.plan_tier)}
+                          >
+                            Switch to {plan.label}
+                          </Button>
+                        )
                       )}
                     </Stack>
                   </Card>
@@ -284,13 +318,21 @@ export function AccountBillingPlan() {
 
           <BillingRow
             label={`Base subscription (${tierLabel(currentTier)})`}
-            secondary="includes 1 owner seat"
+            secondary={
+              isStandard
+                ? 'includes 3 seats (owner + 2)'
+                : 'includes 1 owner seat'
+            }
             value={`${fCurrency(summary.base_fee)}/mo`}
           />
 
           <BillingRow
             label="Extra seat rate"
-            secondary="per seat beyond first per store"
+            secondary={
+              isStandard
+                ? `per seat beyond ${includedSeats ?? 3} included`
+                : 'per seat beyond first per store'
+            }
             value={`${fCurrency(seatPrice)}/mo`}
           />
 
@@ -314,7 +356,7 @@ export function AccountBillingPlan() {
           <Divider sx={{ my: 1 }} />
 
           <Typography variant="overline" color="text.disabled" sx={{ mb: 0.5 }}>
-            Stores ({summary.store_count} total — 1 free)
+            Stores ({summary.store_count} total — {freeStores} free)
           </Typography>
 
           {summary.store_breakdown?.map((store) => (
@@ -338,7 +380,17 @@ export function AccountBillingPlan() {
               </Stack>
 
               <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Tooltip title={store.paid_seats <= 1 ? 'Owner seat — cannot be removed' : 'Remove seat'}>
+                <Tooltip
+                  title={
+                    isStandard
+                      ? store.paid_seats <= 1 && includedSeats > 0
+                        ? 'Included in your 3-seat allowance'
+                        : 'Remove seat'
+                      : store.paid_seats <= 1
+                        ? 'Owner seat — cannot be removed'
+                        : 'Remove seat'
+                  }
+                >
                   <span>
                     <Button
                       size="small"

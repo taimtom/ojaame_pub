@@ -29,6 +29,7 @@ import { Iconify } from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 
 import { Main } from './main';
 import { NavMobile } from './nav-mobile';
@@ -73,6 +74,7 @@ export function DashboardLayout({ sx, children, data }) {
   const { user } = useAuthContext();
 
   const { status, paystackStatus, gracePeriodEnd, isOwner } = useGetSubscriptionStatus();
+  const { canAddStore } = usePlanFeatures();
   const [quickModeAnchorEl, setQuickModeAnchorEl] = useState(null);
   const [quickEntryMode, setQuickEntryMode] = useState('product'); // default
   const quickModeMenuOpen = Boolean(quickModeAnchorEl);
@@ -101,12 +103,14 @@ export function DashboardLayout({ sx, children, data }) {
   // Dynamically update the Profile link in the _account array
   const accountNav = useMemo(
     () =>
-      _account.map((item) =>
-        item.label === 'Profile'
-          ? { ...item, href: user?.user_id ? paths.dashboard.user.edit(user.user_id) : item.href }
-          : item
-      ),
-    [user]
+      _account
+        .filter((item) => item.label !== 'Add store' || canAddStore(stores?.length ?? 0))
+        .map((item) =>
+          item.label === 'Profile'
+            ? { ...item, href: user?.user_id ? paths.dashboard.user.edit(user.user_id) : item.href }
+            : item
+        ),
+    [user, stores, canAddStore]
   );
   const showBillingBanner = isOwner && (status === 'unpaid' || status === 'deactivated');
 

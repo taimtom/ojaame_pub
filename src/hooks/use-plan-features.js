@@ -33,6 +33,16 @@ export function usePlanFeatures() {
   const isStandardOrAbove = planTier === 'standard' || planTier === 'enterprise';
   const maxSeatsPerStore = limits?.max_seats_per_store ?? null;
 
+  const canAddStore = useCallback(
+    (storeCount = 0) => {
+      if (isStandardOrAbove) {
+        return true;
+      }
+      return storeCount < 1;
+    },
+    [isStandardOrAbove]
+  );
+
   return {
     planTier,
     features: features || [],
@@ -40,6 +50,7 @@ export function usePlanFeatures() {
     maxSeatsPerStore,
     isBasic,
     isStandardOrAbove,
+    canAddStore,
     hasPlanFeature,
     statusLoading,
     standardOnlyFeatures: STANDARD_ONLY_FEATURES,
