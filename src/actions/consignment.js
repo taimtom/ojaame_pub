@@ -90,6 +90,11 @@ export async function returnConsignment(id, payload) {
   return response.data;
 }
 
+export async function recordPartnerSale(id, payload) {
+  const response = await axiosInstance.post(endpoints.consignment.recordPartnerSale(id), payload);
+  return response.data;
+}
+
 export async function settleConsignment(id, payload = {}) {
   const response = await axiosInstance.post(endpoints.consignment.settle(id), payload);
   return response.data;

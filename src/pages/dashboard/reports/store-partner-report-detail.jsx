@@ -28,12 +28,15 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { fCurrency } from 'src/utils/format-number';
+import { fDateTime } from 'src/utils/format-time';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { ReportPeriodSelector } from 'src/components/report-period-selector';
 import { usePermissions } from 'src/hooks/use-permissions';
+import { recordPartnerSale, useGetConsignment } from 'src/actions/consignment';
+import { PartnerSaleDialog } from 'src/sections/consignment/partner-sale-dialog';
 import {
   usePartnerReportDetail,
   payPartner,
@@ -72,6 +75,7 @@ export default function StorePartnerReportDetailPage() {
   const numericPartnerId = Number(partnerId);
   const { hasPermission } = usePermissions();
   const canPay = hasPermission('inventory.update') || hasPermission('sales.update');
+  const canRecordSale = hasPermission('inventory.update') || hasPermission('inventory.manage');
 
   const [periodState, setPeriodState] = useState({
     period: 'this_month',
@@ -86,8 +90,13 @@ export default function StorePartnerReportDetailPage() {
   const [collectMode, setCollectMode] = useState('pay_all');
   const [partialAmount, setPartialAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [openPartnerSale, setOpenPartnerSale] = useState(false);
+  const [saleConsignmentId, setSaleConsignmentId] = useState(null);
 
   const { period, month, year, date } = periodState;
+
+  const { consignment: saleConsignment, consignmentLoading: saleConsignmentLoading } =
+    useGetConsignment(saleConsignmentId);
 
   const { detail, detailLoading, detailError, refetchDetail } = usePartnerReportDetail(
     storeId,
@@ -102,6 +111,7 @@ export default function StorePartnerReportDetailPage() {
   const metrics = detail?.metrics;
   const payables = detail?.outstanding_payables || [];
   const receivables = detail?.outstanding_receivables || [];
+  const paymentHistory = detail?.payment_history || [];
 
   const youOwe = metrics?.amount_you_owe ?? 0;
   const owesYou = metrics?.amount_partner_owes ?? 0;
@@ -141,6 +151,31 @@ export default function StorePartnerReportDetailPage() {
     navigate(paths.dashboard.consignment.details(storeParam, consignmentId));
   };
 
+  const canRecordPartnerSale = (row) =>
+    canRecordSale &&
+    row.direction === 'lending' &&
+    ['received', 'return_overdue'].includes(row.status);
+
+  const openPartnerSaleDialog = (consignmentId) => {
+    setSaleConsignmentId(consignmentId);
+    setOpenPartnerSale(true);
+  };
+
+  const handlePartnerSaleSubmit = async (consignmentId, payload) => {
+    setSubmitting(true);
+    try {
+      await recordPartnerSale(consignmentId, { items: payload });
+      toast.success('Partner sale recorded');
+      setOpenPartnerSale(false);
+      setSaleConsignmentId(null);
+      await refetchDetail();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to record partner sale');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCollect = async () => {
     if (!storeId) return;
     setSubmitting(true);
@@ -150,7 +185,11 @@ export default function StorePartnerReportDetailPage() {
         mode: collectMode,
         amount: collectMode === 'partial' ? collectTarget : undefined,
       });
-      toast.success('Collection recorded');
+      toast.success(
+        collectMode === 'pay_all'
+          ? 'Collection recorded — all partner consignment balances updated'
+          : 'Collection recorded — applied oldest consignment balances first'
+      );
       setCollectOpen(false);
       setPartialAmount('');
       await refetchDetail();
@@ -228,13 +267,34 @@ export default function StorePartnerReportDetailPage() {
         <Stack direction="row" spacing={2} mb={3} flexWrap="wrap">
           <KpiCard label="You owe" value={fCurrency(youOwe)} loading={detailLoading} />
           <KpiCard label="Owes you" value={fCurrency(owesYou)} loading={detailLoading} />
+          <KpiCard
+            label="Paid to partner"
+            value={fCurrency(metrics?.total_paid_to_partner ?? 0)}
+            loading={detailLoading}
+          />
+          <KpiCard
+            label="Collected from partner"
+            value={fCurrency(metrics?.total_collected_from_partner ?? 0)}
+            loading={detailLoading}
+          />
           <KpiCard label="Items borrowed" value={metrics?.items_borrowed ?? 0} loading={detailLoading} />
           <KpiCard label="Items lent" value={metrics?.items_lent ?? 0} loading={detailLoading} />
         </Stack>
 
+        {(youOwe > AMOUNT_EPS || owesYou > AMOUNT_EPS) && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {youOwe > AMOUNT_EPS && owesYou > AMOUNT_EPS
+              ? 'Use Pay partner for borrowed items you sold. Use Collect payment when the partner sold items you lent them.'
+              : youOwe > AMOUNT_EPS
+                ? 'You owe this partner for borrowed consignment sales. Use Pay partner.'
+                : 'This partner owes you for lent consignment sales. Use Collect payment.'}
+          </Typography>
+        )}
+
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
           <Tab value="payables" label={`You owe (${payables.length})`} />
           <Tab value="receivables" label={`Owes you (${receivables.length})`} />
+          <Tab value="payments" label={`Payment history (${paymentHistory.length})`} />
           <Tab value="top_received" label="Top received" />
           <Tab value="top_lent" label="Top lent" />
           <Tab value="consignments" label="Recent consignments" />
@@ -312,6 +372,44 @@ export default function StorePartnerReportDetailPage() {
           </Card>
         )}
 
+        {tab === 'payments' && (
+          <Card>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell align="right">Amount</TableCell>
+                  <TableCell>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paymentHistory.map((row) => (
+                  <TableRow key={`${row.entry_type}-${row.reference_id}`}>
+                    <TableCell>{row.occurred_at ? fDateTime(row.occurred_at) : '—'}</TableCell>
+                    <TableCell>
+                      {row.entry_type === 'paid_to_partner' ? 'You paid' : 'You collected'}
+                    </TableCell>
+                    <TableCell>{row.description}</TableCell>
+                    <TableCell align="right">{fCurrency(row.amount)}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={row.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!detailLoading && !paymentHistory.length && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No payments recorded in this period.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+
         {tab === 'top_received' && (
           <Card>
             <Table size="small">
@@ -363,6 +461,7 @@ export default function StorePartnerReportDetailPage() {
                   <TableCell>Direction</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Items</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -383,11 +482,26 @@ export default function StorePartnerReportDetailPage() {
                       <Chip size="small" label={row.status} />
                     </TableCell>
                     <TableCell>{row.items_summary}</TableCell>
+                    <TableCell align="right">
+                      {canRecordPartnerSale(row) && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="success"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPartnerSaleDialog(row.id);
+                          }}
+                        >
+                          Record sale
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {!detailLoading && !(detail?.recent_consignments || []).length && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={5} align="center">
                       No consignments in this period.
                     </TableCell>
                   </TableRow>
@@ -426,9 +540,13 @@ export default function StorePartnerReportDetailPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={collectOpen} onClose={() => !submitting && setCollectOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={collectOpen} onClose={() => !submitting && setCollectOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Collect from partner</DialogTitle>
         <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Payment is applied oldest-first across all lent consignments this partner owes you on,
+            just like invoice collections.
+          </Typography>
           <RadioGroup value={collectMode} onChange={(e) => setCollectMode(e.target.value)}>
             <FormControlLabel value="pay_all" control={<Radio />} label={`Collect all (${fCurrency(owesYou)})`} />
             <FormControlLabel value="partial" control={<Radio />} label="Partial amount" />
@@ -443,6 +561,16 @@ export default function StorePartnerReportDetailPage() {
               sx={{ mt: 2 }}
             />
           )}
+          {receivables.length > 0 && (
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              <Typography variant="subtitle2">Will clear (oldest first)</Typography>
+              {receivables.map((row) => (
+                <Typography key={row.receivable_id} variant="body2" color="text.secondary">
+                  {row.description || `Receivable #${row.receivable_id}`} · {fCurrency(row.balance_due)} due
+                </Typography>
+              ))}
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCollectOpen(false)} disabled={submitting}>
@@ -453,6 +581,18 @@ export default function StorePartnerReportDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <PartnerSaleDialog
+        open={openPartnerSale}
+        onClose={() => {
+          setOpenPartnerSale(false);
+          setSaleConsignmentId(null);
+        }}
+        consignment={saleConsignment}
+        consignmentLoading={saleConsignmentLoading}
+        submitting={submitting}
+        onSubmit={handlePartnerSaleSubmit}
+      />
     </>
   );
 }

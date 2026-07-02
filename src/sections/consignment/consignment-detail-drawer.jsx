@@ -72,6 +72,7 @@ export function ConsignmentDetailDrawer({
 
   const actionButtons = [
     { key: 'receive', show: access.canReceive, variant: 'contained' },
+    { key: 'partner_sale', show: access.canRecordPartnerSale, variant: 'contained', color: 'success' },
     { key: 'return', show: access.canReturn },
   ].filter((btn) => btn.show);
 
@@ -143,12 +144,29 @@ export function ConsignmentDetailDrawer({
             </Alert>
           )}
 
-          {Number(consignment.total_owed || 0) > 0 &&
+          {isLending &&
+            Number(consignment.total_owed || 0) > 0 &&
             consignment.payment_status &&
             consignment.payment_status !== 'paid' && (
             <Alert severity="warning" sx={{ py: 0.5 }}>
-              Owe {consignment.partner_name || 'partner'}: {fCurrency(consignment.total_owed)}
+              {consignment.partner_name || 'Partner'} owes you: {fCurrency(consignment.total_owed)}
               {consignment.payment_status === 'unpaid' ? ' — unpaid' : ' — partially paid'}
+              <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                Use Collect payment on the partner report page.
+              </Typography>
+            </Alert>
+          )}
+
+          {!isLending &&
+            Number(consignment.total_owed || 0) > 0 &&
+            consignment.payment_status &&
+            consignment.payment_status !== 'paid' && (
+            <Alert severity="warning" sx={{ py: 0.5 }}>
+              You owe {consignment.partner_name || 'partner'}: {fCurrency(consignment.total_owed)}
+              {consignment.payment_status === 'unpaid' ? ' — unpaid' : ' — partially paid'}
+              <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                Use Pay partner on the partner report page.
+              </Typography>
             </Alert>
           )}
 
@@ -156,7 +174,7 @@ export function ConsignmentDetailDrawer({
             consignment.payment_status === 'paid' &&
             Number(consignment.total_owed || 0) === 0 && (
             <Alert severity="success" sx={{ py: 0.5 }}>
-              Partner payment recorded
+              {isLending ? 'Partner payment collected' : 'Partner payment recorded'}
             </Alert>
           )}
 
@@ -198,8 +216,10 @@ export function ConsignmentDetailDrawer({
                 </Typography>
                 {amountOwed > 0 && (
                   <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Owed: {fCurrency(amountOwed)}
-                    {item.vendor_bill_status ? ` (${item.vendor_bill_status})` : ''}
+                    {isLending ? 'Partner owes' : 'You owe'}: {fCurrency(amountOwed)}
+                    {(item.receivable_status || item.vendor_bill_status)
+                      ? ` (${item.receivable_status || item.vendor_bill_status})`
+                      : ''}
                   </Typography>
                 )}
                 {item.received_at && (
@@ -240,6 +260,7 @@ export function ConsignmentDetailDrawer({
               key={btn.key}
               size="small"
               variant={btn.variant || 'outlined'}
+              color={btn.color || 'primary'}
               disabled={submitting}
               onClick={() => onAction(btn.key, consignment)}
             >

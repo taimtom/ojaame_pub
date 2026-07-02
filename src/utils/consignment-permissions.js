@@ -6,11 +6,13 @@ const DONE_STATUSES = new Set(['sold_out', 'returned', 'completed', 'settled', '
 export const CONSIGNMENT_ACTION_LABELS = {
   receive: 'Mark received',
   return: 'Return unsold',
+  partner_sale: 'Record partner sale',
 };
 
 export const LENDING_ACTION_LABELS = {
   receive: 'Mark sent',
   return: 'Return unsold',
+  partner_sale: 'Record partner sale',
 };
 
 export const CONSIGNMENT_STATUS_COLORS = {
@@ -184,6 +186,12 @@ export function getConsignmentActionAccess({ userPermissions, currentStoreId, co
       canUpdate &&
       status === 'requested' &&
       ((isBorrowing && isHolder) || (isLending && isOwner)),
+    canRecordPartnerSale:
+      canUpdate &&
+      isLending &&
+      isOwner &&
+      ['received', 'return_overdue'].includes(status) &&
+      hasUnreturned,
     canReturn:
       canUpdate &&
       (status === 'received' || status === 'return_overdue') &&

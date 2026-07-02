@@ -34,6 +34,7 @@ import {
   createConsignmentPartner,
   getConsignmentKpis,
   receiveConsignment,
+  recordPartnerSale,
   returnConsignment,
   useGetConsignment,
   useGetConsignmentPartners,
@@ -41,6 +42,7 @@ import {
 } from 'src/actions/consignment';
 
 import { ConsignmentDetailDrawer } from '../consignment-detail-drawer';
+import { PartnerSaleDialog, buildPartnerSaleLines } from '../partner-sale-dialog';
 import {
   CONSIGNMENT_STATUS_COLORS,
   formatItemProgress,
@@ -67,6 +69,8 @@ export function ConsignmentListView({ storeId, storeParam }) {
   const [listFilter, setListFilter] = useState('active');
   const [openCreate, setOpenCreate] = useState(false);
   const [openPartner, setOpenPartner] = useState(false);
+  const [openPartnerSale, setOpenPartnerSale] = useState(false);
+  const [partnerSaleConsignment, setPartnerSaleConsignment] = useState(null);
   const [goodsAlreadyHere, setGoodsAlreadyHere] = useState(false);
   const [showInlinePartner, setShowInlinePartner] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -198,6 +202,26 @@ export function ConsignmentListView({ storeId, storeParam }) {
       return;
     }
 
+    if (!isBorrowed) {
+      const stockErrors = normalized
+        .map((row) => {
+          const product = (products || []).find(
+            (p) => Number(p.id) === Number(row.source_product_id)
+          );
+          const availableQty = Number(product?.quantity || 0);
+          if (row.qty_sent > availableQty) {
+            return `${product?.name || row.product_name}: requested ${row.qty_sent}, available ${availableQty}`;
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      if (stockErrors.length) {
+        toast.error(`Insufficient stock to lend: ${stockErrors[0]}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const created = await createConsignment({
@@ -227,6 +251,9 @@ export function ConsignmentListView({ storeId, storeParam }) {
       setOpenCreate(false);
       setGoodsAlreadyHere(false);
       await reload();
+      if (created?.id) {
+        openDetail(created.id);
+      }
     } catch (err) {
       toast.error(err?.message || 'Failed to create consignment');
     } finally {
@@ -274,6 +301,16 @@ export function ConsignmentListView({ storeId, storeParam }) {
   };
 
   const handleDrawerAction = async (action, row) => {
+    if (action === 'partner_sale') {
+      if (!buildPartnerSaleLines(row).length) {
+        toast.error('No items with partner still available to sell.');
+        return;
+      }
+      setPartnerSaleConsignment(row);
+      setOpenPartnerSale(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (action === 'receive') {
@@ -300,6 +337,21 @@ export function ConsignmentListView({ storeId, storeParam }) {
       await reload();
     } catch (err) {
       toast.error(err?.message || 'Action failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePartnerSaleSubmit = async (consignmentId, payload) => {
+    setSubmitting(true);
+    try {
+      await recordPartnerSale(consignmentId, { items: payload });
+      toast.success('Partner sale recorded');
+      setOpenPartnerSale(false);
+      setPartnerSaleConsignment(null);
+      await reload();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to record partner sale');
     } finally {
       setSubmitting(false);
     }
@@ -495,9 +547,22 @@ export function ConsignmentListView({ storeId, storeParam }) {
               fullWidth
               helperText="Unsold items should be returned within this many days"
             />
-            {items.map((row, idx) => (
+            {items.map((row, idx) => {
+              const selectedProduct =
+                tab === 'lent'
+                  ? (products || []).find((p) => Number(p.id) === Number(row.source_product_id))
+                  : null;
+              const availableQty = Number(selectedProduct?.quantity || 0);
+              const requestedQty = Number(row.qty_sent || 0);
+              const hasQtyError =
+                tab === 'lent' &&
+                Boolean(selectedProduct) &&
+                requestedQty > 0 &&
+                requestedQty > availableQty;
+
+              return (
               <Stack key={idx} spacing={1} sx={{ p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-                <Stack direction="row" spacing={1}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
                   {tab === 'borrowed' ? (
                     <Autocomplete
                       sx={{ flex: 2 }}
@@ -534,7 +599,7 @@ export function ConsignmentListView({ storeId, storeParam }) {
                     />
                   ) : (
                     <Autocomplete
-                      sx={{ flex: 2 }}
+                      sx={{ flex: 2, width: '100%' }}
                       options={products || []}
                       getOptionLabel={(o) => o.name || ''}
                       value={(products || []).find((p) => Number(p.id) === Number(row.source_product_id)) || null}
@@ -545,10 +610,24 @@ export function ConsignmentListView({ storeId, storeParam }) {
                           source_product_id: v?.id || '',
                           product_name: v?.name || '',
                           agreed_cost: v?.costPrice != null ? String(v.costPrice) : next[idx].agreed_cost,
+                          sell_price: v?.price != null ? String(v.price) : next[idx].sell_price,
                         };
                         setItems(next);
                       }}
-                      renderInput={(params) => <TextField {...params} label="Product from your store" />}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Product from your store"
+                          helperText={
+                            hasQtyError
+                              ? `Only ${availableQty} available in your store`
+                              : selectedProduct
+                                ? `Available: ${availableQty}`
+                                : ''
+                          }
+                          error={hasQtyError}
+                        />
+                      )}
                     />
                   )}
                   <TextField
@@ -560,10 +639,13 @@ export function ConsignmentListView({ storeId, storeParam }) {
                       next[idx] = { ...next[idx], qty_sent: e.target.value };
                       setItems(next);
                     }}
-                    sx={{ width: 90 }}
+                    inputProps={{ min: 1 }}
+                    error={hasQtyError}
+                    helperText={hasQtyError ? `Only ${availableQty} available` : undefined}
+                    sx={{ width: { xs: '100%', md: 90 } }}
                   />
                 </Stack>
-                <Stack direction="row" spacing={1}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
                   {tab === 'borrowed' && (
                     <TextField
                       label="Sell price"
@@ -576,6 +658,20 @@ export function ConsignmentListView({ storeId, storeParam }) {
                       }}
                       sx={{ flex: 1 }}
                       helperText="Price when selling to your customer"
+                    />
+                  )}
+                  {tab === 'lent' && (
+                    <TextField
+                      label="Sell price"
+                      type="number"
+                      value={row.sell_price}
+                      onChange={(e) => {
+                        const next = [...items];
+                        next[idx] = { ...next[idx], sell_price: e.target.value };
+                        setItems(next);
+                      }}
+                      sx={{ flex: 1 }}
+                      helperText="Price partner sold at (optional)"
                     />
                   )}
                   <TextField
@@ -606,7 +702,7 @@ export function ConsignmentListView({ storeId, storeParam }) {
                     />
                   ) : (
                     <TextField
-                      label="Cost per unit (owed to owner)"
+                      label={tab === 'lent' ? 'Amount owed to you per unit' : 'Cost per unit (owed to owner)'}
                       type="number"
                       value={row.agreed_cost}
                       onChange={(e) => {
@@ -619,7 +715,8 @@ export function ConsignmentListView({ storeId, storeParam }) {
                   )}
                 </Stack>
               </Stack>
-            ))}
+            );
+            })}
             <Button
               size="small"
               onClick={() =>
@@ -648,6 +745,17 @@ export function ConsignmentListView({ storeId, storeParam }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <PartnerSaleDialog
+        open={openPartnerSale}
+        onClose={() => {
+          setOpenPartnerSale(false);
+          setPartnerSaleConsignment(null);
+        }}
+        consignment={partnerSaleConsignment}
+        submitting={submitting}
+        onSubmit={handlePartnerSaleSubmit}
+      />
 
       <Dialog open={openPartner} onClose={() => setOpenPartner(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Add partner</DialogTitle>

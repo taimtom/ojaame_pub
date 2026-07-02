@@ -402,6 +402,7 @@ export const endpoints = {
     send: (id) => `/api/consignments/${id}/send`,
     receive: (id) => `/api/consignments/${id}/receive`,
     return: (id) => `/api/consignments/${id}/return`,
+    recordPartnerSale: (id) => `/api/consignments/${id}/record-partner-sale`,
     settle: (id) => `/api/consignments/${id}/settle`,
     close: (id) => `/api/consignments/${id}/close`,
     kpis: '/api/consignments/metrics/kpis',
