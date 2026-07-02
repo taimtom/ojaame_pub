@@ -3,6 +3,7 @@ import { Page, View, Text, Font, Image, Document, StyleSheet } from '@react-pdf/
 
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { lineItemTotal, resolveReceiptSubtotal } from 'src/utils/escpos/receipt-from-sale';
 
 // ----------------------------------------------------------------------
 
@@ -14,111 +15,120 @@ Font.register({
   ],
 });
 
-const useStyles = () =>
-  useMemo(
+// 1 mm ≈ 2.83465 pt; A4 height for multi-page thermal strips.
+const MM_TO_PT = 2.83465;
+const THERMAL_PAGE_HEIGHT_PT = 841.89;
+
+function thermalWidthToPt(mm) {
+  return mm * MM_TO_PT;
+}
+
+function scaleSize(value, scale) {
+  return Math.round(value * scale * 10) / 10;
+}
+
+const useStyles = (paperWidthMm = 80) => {
+  const scale = paperWidthMm / 80;
+
+  return useMemo(
     () =>
       StyleSheet.create({
-        // 80mm thermal printer page (57mm usable width)
         page: {
-          fontSize: 8,
+          fontSize: scaleSize(8, scale),
           lineHeight: 1.4,
           fontFamily: 'Roboto',
           backgroundColor: '#FFFFFF',
-          padding: '10px 8px',
-          width: '80mm',
+          padding: `${scaleSize(10, scale)}px ${scaleSize(8, scale)}px`,
+          width: `${paperWidthMm}mm`,
           minHeight: 'auto',
         },
-        // Header styles
         header: {
           alignItems: 'center',
           textAlign: 'center',
-          marginBottom: 15,
+          marginBottom: scaleSize(15, scale),
         },
         logo: {
-          width: 30,
-          height: 30,
-          marginBottom: 5,
+          width: scaleSize(30, scale),
+          height: scaleSize(30, scale),
+          marginBottom: scaleSize(5, scale),
           alignSelf: 'center',
         },
         companyName: {
-          fontSize: 12,
+          fontSize: scaleSize(12, scale),
           fontWeight: 'bold',
-          marginBottom: 2,
+          marginBottom: scaleSize(2, scale),
         },
         companyDetails: {
-          fontSize: 7,
-          marginBottom: 1,
+          fontSize: scaleSize(7, scale),
+          marginBottom: scaleSize(1, scale),
           textAlign: 'center',
         },
         divider: {
           borderBottomWidth: 1,
           borderStyle: 'dashed',
           borderColor: '#333',
-          marginVertical: 8,
+          marginVertical: scaleSize(8, scale),
         },
-        // Content styles
         receiptTitle: {
-          fontSize: 10,
+          fontSize: scaleSize(10, scale),
           fontWeight: 'bold',
           textAlign: 'center',
-          marginBottom: 8,
+          marginBottom: scaleSize(8, scale),
         },
         infoRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginBottom: 2,
+          marginBottom: scaleSize(2, scale),
         },
         infoLabel: {
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
           fontWeight: 'bold',
         },
         infoValue: {
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
         },
-        // Items table
         itemHeader: {
           flexDirection: 'row',
           borderBottomWidth: 1,
           borderStyle: 'solid',
           borderColor: '#333',
-          paddingVertical: 3,
-          marginBottom: 3,
+          paddingVertical: scaleSize(3, scale),
+          marginBottom: scaleSize(3, scale),
         },
         itemRow: {
           flexDirection: 'row',
-          paddingVertical: 1,
-          marginBottom: 1,
+          paddingVertical: scaleSize(1, scale),
+          marginBottom: scaleSize(1, scale),
         },
         itemDesc: {
           width: '45%',
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
         },
         itemQty: {
           width: '15%',
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
           textAlign: 'center',
         },
         itemPrice: {
           width: '20%',
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
           textAlign: 'right',
         },
         itemTotal: {
           width: '20%',
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
           textAlign: 'right',
         },
-        // Summary styles
         summaryRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginBottom: 2,
+          marginBottom: scaleSize(2, scale),
         },
         summaryLabel: {
-          fontSize: 8,
+          fontSize: scaleSize(8, scale),
         },
         summaryValue: {
-          fontSize: 8,
+          fontSize: scaleSize(8, scale),
         },
         totalRow: {
           flexDirection: 'row',
@@ -126,66 +136,70 @@ const useStyles = () =>
           borderTopWidth: 1,
           borderStyle: 'solid',
           borderColor: '#333',
-          paddingTop: 3,
-          marginTop: 3,
+          paddingTop: scaleSize(3, scale),
+          marginTop: scaleSize(3, scale),
         },
         totalLabel: {
-          fontSize: 9,
+          fontSize: scaleSize(9, scale),
           fontWeight: 'bold',
         },
         totalValue: {
-          fontSize: 9,
+          fontSize: scaleSize(9, scale),
           fontWeight: 'bold',
         },
-        // Payment details
         paymentSection: {
-          marginTop: 10,
+          marginTop: scaleSize(10, scale),
         },
         paymentTitle: {
-          fontSize: 8,
+          fontSize: scaleSize(8, scale),
           fontWeight: 'bold',
-          marginBottom: 3,
+          marginBottom: scaleSize(3, scale),
         },
         paymentRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginBottom: 1,
+          marginBottom: scaleSize(1, scale),
         },
         paymentMethod: {
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
         },
         paymentAmount: {
-          fontSize: 7,
+          fontSize: scaleSize(7, scale),
         },
-        // Footer
         footer: {
-          marginTop: 15,
+          marginTop: scaleSize(15, scale),
           alignItems: 'center',
           textAlign: 'center',
         },
         thankYou: {
-          fontSize: 9,
+          fontSize: scaleSize(9, scale),
           fontWeight: 'bold',
-          marginBottom: 5,
+          marginBottom: scaleSize(5, scale),
         },
         footerText: {
-          fontSize: 6,
-          marginBottom: 2,
+          fontSize: scaleSize(6, scale),
+          marginBottom: scaleSize(2, scale),
           textAlign: 'center',
         },
         barcode: {
-          fontSize: 6,
+          fontSize: scaleSize(6, scale),
           fontFamily: 'Courier',
           textAlign: 'center',
-          marginTop: 5,
+          marginTop: scaleSize(5, scale),
         },
       }),
-    []
+    [paperWidthMm, scale]
   );
+};
 
 // ----------------------------------------------------------------------
 
-export function ThermalReceiptPDF({ receipt, currentStatus }) {
+/** @param {object} props
+ *  @param {object} props.receipt
+ *  @param {string} [props.currentStatus]
+ *  @param {58|80} [props.paperWidthMm] Roll width in mm (default 80). */
+export function ThermalReceiptPDF({ receipt, currentStatus, paperWidthMm = 80 }) {
+  const widthMm = paperWidthMm === 58 ? 58 : 80;
   const {
     items = [],
     payments = [],
@@ -199,20 +213,36 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
     invoice_number,
     customer_name,
     customer_phone,
+    company_name,
     store_name,
     store_address,
     store_phone,
+    rc_cac_reg_number,
     user_fullname,
   } = receipt || {};
 
-  const styles = useStyles();
+  const resolvedSubtotal = useMemo(
+    () => resolveReceiptSubtotal({ items, subtotal, total_amount, taxes, discount, shipping }),
+    [items, subtotal, total_amount, taxes, discount, shipping]
+  );
+
+  const styles = useStyles(widthMm);
+
+  const displayCompanyName = company_name || store_name || 'Your Store';
+  const showStoreName = Boolean(store_name && company_name);
 
   const renderHeader = (
     <View style={styles.header}>
       <Image source="/logo/logo-single.png" style={styles.logo} />
-      <Text style={styles.companyName}>{store_name || 'Your Store'}</Text>
+      <Text style={styles.companyName}>{displayCompanyName}</Text>
+      {showStoreName ? (
+        <Text style={styles.companyDetails}>Store: {store_name}</Text>
+      ) : null}
       <Text style={styles.companyDetails}>{store_address}</Text>
       <Text style={styles.companyDetails}>Tel: {store_phone}</Text>
+      {rc_cac_reg_number ? (
+        <Text style={styles.companyDetails}>{rc_cac_reg_number}</Text>
+      ) : null}
       <View style={styles.divider} />
     </View>
   );
@@ -265,7 +295,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
           </Text>
           <Text style={styles.itemQty}>{item.quantity}</Text>
           <Text style={styles.itemPrice}>{fCurrency(item.price)}</Text>
-          <Text style={styles.itemTotal}>{fCurrency(item.quantity * item.price)}</Text>
+          <Text style={styles.itemTotal}>{fCurrency(lineItemTotal(item))}</Text>
         </View>
       ))}
       <View style={styles.divider} />
@@ -276,7 +306,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
     <View>
       <View style={styles.summaryRow}>
         <Text style={styles.summaryLabel}>Subtotal:</Text>
-        <Text style={styles.summaryValue}>{fCurrency(subtotal)}</Text>
+        <Text style={styles.summaryValue}>{fCurrency(resolvedSubtotal)}</Text>
       </View>
       {discount > 0 && (
         <View style={styles.summaryRow}>
@@ -356,7 +386,7 @@ export function ThermalReceiptPDF({ receipt, currentStatus }) {
 
   return (
     <Document>
-      <Page size="A7" style={styles.page}>
+      <Page size={[thermalWidthToPt(widthMm), THERMAL_PAGE_HEIGHT_PT]} style={styles.page} wrap>
         {renderHeader}
         {renderReceiptInfo}
         {renderItems}

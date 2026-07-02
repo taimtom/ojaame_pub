@@ -21,16 +21,17 @@ import {
   AccordionDetails,
   LinearProgress
 } from '@mui/material';
-import {
-  Psychology as AIIcon,
-  TrendingUp as TrendIcon,
-  Warning as WarningIcon,
-  Lightbulb as IdeaIcon,
-  Send as SendIcon,
-  ExpandMore as ExpandIcon,
-  AutoAwesome as SparkleIcon
-} from '@mui/icons-material';
 import axios from '../../utils/axios';
+
+import { Iconify } from 'src/components/iconify';
+
+const AIIcon = (props) => <Iconify icon="solar:brain-bold" width={20} {...props} />;
+const TrendIcon = (props) => <Iconify icon="solar:chart-2-bold" width={20} {...props} />;
+const WarningIcon = (props) => <Iconify icon="solar:danger-triangle-bold" width={20} {...props} />;
+const IdeaIcon = (props) => <Iconify icon="solar:lightbulb-bold" width={20} {...props} />;
+const SendIcon = (props) => <Iconify icon="solar:plain-2-bold" width={20} {...props} />;
+const ExpandIcon = (props) => <Iconify icon="solar:alt-arrow-down-bold" width={20} {...props} />;
+const SparkleIcon = (props) => <Iconify icon="solar:stars-bold" width={20} {...props} />;
 
 const AIBusinessAssistant = ({ companyId }) => {
   const [loading, setLoading] = useState(false);

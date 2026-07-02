@@ -10,7 +10,7 @@ import { ProductNewEditForm } from '../product-new-edit-form';
 
 // ----------------------------------------------------------------------
 
-export function ProductEditView({ product, storeSlug, storeNameSlug, storeId }) {
+export function ProductEditView({ product, mutateProduct, storeSlug, storeNameSlug, storeId }) {
   const { t } = useBusinessType();
   const productTerm = t('product');
 
@@ -26,7 +26,13 @@ export function ProductEditView({ product, storeSlug, storeNameSlug, storeId }) 
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <ProductNewEditForm storeId={storeId} storeSlug={storeSlug} storeNameSlug={storeNameSlug} currentProduct={product} />
+      <ProductNewEditForm
+        storeId={storeId}
+        storeSlug={storeSlug}
+        storeNameSlug={storeNameSlug}
+        currentProduct={product}
+        mutateProduct={mutateProduct}
+      />
     </DashboardContent>
   );
 }

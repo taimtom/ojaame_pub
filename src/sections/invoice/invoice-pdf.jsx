@@ -73,6 +73,47 @@ const useStyles = () =>
 
 // ----------------------------------------------------------------------
 
+function lineItemTotal(item) {
+  if (item?.total != null && item.total !== '') {
+    const t = Number(item.total);
+    if (!Number.isNaN(t)) return t;
+  }
+  const p = Number(item?.price);
+  const q = Number(item?.quantity);
+  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
+  return 0;
+}
+
+function resolveInvoiceContactEmail(invoice) {
+  if (!invoice) return 'N/A';
+
+  const candidates = [
+    invoice.store_email,
+    invoice.storeEmail,
+    invoice.store_email_address,
+    invoice.store_email_contact,
+    invoice.store?.email,
+    invoice.store?.storeEmail,
+    invoice.company_email,
+    invoice.companyEmail,
+    invoice.company?.email,
+    invoice.company?.companyEmail,
+    invoice.owner_email,
+    invoice.ownerEmail,
+    invoice.owner?.email,
+    invoice.owner?.ownerEmail,
+    invoice.user_email,
+    invoice.userEmail,
+  ];
+
+  const found = candidates.find((value) => typeof value === 'string' && value.trim() !== '');
+
+  return (
+    found ||
+    'N/A'
+  );
+}
+
 export function InvoicePDF({ invoice, currentStatus }) {
   // Destructure keys using the keys from your provided data.
   const {
@@ -81,7 +122,6 @@ export function InvoicePDF({ invoice, currentStatus }) {
     due_date,
     discount,
     shipping,
-    subtotal,
     create_date,
     total_amount,
     invoice_number,
@@ -101,8 +141,11 @@ export function InvoicePDF({ invoice, currentStatus }) {
     fulldue_date,
     user_fullname,
   } = invoice;
+  const contactEmail = resolveInvoiceContactEmail(invoice);
 
   const styles = useStyles();
+
+  const computedSubtotal = (items || []).reduce((acc, item) => acc + lineItemTotal(item), 0);
 
   const renderHeader = (
     <View style={[styles.container, styles.mb40]}>
@@ -124,7 +167,7 @@ export function InvoicePDF({ invoice, currentStatus }) {
       </View>
       <View style={{ width: '25%', textAlign: 'right' }}>
         <Text style={styles.subtitle2}>Have a question?</Text>
-        <Text>support@abcapp.com</Text>
+        <Text>{contactEmail}</Text>
       </View>
     </View>
   );
@@ -198,7 +241,7 @@ export function InvoicePDF({ invoice, currentStatus }) {
           </View>
         </View>
         <View>
-          {items.map((item, index) => (
+          {(items || []).map((item, index) => (
             <View key={item.id || index} style={styles.row}>
               <View style={styles.cell_1}>
                 <Text>{index + 1}</Text>
@@ -225,12 +268,12 @@ export function InvoicePDF({ invoice, currentStatus }) {
                 <Text>{fCurrency(item.price)}</Text>
               </View>
               <View style={[styles.cell_5, { textAlign: 'right' }]}>
-                <Text>{fCurrency(item.price * item.quantity)}</Text>
+                <Text>{fCurrency(lineItemTotal(item))}</Text>
               </View>
             </View>
           ))}
           {[
-            { name: 'Subtotal', value: subtotal },
+            { name: 'Subtotal', value: computedSubtotal },
             { name: 'Shipping', value: -shipping },
             { name: 'Discount', value: -discount },
             { name: 'Taxes', value: taxes },

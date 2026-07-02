@@ -24,8 +24,9 @@ import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
-export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditRow, onHistoryRow, onDeleteRow }) {
+export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditRow, onHistoryRow, onDeleteRow, onMarkAsPaid }) {
   const confirm = useBoolean();
+  const confirmPaid = useBoolean();
 
   const popover = usePopover();
   const customerName = row.customer_name || 'N/A';
@@ -88,14 +89,25 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
         <TableCell>{fCurrency(row.total_amount)}</TableCell>
 
         <TableCell>
-          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-            {fCurrency(row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0)}
-          </Typography>
-          {row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) < row.total_amount && (
-            <Typography variant="caption" sx={{ color: 'error.main', display: 'block' }}>
-              Due: {fCurrency(row.total_amount - (row.payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0))}
-            </Typography>
-          )}
+          {(() => {
+            const isFullyPaid = row.status === 'paid' || row.status === 'completed';
+            const paymentsSum = row.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+            // For paid/completed sales, treat the full amount as paid regardless of payment records
+            const displayPaid = isFullyPaid ? row.total_amount : paymentsSum;
+            const due = row.total_amount - displayPaid;
+            return (
+              <>
+                <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                  {fCurrency(displayPaid)}
+                </Typography>
+                {!isFullyPaid && due > 0 && (
+                  <Typography variant="caption" sx={{ color: 'error.main', display: 'block' }}>
+                    Due: {fCurrency(due)}
+                  </Typography>
+                )}
+              </>
+            );
+          })()}
         </TableCell>
 
         <TableCell>
@@ -172,6 +184,19 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
             SalesHistory
           </MenuItem>
 
+          {row.status === 'credit' && (
+            <MenuItem
+              onClick={() => {
+                confirmPaid.onTrue();
+                popover.onClose();
+              }}
+              sx={{ color: 'success.main' }}
+            >
+              <Iconify icon="solar:check-circle-bold" />
+              Mark as Paid
+            </MenuItem>
+          )}
+
           <Divider sx={{ borderStyle: 'dashed' }} />
 
           <MenuItem
@@ -195,6 +220,22 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onViewRow, onEditR
         action={
           <Button variant="contained" color="error" onClick={onDeleteRow}>
             Delete
+          </Button>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmPaid.value}
+        onClose={confirmPaid.onFalse}
+        title="Mark as Paid"
+        content={
+          <>
+            Mark <strong>{row.customer_name || 'this sale'}</strong> ({row.invoice_number}) as fully paid?
+          </>
+        }
+        action={
+          <Button variant="contained" color="success" onClick={() => { onMarkAsPaid(); confirmPaid.onFalse(); }}>
+            Confirm
           </Button>
         }
       />

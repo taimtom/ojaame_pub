@@ -9,6 +9,7 @@ import { Router } from 'src/routes/sections';
 import { useScrollToTop } from 'src/hooks/use-scroll-to-top';
 
 import { CONFIG } from 'src/config-global';
+import { getGoogleClientId } from 'src/utils/google-auth-env';
 import { LocalizationProvider } from 'src/locales';
 import { I18nProvider } from 'src/locales/i18n-provider';
 import { ThemeProvider } from 'src/theme/theme-provider';
@@ -17,11 +18,14 @@ import { Snackbar } from 'src/components/snackbar';
 import { ProgressBar } from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
+import { OfflineBanner } from 'src/components/pwa/offline-banner';
+import { PwaInstallBanner } from 'src/components/pwa/pwa-install-banner';
 
 import { CheckoutProvider } from 'src/sections/checkout/context';
 
 import { BusinessTypeProvider } from 'src/contexts/business-type-context';
 import { CurrencyProvider } from 'src/contexts/CurrencyContext';
+import { AgentAuthProvider } from 'src/contexts/AgentAuthContext';
 
 import { AuthProvider as JwtAuthProvider } from 'src/auth/context/jwt';
 import { AuthProvider as Auth0AuthProvider } from 'src/auth/context/auth0';
@@ -42,9 +46,10 @@ export default function App() {
   useScrollToTop();
 
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider clientId={getGoogleClientId()}>
       <I18nProvider>
         <LocalizationProvider>
+          <AgentAuthProvider>
           <AuthProvider>
             <CurrencyProvider>
             <BusinessTypeProvider>
@@ -52,6 +57,8 @@ export default function App() {
                 <ThemeProvider>
                   <MotionLazy>
                     <CheckoutProvider>
+                      <OfflineBanner />
+                      <PwaInstallBanner />
                       <Snackbar />
                       <ProgressBar />
                       <SettingsDrawer />
@@ -63,6 +70,7 @@ export default function App() {
             </BusinessTypeProvider>
             </CurrencyProvider>
           </AuthProvider>
+          </AgentAuthProvider>
         </LocalizationProvider>
       </I18nProvider>
     </GoogleOAuthProvider>

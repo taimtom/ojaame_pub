@@ -6,6 +6,7 @@ export const USER_STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'pending', label: 'Pending' },
   { value: 'banned', label: 'Banned' },
+  { value: 'deleted', label: 'Deleted' },
   { value: 'rejected', label: 'Rejected' },
 ];
 

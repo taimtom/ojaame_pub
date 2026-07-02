@@ -7,15 +7,35 @@ import { paths } from 'src/routes/paths';
 import { paramCase } from 'src/utils/change-case';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { getOnboardingRedirectPath } from 'src/utils/onboarding-routes';
 
 export default function DashboardRootRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext(); // user object includes user_id and other login info
+  const { progress, progressLoading } = useOnboardingProgress({
+    skip: !user?.company_id,
+  });
 
   useEffect(() => {
-    // Allow direct access to the company-level analytics page
-    if (location.pathname === paths.dashboard.general.analytics) {
+    if (progressLoading) {
+      return;
+    }
+    if (progress?.is_owner && !progress.onboarding_completed) {
+      navigate(getOnboardingRedirectPath(progress), { replace: true });
+      return;
+    }
+    // Allow direct access to pages that are NOT store-scoped.
+    const nonStorePages = [
+      paths.dashboard.general.analytics,
+      paths.dashboard.reports?.companyRoot,
+      paths.dashboard.user?.root,
+      paths.dashboard.integration?.root,
+      paths.dashboard.role?.root,
+      paths.dashboard.role?.new,
+    ];
+    if (nonStorePages.some((p) => p && location.pathname.startsWith(p))) {
       return;
     }
 
@@ -30,8 +50,10 @@ export default function DashboardRootRedirect() {
 
     const activeWorkspace = JSON.parse(activeWorkspaceJson);
 
-    // Verify that the active workspace belongs to the logged-in user.
-    if (activeWorkspace.user_id !== user.user_id) {
+    // Only enforce user ownership if user_id was explicitly stored in the workspace.
+    // Workspaces saved via store-item.jsx may not include user_id, so we skip
+    // the check when it is absent rather than always clearing localStorage.
+    if (activeWorkspace.user_id && activeWorkspace.user_id !== user.user_id) {
       localStorage.removeItem('activeWorkspace');
       navigate(paths.dashboard.store.list, { replace: true });
       return;
@@ -57,7 +79,7 @@ export default function DashboardRootRedirect() {
     if (!location.pathname.includes(storedStoreParam)) {
       navigate(`${paths.dashboard.root}/${storedStoreParam}`, { replace: true });
     }
-  }, [navigate, location, user]);
+  }, [navigate, location, user, progress, progressLoading]);
 
   return null;
 }

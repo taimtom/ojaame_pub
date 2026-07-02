@@ -126,7 +126,7 @@ export function HeaderBase({
               {helpLink && (
                 <Link
                   data-slot="help-link"
-                  href={paths.faqs}
+                  href={paths.contact}
                   component={RouterLink}
                   color="inherit"
                   sx={{ typography: 'subtitle2' }}
@@ -143,7 +143,7 @@ export function HeaderBase({
 
               {/* -- Notifications popover -- */}
               {notifications && (
-                <NotificationsDrawer data-slot="notifications" data={data?.notifications} />
+                <NotificationsDrawer data-slot="notifications" />
               )}
 
               {/* -- Contacts popover -- */}
@@ -158,14 +158,13 @@ export function HeaderBase({
               {/* -- Sign in button -- */}
               {signIn && <SignInButton />}
 
-              {/* -- Purchase button -- */}
+              {/* -- Sign up button -- */}
               {purchase && (
                 <Button
                   data-slot="purchase"
                   variant="contained"
-                  rel="noopener"
-                  target="_blank"
-                  href={paths.minimalStore}
+                  component={RouterLink}
+                  href={paths.auth.jwt.signUp}
                   sx={{
                     display: 'none',
                     [theme.breakpoints.up(layoutQuery)]: {
@@ -173,7 +172,7 @@ export function HeaderBase({
                     },
                   }}
                 >
-                  Purchase
+                  Sign up
                 </Button>
               )}
             </Box>

@@ -18,6 +18,9 @@ export function ProductDetailsToolbar({
   publish,
   backLink,
   editLink,
+  addQtyLink,
+  adjustLink,
+  changePriceLink,
   liveLink,
   publishOptions,
   onChangePublish,
@@ -39,12 +42,47 @@ export function ProductDetailsToolbar({
 
         <Box sx={{ flexGrow: 1 }} />
 
-        {publish === 'published' && (
+        {publish === 'publish' && (
           <Tooltip title="Go Live">
             <IconButton component={RouterLink} href={liveLink}>
               <Iconify icon="eva:external-link-fill" />
             </IconButton>
           </Tooltip>
+        )}
+
+        {addQtyLink && (
+          <Button
+            component={RouterLink}
+            href={addQtyLink}
+            variant="outlined"
+            startIcon={<Iconify icon="solar:add-square-bold" width={18} />}
+          >
+            Add Qty
+          </Button>
+        )}
+
+        {adjustLink && (
+          <Button
+            component={RouterLink}
+            href={adjustLink}
+            variant="outlined"
+            color="error"
+            startIcon={<Iconify icon="solar:danger-triangle-bold" width={18} />}
+          >
+            Record Loss
+          </Button>
+        )}
+
+        {changePriceLink && (
+          <Button
+            component={RouterLink}
+            href={changePriceLink}
+            variant="outlined"
+            color="warning"
+            startIcon={<Iconify icon="solar:tag-price-bold" width={18} />}
+          >
+            Change Price
+          </Button>
         )}
 
         <Tooltip title="Edit">
@@ -82,7 +120,7 @@ export function ProductDetailsToolbar({
                 onChangePublish(option.value);
               }}
             >
-              {option.value === 'published' && <Iconify icon="eva:cloud-upload-fill" />}
+              {option.value === 'publish' && <Iconify icon="eva:cloud-upload-fill" />}
               {option.value === 'draft' && <Iconify icon="solar:file-text-bold" />}
               {option.label}
             </MenuItem>

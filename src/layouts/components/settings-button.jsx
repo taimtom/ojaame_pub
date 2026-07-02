@@ -14,7 +14,7 @@ export function SettingsButton({ sx, ...other }) {
   return (
     <IconButton
       aria-label="settings"
-      onClick={() => router.push(`${paths.dashboard.user.account}?tab=theme-settings`)}
+      onClick={() => router.push(paths.dashboard.user.account)}
       sx={{ p: 0, width: 40, height: 40, ...sx }}
       {...other}
     >

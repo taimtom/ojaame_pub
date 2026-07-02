@@ -2,6 +2,8 @@ import { keyframes } from '@emotion/react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import MenuList from '@mui/material/MenuList';
@@ -11,6 +13,8 @@ import IconButton from '@mui/material/IconButton';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
+
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 
 import { paramCase } from 'src/utils/change-case';
 
@@ -30,6 +34,9 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
   const popover = usePopover();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuthContext();
+  const { canAddStore } = usePlanFeatures();
+  const showAddStore = canAddStore(data.length);
 
   const { id: currentStoreParam } = useParams();
   const storedWorkspaceJson = localStorage.getItem('activeWorkspace');
@@ -72,9 +79,9 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
   const handleChangeWorkspace = useCallback(newWs => {
     setWorkspace(newWs);
     popover.onClose();
-    localStorage.setItem('activeWorkspace', JSON.stringify(newWs));
+    localStorage.setItem('activeWorkspace', JSON.stringify({ ...newWs, user_id: user?.user_id }));
     navigate(`${paths.dashboard.root}/${buildStoreParam(newWs)}`);
-  }, [popover, navigate]);
+  }, [popover, navigate, user]);
 
   const handleEditStore = useCallback(
     (storeId) => {
@@ -222,10 +229,12 @@ export function WorkspacesPopover({ data = [], sx, ...other }) {
             );
           })}
 
-          <MenuItem onClick={handleAddNewStore} sx={{ height: 48, mt: 1 }}>
-            <Iconify icon="eva:plus-fill" width={20} sx={{ mr: 1 }} />
-            Add new store
-          </MenuItem>
+          {showAddStore && (
+            <MenuItem onClick={handleAddNewStore} sx={{ height: 48, mt: 1 }}>
+              <Iconify icon="eva:plus-fill" width={20} sx={{ mr: 1 }} />
+              Add new store
+            </MenuItem>
+          )}
         </MenuList>
       </CustomPopover>
     </>

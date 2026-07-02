@@ -1,16 +1,16 @@
 import { z as zod } from 'zod';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isValidPhoneNumber } from 'react-phone-number-input/input';
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 // import MenuItem from '@mui/material/MenuItem';
 import Grid from '@mui/material/Unstable_Grid2';
-// import InputLabel from '@mui/material/InputLabel';
-// import Typography from '@mui/material/Typography';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 // import FormControl from '@mui/material/FormControl';
 // import FormControlLabel from '@mui/material/FormControlLabel';
@@ -24,6 +24,8 @@ import { paramCase } from 'src/utils/change-case';
 import { useGetRoles } from 'src/actions/role';
 import { useGetStores } from 'src/actions/store';
 import { addCustomer, editCustomer } from 'src/actions/customer';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
 
 // import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -50,6 +52,10 @@ export const NewCustomerSchema = zod.object({
 
 export function CustomerNewEditForm({ currentUser }) {
   const router = useRouter();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
+  const [addedCount, setAddedCount] = useState(0);
 
   const { roles, rolesLoading } = useGetRoles();
   const { stores, storesLoading } = useGetStores();
@@ -105,12 +111,22 @@ export function CustomerNewEditForm({ currentUser }) {
           if (currentUser && currentUser.id) {
             await editCustomer(currentUser.id, data);
             toast.success('Customer updated successfully!');
+            if (onboarding) {
+              await advanceOnboarding();
+            } else {
+              router.push(paths.dashboard.customer.root(storeSlug));
+            }
           } else {
             await addCustomer(data);
             toast.success('Customer added successfully!');
+            if (onboarding) {
+              setAddedCount((prev) => prev + 1);
+              await mutateProgress();
+              reset(defaultValues);
+            } else {
+              router.push(paths.dashboard.customer.root(storeSlug));
+            }
           }
-          // Navigate to the customer list page with the store slug.
-          router.push(paths.dashboard.customer.root(storeSlug));
         } catch (parseError) {
           console.error("Error parsing activeWorkspace:", parseError);
           toast.error("Failed to retrieve store information");
@@ -206,10 +222,33 @@ export function CustomerNewEditForm({ currentUser }) {
             <Field.Checkbox name="primary" label="Use this address as default." />
           </Stack>
 
-            <Stack alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
-                {!currentUser ? 'Create Customer' : 'Save changes'}
-              </LoadingButton>
+            <Stack alignItems="flex-end" spacing={2} sx={{ mt: 3 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: '100%' }}>
+                <LoadingButton
+                  type="submit"
+                  variant="contained"
+                  loading={isSubmitting}
+                  sx={{ flex: 1 }}
+                >
+                  {!currentUser ? 'Create Customer' : 'Save changes'}
+                </LoadingButton>
+                {onboarding && !currentUser && addedCount > 0 && (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    disabled={isSubmitting}
+                    onClick={() => advanceOnboarding()}
+                    sx={{ flex: 1 }}
+                  >
+                    Next
+                  </Button>
+                )}
+              </Stack>
+              {onboarding && !currentUser && addedCount > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {addedCount} customer{addedCount === 1 ? '' : 's'} added this session
+                </Typography>
+              )}
             </Stack>
           </Card>
         </Grid>

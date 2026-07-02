@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR Options
@@ -15,24 +16,25 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 // useGetServices - Fetches a list of services for a given store.
 // ----------------------------------------------------------------------
-export function useGetServices(storeId) {
-
-  const key = storeId ? [endpoints.service.list, { params: { store_id: storeId } }] : null;
-
-
+export function useGetServices(storeId, queryParams = {}) {
+  const key = storeId ? [endpoints.service.list, { params: { store_id: storeId, ...queryParams } }] : null;
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
     ...swrOptions,
-    keepPreviousData: true, // Retains old data during revalidation
+    keepPreviousData: true,
   });
 
   const memoizedValue = useMemo(
-    () => ({
-      services: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      services: paged.items,
+      servicesPagination: paged.pagination,
       servicesLoading: isLoading,
       servicesError: error,
       servicesValidating: isValidating,
-      servicesEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      servicesEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
   return memoizedValue;
@@ -65,11 +67,10 @@ export function useGetService(serviceId, storeId) {
 // ----------------------------------------------------------------------
 // useSearchServices - Searches for services based on a query and store ID.
 // ----------------------------------------------------------------------
-export function useSearchServices(query, storeId) {
-  // Only run the search if both query and storeId are provided.
+export function useSearchServices(query, storeId, queryParams = {}) {
   const key =
     query && storeId
-      ? [endpoints.service.search, { params: { query, store_id: storeId } }]
+      ? [endpoints.service.search, { params: { query, q: query, store_id: storeId, ...queryParams } }]
       : null;
 
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
@@ -78,13 +79,17 @@ export function useSearchServices(query, storeId) {
   });
 
   const memoizedValue = useMemo(
-    () => ({
-      searchResults: data?.results || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      searchResults: paged.items,
+      searchPagination: paged.pagination,
       searchLoading: isLoading,
       searchError: error,
       searchValidating: isValidating,
-      searchEmpty: !isLoading && (!data || data.results.length === 0),
-    }),
+      searchEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 
@@ -107,6 +112,28 @@ export async function addService(serviceData) {
 // ----------------------------------------------------------------------
 // editService - Updates an existing service.
 // ----------------------------------------------------------------------
+export function useGetServiceSaleHistory(storeId, serviceId, queryParams = {}) {
+  const key =
+    storeId && serviceId
+      ? [endpoints.service.saleHistory, { params: { store_id: storeId, service_id: serviceId, ...queryParams } }]
+      : null;
+
+  const { data, isLoading, error } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      serviceSaleHistory: paged.items,
+      serviceSaleHistoryPagination: paged.pagination,
+      serviceSaleHistoryLoading: isLoading,
+      serviceSaleHistoryError: error,
+    };
+    },
+    [data, error, isLoading]
+  );
+}
+
 export async function editService(serviceId, serviceData) {
   try {
     // Construct the URL by appending the serviceId.

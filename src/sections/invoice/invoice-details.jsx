@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -31,13 +31,55 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+/** Prefer persisted line total; supports fractional quantities. */
+function lineItemTotal(item) {
+  if (item?.total != null && item.total !== '') {
+    const t = Number(item.total);
+    if (!Number.isNaN(t)) return t;
+  }
+  const p = Number(item?.price);
+  const q = Number(item?.quantity);
+  if (!Number.isNaN(p) && !Number.isNaN(q)) return p * q;
+  return 0;
+}
 
-export function InvoiceDetails({ invoice }) {
-  // Calculate subtotal by multiplying price and quantity for each item.
-  const computedSubtotal = invoice?.items?.reduce((acc, item) => {
-    const itemTotal = Number(item.price) * Number(item.quantity);
-    return acc + itemTotal;
-  }, 0) || 0;
+function resolveInvoiceContactEmail(invoice) {
+  if (!invoice) return 'N/A';
+
+  const candidates = [
+    invoice.store_email,
+    invoice.storeEmail,
+    invoice.store_email_address,
+    invoice.store_email_contact,
+    invoice.store?.email,
+    invoice.store?.storeEmail,
+    invoice.company_email,
+    invoice.companyEmail,
+    invoice.company?.email,
+    invoice.company?.companyEmail,
+    invoice.owner_email,
+    invoice.ownerEmail,
+    invoice.owner?.email,
+    invoice.owner?.ownerEmail,
+    invoice.user_email,
+    invoice.userEmail,
+  ];
+
+  const found = candidates.find((value) => typeof value === 'string' && value.trim() !== '');
+
+  return (
+    found ||
+    'N/A'
+  );
+}
+
+export function InvoiceDetails({ invoice, receiptFormat = 'a4', pdfFlavor = 'invoice' }) {
+  const contactEmail = resolveInvoiceContactEmail(invoice);
+
+  const computedSubtotal = useMemo(
+    () => invoice?.items?.reduce((acc, item) => acc + lineItemTotal(item), 0) || 0,
+    [invoice?.items]
+  );
 
   // Use local state for status (fallback to invoice.status if available)
   const [currentStatus, setCurrentStatus] = useState(invoice?.status || '');
@@ -107,13 +149,88 @@ export function InvoiceDetails({ invoice }) {
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
           Have a question?
         </Typography>
-        <Typography variant="body2">support@minimals.cc</Typography>
+        <Typography variant="body2">{contactEmail}</Typography>
       </Box>
     </Box>
   );
 
+  const renderMobileList = (
+    <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 5 }}>
+      <Stack spacing={2}>
+        {invoice?.items?.map((row, index) => {
+          const itemName =
+            (row.product_id && row.product_name) ||
+            (row.service_id && row.service_name) ||
+            row.description ||
+            '';
+          const showDescription =
+            ((row.product_id && row.product_name) || (row.service_id && row.service_name)) &&
+            row.description &&
+            row.description.trim() !== '';
+
+          return (
+            <Box
+              key={index}
+              sx={{ p: 2, borderRadius: 1.5, bgcolor: 'background.neutral' }}
+            >
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
+                    {index + 1}. {itemName}
+                  </Typography>
+                  {showDescription && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary', wordBreak: 'break-word' }}>
+                      {row.description}
+                    </Typography>
+                  )}
+                </Box>
+                <Typography variant="subtitle2" sx={{ whiteSpace: 'nowrap' }}>
+                  {fCurrency(lineItemTotal(row))}
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mt: 1, color: 'text.secondary', typography: 'body2' }}
+              >
+                <span>Qty: {row.quantity}</span>
+                <span>Unit price: {fCurrency(row.price)}</span>
+              </Stack>
+            </Box>
+          );
+        })}
+      </Stack>
+
+      <Stack spacing={1} sx={{ mt: 3 }}>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Subtotal</Box>
+          <Box component="span" sx={{ typography: 'subtitle2' }}>{fCurrency(computedSubtotal)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Shipping</Box>
+          <Box component="span" sx={{ color: 'error.main' }}>- {fCurrency(invoice?.shipping)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Discount</Box>
+          <Box component="span" sx={{ color: 'error.main' }}>- {fCurrency(invoice?.discount)}</Box>
+        </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'body2' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>Taxes</Box>
+          <Box component="span">{fCurrency(invoice?.taxes)}</Box>
+        </Stack>
+        <Divider sx={{ borderStyle: 'dashed' }} />
+        <Stack direction="row" justifyContent="space-between" sx={{ typography: 'subtitle1' }}>
+          <Box component="span">Total</Box>
+          <Box component="span">{fCurrency(invoice?.total_amount)}</Box>
+        </Stack>
+      </Stack>
+    </Box>
+  );
+
   const renderList = (
-    <Scrollbar sx={{ mt: 5 }}>
+    <Scrollbar sx={{ mt: 5, display: { xs: 'none', md: 'block' } }}>
       <Table sx={{ minWidth: 960 }}>
         <TableHead>
           <TableRow>
@@ -152,7 +269,7 @@ export function InvoiceDetails({ invoice }) {
               </TableCell>
               <TableCell>{row.quantity}</TableCell>
               <TableCell align="right">{fCurrency(row.price)}</TableCell>
-              <TableCell align="right">{fCurrency(row.price * row.quantity)}</TableCell>
+              <TableCell align="right">{fCurrency(lineItemTotal(row))}</TableCell>
             </TableRow>
           ))}
 
@@ -169,9 +286,11 @@ export function InvoiceDetails({ invoice }) {
         currentStatus={currentStatus || ''}
         onChangeStatus={handleChangeStatus}
         statusOptions={INVOICE_STATUS_OPTIONS}
+        receiptFormat={receiptFormat}
+        pdfFlavor={pdfFlavor}
       />
 
-      <Card sx={{ pt: 5, px: 5 }}>
+      <Card sx={{ pt: { xs: 3, md: 5 }, px: { xs: 2, md: 5 }, pb: { xs: 1, md: 0 } }}>
         <Box
           rowGap={5}
           display="grid"
@@ -200,14 +319,19 @@ export function InvoiceDetails({ invoice }) {
             <Typography variant="h6">{invoice?.invoice_number}</Typography>
           </Stack>
 
-          {/* Invoice from (store details) */}
+          {/* Invoice from (company / store details) */}
           <Stack sx={{ typography: 'body2' }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Invoice from
             </Typography>
             <Typography variant="body2">
-              {invoice?.store_name || 'N/A'}
+              {invoice?.company_name || invoice?.store_name || 'N/A'}
             </Typography>
+            {invoice?.store_name && invoice?.company_name ? (
+              <Typography variant="body2">
+                Store: {invoice.store_name}
+              </Typography>
+            ) : null}
             <Typography variant="body2">
               {invoice?.store_address}, {invoice?.store_state}, {invoice?.store_country}
             </Typography>
@@ -257,6 +381,8 @@ export function InvoiceDetails({ invoice }) {
             </Typography>
           </Stack>
         </Box>
+
+        {renderMobileList}
 
         {renderList}
 

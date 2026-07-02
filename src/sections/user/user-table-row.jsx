@@ -22,7 +22,15 @@ import { UserQuickEditForm } from './user-quick-edit-form';
 
 // ----------------------------------------------------------------------
 
-export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRow, onResendInvite }) {
+export function UserTableRow({
+  row,
+  selected,
+  onEditRow,
+  onSelectRow,
+  onDeleteRow,
+  onResendInvite,
+  canDeleteUser = false,
+}) {
   const confirm = useBoolean();
 
   const popover = usePopover();
@@ -31,12 +39,20 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
 
   const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
 
+  const isOwner = row.role === 'merchant' || row.role === 'owner';
+  const isDeleted = row.status === 'deleted';
+  const showDelete = canDeleteUser && !isOwner && !isDeleted;
+
   return (
     <>
       <TableRow hover selected={selected} aria-checked={selected} tabIndex={-1}>
         <TableCell padding="checkbox">
-          {/* Convert row.user_id to string */}
-          <Checkbox id={`${row.user_id}`} checked={selected} onClick={onSelectRow} />
+          <Checkbox
+            id={`${row.user_id}`}
+            checked={selected}
+            onClick={onSelectRow}
+            disabled={isOwner}
+          />
         </TableCell>
 
         <TableCell>
@@ -70,6 +86,7 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
               (row.status === 'active' && 'success') ||
               (row.status === 'pending' && 'warning') ||
               (row.status === 'banned' && 'error') ||
+              (row.status === 'deleted' && 'default') ||
               'default'
             }
           >
@@ -103,16 +120,18 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          <MenuItem
-            onClick={() => {
-              confirm.onTrue();
-              popover.onClose();
-            }}
-            sx={{ color: 'error.main' }}
-          >
-            <Iconify icon="solar:trash-bin-trash-bold" />
-            Delete
-          </MenuItem>
+          {showDelete && (
+            <MenuItem
+              onClick={() => {
+                confirm.onTrue();
+                popover.onClose();
+              }}
+              sx={{ color: 'error.main' }}
+            >
+              <Iconify icon="solar:trash-bin-trash-bold" />
+              Delete
+            </MenuItem>
+          )}
 
           <MenuItem
             onClick={() => {
@@ -142,9 +161,16 @@ export function UserTableRow({ row, selected, onEditRow, onSelectRow, onDeleteRo
         open={confirm.value}
         onClose={confirm.onFalse}
         title="Delete"
-        content="Are you sure want to delete?"
+        content="Are you sure you want to delete this user? Their account will be deactivated and their email will be freed for future use."
         action={
-          <Button variant="contained" color="error" onClick={onDeleteRow}>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              onDeleteRow();
+              confirm.onFalse();
+            }}
+          >
             Delete
           </Button>
         }

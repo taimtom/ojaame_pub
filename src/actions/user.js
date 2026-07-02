@@ -1,7 +1,8 @@
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // Map your role names to role IDs as needed
 // ----------------------------------------------------------------------
@@ -57,6 +58,15 @@ export const editUserDetails = async (userId, userData) => {
 };
 
 // ----------------------------------------------------------------------
+// softDeleteUser - Soft-deletes a staff user (mutates email, deactivates).
+// ----------------------------------------------------------------------
+export const softDeleteUser = async (userId) => {
+  const response = await axiosInstance.post(endpoints.user.softDelete(userId));
+  await mutate([endpoints.user.list, { params: {} }]);
+  return response.data;
+};
+
+// ----------------------------------------------------------------------
 // useUser - Retrieves the currently logged in user's details.
 // ----------------------------------------------------------------------
 export function useUser() {
@@ -73,8 +83,8 @@ export function useUser() {
 // ----------------------------------------------------------------------
 // useGetUsers - Fetches a list of users for the company.
 // ----------------------------------------------------------------------
-export function useGetUsers() {
-  const key = endpoints.user.list;
+export function useGetUsers(queryParams = {}) {
+  const key = [endpoints.user.list, { params: { ...queryParams } }];
   const { data, isLoading, error, isValidating } = useSWR(key, fetcher, {
     revalidateIfStale: true,
     revalidateOnFocus: false,
@@ -83,13 +93,17 @@ export function useGetUsers() {
   });
 
   return useMemo(
-    () => ({
-      users: data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      users: paged.items,
+      usersPagination: paged.pagination,
       usersLoading: isLoading,
       usersError: error,
       usersValidating: isValidating,
-      usersEmpty: !isLoading && (!data || data.length === 0),
-    }),
+      usersEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }

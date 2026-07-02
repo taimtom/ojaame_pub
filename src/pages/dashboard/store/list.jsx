@@ -6,6 +6,8 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
+import { useOnboardingActive } from 'src/hooks/use-onboarding-mode';
+import { withOnboardingQuery } from 'src/utils/onboarding-routes';
 
 import { CONFIG } from 'src/config-global';
 import { useGetStores } from 'src/actions/store';
@@ -20,6 +22,14 @@ const metadata = { title: `Company Store - ${CONFIG.site.name}` };
 export default function Page() {
   const { stores, storesLoading } = useGetStores();
   const navigate = useNavigate();
+  const { active: onboardingActive } = useOnboardingActive();
+
+  const goToNewStore = () => {
+    const target = onboardingActive
+      ? withOnboardingQuery(paths.dashboard.store.new)
+      : paths.dashboard.store.new;
+    navigate(target);
+  };
 
   // If loading is complete and there are no stores, show a plus icon to create a new store.
   if (!storesLoading && (!stores || stores.length === 0)) {
@@ -30,7 +40,7 @@ export default function Page() {
         </Helmet>
         <Box sx={{ textAlign: 'center', py: 10 }}>
           <IconButton
-            onClick={() => navigate(paths.dashboard.store.new)}
+            onClick={goToNewStore}
             sx={{
               width: 64,
               height: 64,

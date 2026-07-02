@@ -1,7 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import { setSession } from './utils';
-import { STORAGE_KEY } from './constant';
 
 /** **************************************
  * Sign in
@@ -18,7 +17,7 @@ export const signInWithPassword = async ({ email, password }) => {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -38,8 +37,7 @@ export const signInWithGoogle = async (idToken) => {
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
-    setSession(accessToken);
+    await setSession(accessToken);
     return accessToken;
   } catch (error) {
     console.error('Error during Google sign in:', error);
@@ -57,6 +55,7 @@ export const signUp = async ({
   firstName,
   lastName,
   phoneNumber,
+  referral_code_used,
 }) => {
   const params = {
     email,
@@ -65,6 +64,7 @@ export const signUp = async ({
     firstName,
     lastName,
     phoneNumber,
+    ...(referral_code_used ? { referral_code_used } : {}),
   };
 
   try {
@@ -76,7 +76,7 @@ export const signUp = async ({
       throw new Error('Access token not found in response');
     }
 
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign up:', error);
     // Check if the error response includes a "detail" property.

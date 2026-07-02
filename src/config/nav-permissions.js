@@ -26,6 +26,9 @@ export const NAV_PERMISSIONS = {
     Accounting: {
       required: ['payment_methods.read', 'expenses.read', 'payments.read'], // Show if user has ANY of these
     },
+    Reports: {
+      required: ['reports.read', 'reports.create', 'reports.update'], // Show if user has ANY report access
+    },
     'Customer Management': {
       required: ['customers.read'], // Show if user has this permission
     },
@@ -40,9 +43,14 @@ export const NAV_PERMISSIONS = {
     },
   },
   items: {
-    // Overview items (always visible)
-    'Company Dashboard': [],
-    'Store Dashboard': [],
+    // Overview items
+    'Company Dashboard': ['reports.read', 'stores.read', 'stores.update'],
+    'Store Dashboard': ['stores.read', 'stores.update'],
+    'Quick Dashboard': [],
+    'Service Log': [],
+    'Usage dashboard': ['inventory.read', 'inventory.update', 'inventory.manage'],
+    'Help & Support': [],
+    'Quick Restock': ['inventory.update', 'inventory.manage', 'products.update'],
     
     // Sales & Orders items
     'Point of Sales': ['orders.create', 'sales.create'], // Show if user has ANY
@@ -52,16 +60,22 @@ export const NAV_PERMISSIONS = {
     Category: ['categories.read'],
     'Product Management': ['products.read'],
     'Service Management': ['services.read'],
+    'Digital Product': ['digital_products.read', 'products.read', 'services.read'],
     
     // Accounting items
     'Manage Store Payment': ['payment_methods.read'],
+    'Add Payment Method': ['payment_methods.create'],
+    'Payment List': ['payment_methods.read'],
     Expenses: ['expenses.read'],
+    'Add Expense': ['expenses.create'],
+    'Expenses List': ['expenses.read'],
     
     // Customer Management items
     'Manage Customer': ['customers.read'],
     
     // User & Staff items
     'Manage User': ['users.read'],
+    'Invite User': ['users.create'],
     'Roles & Permission': ['users.manage'],
     
     // Settings & Integrations items
@@ -73,6 +87,24 @@ export const NAV_PERMISSIONS = {
     Permission: ['users.manage'],
     'View Public Site': [], // Always visible
     Blank: [], // Always visible
+
+    // Reports (store)
+    'Store Reports': ['reports.read', 'reports.create', 'reports.update'],
+    'Essential Reports': ['reports.read'],
+    'Advanced Reports': ['reports.read'],
+    'General Store Reports': ['reports.read'],
+    'Inventory Report': ['reports.read'],
+    'Financial Report': ['reports.read'],
+    'Profit & Loss': ['reports.read'],
+    'Cash Flow': ['reports.read'],
+    'Balance Sheet': ['reports.read'],
+    'Trial Balance': ['reports.read'],
+    'Sales Trends': ['reports.read'],
+    'End of period': ['reports.read'],
+    'Customer Report': ['reports.read'],
+    'Company Reports': ['reports.create', 'reports.update'],
+    'All Company Reports': ['reports.create', 'reports.update'],
+    'End of day': ['reports.read'],
   },
 };
 
@@ -95,13 +127,20 @@ export function getItemPermissions(itemTitle) {
 }
 
 /**
- * Check if a section should be visible based on permissions
+ * Check if a section should be visible based on permissions.
+ * Accepts either the display subheader or a stable sectionPermKey (preferred when
+ * the subheader is rendered dynamically via the business-type registry).
  * @param {string[]} userPermissions - User's permissions
- * @param {string} sectionSubheader - The subheader/title of the section
+ * @param {string} sectionSubheaderOrKey - The subheader or sectionPermKey of the section
  * @returns {boolean} True if section should be visible
  */
-export function isSectionVisible(userPermissions, sectionSubheader) {
-  const required = getSectionPermissions(sectionSubheader);
+export function isSectionVisible(userPermissions, sectionSubheaderOrKey) {
+  const sectionConfig = NAV_PERMISSIONS.sections[sectionSubheaderOrKey];
+  // Unknown key (e.g. a dynamic business-type label) — item-level permissions govern
+  if (!sectionConfig) {
+    return true;
+  }
+  const required = sectionConfig.required;
   if (required.length === 0) {
     return true; // No requirements means always visible
   }
@@ -110,13 +149,15 @@ export function isSectionVisible(userPermissions, sectionSubheader) {
 }
 
 /**
- * Check if an item should be visible based on permissions
+ * Check if an item should be visible based on permissions.
+ * Accepts either the display title or a stable permissionKey (preferred when the
+ * title is rendered dynamically via the business-type registry).
  * @param {string[]} userPermissions - User's permissions
- * @param {string} itemTitle - The title of the navigation item
+ * @param {string} itemTitleOrKey - The title or permissionKey of the navigation item
  * @returns {boolean} True if item should be visible
  */
-export function isItemVisible(userPermissions, itemTitle) {
-  const required = getItemPermissions(itemTitle);
+export function isItemVisible(userPermissions, itemTitleOrKey) {
+  const required = getItemPermissions(itemTitleOrKey);
   if (required.length === 0) {
     return true; // No requirements means always visible
   }

@@ -24,6 +24,7 @@ build
 # environment variables
 .env
 .env.local
+.env.mobile
 .env.development.local
 .env.test.local
 .env.production.local
@@ -36,3 +37,13 @@ build
 .eslintcache
 .unimportedrc.json
 tsconfig.tsbuildinfo
+
+# Capacitor native build artifacts
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+ios/App/build
+ios/App/Pods
+ios/Pods
+ios/DerivedData

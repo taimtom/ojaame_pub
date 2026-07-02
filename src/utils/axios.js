@@ -1,14 +1,50 @@
 import axios from 'axios';
 
 import { CONFIG } from 'src/config-global';
+import { getAuthToken } from 'src/utils/auth-storage';
 
 // ----------------------------------------------------------------------
 
 const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
 
+// Attach the auth token from storage to every request. Storage is async
+// (Capacitor Preferences on native, sessionStorage on web), so this interceptor
+// reads it fresh each time instead of relying on axios.defaults being set in time.
+axiosInstance.interceptors.request.use(async (config) => {
+  try {
+    const token = await getAuthToken();
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (error) {
+    console.error('Error attaching auth token to request:', error);
+  }
+  return config;
+});
+
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject((error.response && error.response.data) || 'Something went wrong!')
+  (error) => {
+    const data = (error.response && error.response.data) || 'Something went wrong!';
+    const httpStatus = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    // Subscription deactivation: owner → redirect to billing settings
+    if (httpStatus === 402 && detail === 'subscription_deactivated_owner') {
+      window.location.href = '/app/user/account?tab=billing';
+    }
+    // Subscription deactivation: staff → show subscription inactive page
+    if (httpStatus === 403 && detail === 'subscription_deactivated_staff') {
+      window.location.href = '/app/subscription-inactive';
+    }
+
+    // Attach the HTTP status so catch blocks can branch on it
+    const err = new Error(data?.detail || data?.message || 'Request failed');
+    err.data = data && typeof data === 'object' ? { ...data, _httpStatus: httpStatus } : data;
+    err._httpStatus = httpStatus;
+    return Promise.reject(err);
+  }
 );
 
 export default axiosInstance;
@@ -53,6 +89,7 @@ export const endpoints = {
     list: '/api/auth/list',
     details: '/api/auth/details',
     edit: '/api/auth/edit',
+    softDelete: (userId) => `/api/auth/users/${userId}/soft-delete`,
   },
   expense:{
     list: '/api/expense/list',
@@ -96,10 +133,24 @@ export const endpoints = {
     details: '/api/product/details', // Keep the parameter-based URL
     search: '/api/product/search',
     edit: '/api/product/edit',
+    changePrice: '/api/product/price',
     add: '/api/product/add',
     quantity: '/api/product/quantity',
+    adjust: '/api/product/adjust',
     history: '/api/product/history',
     movement: '/api/product/movement',
+    salesHistory: '/api/product/sales-history',
+    usage: '/api/product/usage',
+    publish: '/api/product/publish',
+    bulkRestock: '/api/product/bulk-restock',
+    bulkOnboard: '/api/product/bulk-onboard',
+    suppliers: '/api/product/suppliers',
+    restockBatches: '/api/product/restock-batches',
+  },
+  catalog: {
+    searchProducts: '/api/catalog/products/search',
+    details: '/api/catalog/products',
+    categories: '/api/catalog/categories',
   },
   shop: {
     list: '/api/product/list',
@@ -148,6 +199,7 @@ export const endpoints = {
   },
   uploads: {
     upload: '/api/uploads',
+    presign: '/api/uploads/presign',
   },
   dashboard: {
     // company-level (no storeId)
@@ -191,8 +243,48 @@ export const endpoints = {
       topProducts: (storeId) => `/api/dashboard/${storeId}/dashboard/top-products`,
       expenses: (storeId) => `/api/dashboard/${storeId}/dashboard/expenses`,
       yearlySales: (storeId) => `/api/dashboard/${storeId}/dashboard/yearly-sales`,
+      featured: (storeId) => `/api/dashboard/${storeId}/dashboard/featured`,
       verify: (storeId) => `/api/dashboard/${storeId}/verify`
     }
+  },
+
+  // Store-level dashboard / report endpoints (query-param style: ?store_id=X)
+  storeDashboard: {
+    stats: '/api/store-dashboard/stats',
+    inventoryAlerts: '/api/store-dashboard/inventory-alerts',
+    stockValue: '/api/store-dashboard/stock-value',
+    salesTrend: '/api/store-dashboard/sales-trend',
+    categoryPerformance: '/api/store-dashboard/category-performance',
+    forecast: '/api/store-dashboard/forecast',
+    inventoryMovement: '/api/store-dashboard/inventory-movement',
+  },
+  // Company dashboard (query-param style: ?company_id=X)
+  companyDashboard: {
+    revenueTrend: '/api/company-dashboard/revenue-trend',
+  },
+  // Financial / company-level reports (query-param style: ?company_id=X)
+  reports: {
+    profitLoss: '/api/reports/profit-loss',
+    profitLossSummary: '/api/reports/profit-loss/summary',
+    cashFlow: '/api/reports/cash-flow',
+    tax: '/api/reports/tax',
+    customers: '/api/reports/customers',
+    mergeCustomers: '/api/reports/customers/merge',
+    customerDetail: (customerId) => `/api/reports/customers/${customerId}`,
+    collectCustomerPayment: (customerId) => `/api/reports/customers/${customerId}/collect-payment`,
+    partners: '/api/reports/partners',
+    partnerDetail: (partnerId) => `/api/reports/partners/${partnerId}`,
+    payPartner: (partnerId) => `/api/reports/partners/${partnerId}/pay`,
+    collectPartnerPayment: (partnerId) => `/api/reports/partners/${partnerId}/collect`,
+    balanceSheet: '/api/reports/balance-sheet',
+    trialBalance: '/api/reports/trial-balance',
+  },
+  accounting: {
+    settings: (companyId) => `/api/companies/${companyId}/settings/accounting`,
+    journalEntries: '/api/accounting/journal-entries',
+    vendorBills: '/api/accounting/vendor-bills',
+    periods: '/api/accounting/periods',
+    arAging: '/api/accounting/ar-aging',
   },
 
   paymentMethod:{
@@ -209,8 +301,15 @@ export const endpoints = {
     add: '/api/services/add', // For adding a new service
     edit: '/api/services/edit', // For editing a service (append /{serviceId})
     detail: '/api/services/detail',
-    // The detail endpoint is constructed directly in useGetService:
-    // `/services/detail/${storeId}/${serviceId}/`
+    saleHistory: '/api/services/sale-history',
+  },
+  digitalProduct: {
+    list: '/api/digital-products/list',
+    add: '/api/digital-products/add',
+    edit: '/api/digital-products/edit',
+    detail: '/api/digital-products/detail',
+    payoutPreview: '/api/digital-products/payout-preview',
+    publish: '/api/digital-products/publish',
   },
   customers: {
     list: '/api/customers/list/',
@@ -228,5 +327,87 @@ export const endpoints = {
     edit: '/api/sales/edit',
     history: '/api/sales/history/',
     saleslist: '/api/sales/historylist/',
+  },
+
+  notifications: {
+    list: '/api/notifications/list',
+    summary: '/api/notifications/summary',
+    markAllRead: '/api/notifications/mark-all-read',
+    markRead: (id) => `/api/notifications/${id}/read`,
+    archive: (id) => `/api/notifications/${id}/archive`,
+    generate: '/api/notifications/generate',
+  },
+
+  subscription: {
+    summary: '/api/subscription/summary',
+    plans: '/api/subscription/plans',
+    plan: '/api/subscription/plan',
+    seats: '/api/subscription/seats',
+    invoices: '/api/subscription/invoices',
+    invoicesPay: '/api/subscription/invoices/pay',
+    status: '/api/subscription/status',
+  },
+
+  onboarding: {
+    progress: '/api/onboarding/progress',
+    skipStep: '/api/onboarding/skip-step',
+    completeReportView: '/api/onboarding/complete-report-view',
+    completeReceiptSetup: '/api/onboarding/complete-receipt-setup',
+    finish: '/api/onboarding/finish',
+  },
+
+  billing: {
+    cards:       '/api/billing/cards',
+    cardVerify:  '/api/billing/cards/verify',
+    card:        (id) => `/api/billing/cards/${id}`,
+    cardDefault: (id) => `/api/billing/cards/${id}/default`,
+    manageLink:  '/api/billing/cards/manage-link',
+    status:      '/api/subscription/status',
+  },
+
+  wallet: {
+    details:       '/api/billing/wallet',
+    create:        '/api/billing/wallet/create',
+    transactions:  '/api/billing/wallet/transactions',
+    preference:    '/api/billing/wallet/preference',
+    topupInitiate: '/api/billing/wallet/topup/initiate',
+    topupVerify:   '/api/billing/wallet/topup/verify',
+  },
+
+  support: {
+    tickets: '/api/support/tickets',
+    ticketComments: (id) => `/api/support/tickets/${id}/comments`,
+  },
+  transfer: {
+    create: '/api/transfers/',
+    list: '/api/transfers/',
+    details: (id) => `/api/transfers/${id}`,
+    pack: (id) => `/api/transfers/${id}/pack`,
+    assignDriver: (id) => `/api/transfers/${id}/assign-driver`,
+    pickup: (id) => `/api/transfers/${id}/pickup`,
+    inTransit: (id) => `/api/transfers/${id}/in-transit`,
+    deliver: (id) => `/api/transfers/${id}/deliver`,
+    receive: (id) => `/api/transfers/${id}/receive`,
+    close: (id) => `/api/transfers/${id}/close`,
+    kpis: '/api/transfers/metrics/kpis',
+    sop: '/api/transfers/ops/sop',
+    drivers: '/api/transfers/drivers',
+    driverDetails: (id) => `/api/transfers/drivers/${id}`,
+  },
+  consignment: {
+    create: '/api/consignments/',
+    list: '/api/consignments/',
+    details: (id) => `/api/consignments/${id}`,
+    accept: (id) => `/api/consignments/${id}/accept`,
+    send: (id) => `/api/consignments/${id}/send`,
+    receive: (id) => `/api/consignments/${id}/receive`,
+    return: (id) => `/api/consignments/${id}/return`,
+    recordPartnerSale: (id) => `/api/consignments/${id}/record-partner-sale`,
+    settle: (id) => `/api/consignments/${id}/settle`,
+    close: (id) => `/api/consignments/${id}/close`,
+    kpis: '/api/consignments/metrics/kpis',
+    partners: '/api/consignments/partners',
+    partnerDetails: (id) => `/api/consignments/partners/${id}`,
+    agreements: '/api/consignments/agreements',
   },
 };
