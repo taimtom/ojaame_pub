@@ -154,6 +154,26 @@ export function TransferListView({ storeId }) {
     }, {});
     const itemsPayload = Object.values(combinedByProduct);
 
+    const productById = (sourceProducts || []).reduce((acc, product) => {
+      acc[String(product.id)] = product;
+      return acc;
+    }, {});
+    const stockErrors = itemsPayload
+      .map((row) => {
+        const product = productById[String(row.product_id)];
+        const availableQty = Number(product?.quantity || 0);
+        if (row.requested_qty > availableQty) {
+          return `${product?.name || `Product #${row.product_id}`}: requested ${row.requested_qty}, available ${availableQty}`;
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    if (stockErrors.length) {
+      toast.error(`Insufficient stock for transfer: ${stockErrors[0]}`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const created = await createTransferOrder({
@@ -566,7 +586,22 @@ export function TransferListView({ storeId }) {
             </Typography>
             <Stack spacing={1.5}>
               {transferItems.map((row, index) => (
-                <Stack key={`transfer-item-${index}`} direction="row" spacing={1.5}>
+                <Stack
+                  key={`transfer-item-${index}`}
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1.25}
+                  alignItems={{ xs: 'stretch', md: 'flex-start' }}
+                >
+                  {(() => {
+                    const selectedProduct = (sourceProducts || []).find(
+                      (p) => Number(p.id) === Number(row.product_id)
+                    );
+                    const availableQty = Number(selectedProduct?.quantity || 0);
+                    const requestedQty = Number(row.requested_qty || 0);
+                    const hasQtyError =
+                      Boolean(selectedProduct) && requestedQty > 0 && requestedQty > availableQty;
+
+                    return (
                   <Autocomplete
                     disablePortal
                     options={sourceProducts || []}
@@ -590,31 +625,46 @@ export function TransferListView({ storeId }) {
                         return name.includes(q) || sku.includes(q) || code.includes(q);
                       });
                     }}
-                    sx={{ flex: 1 }}
+                    sx={{ width: '100%', flex: { md: 1 } }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         label={`Product ${index + 1}`}
                         placeholder="Search product name, SKU, or code"
+                        size="small"
+                        helperText={
+                          hasQtyError
+                            ? `Only ${availableQty} available in source store`
+                            : selectedProduct
+                              ? `Available: ${availableQty}`
+                              : ''
+                        }
+                        error={hasQtyError}
                       />
                     )}
                   />
-                  <TextField
-                    label="Qty"
-                    type="number"
-                    value={row.requested_qty}
-                    onChange={(e) => updateItemRow(index, { requested_qty: e.target.value })}
-                    inputProps={{ min: 1 }}
-                    sx={{ width: 120 }}
-                  />
-                  <Button
-                    color="error"
-                    variant="outlined"
-                    onClick={() => removeItemRow(index)}
-                    disabled={transferItems.length <= 1}
-                  >
-                    Remove
-                  </Button>
+                    );
+                  })()}
+                  <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                    <TextField
+                      label="Qty"
+                      type="number"
+                      value={row.requested_qty}
+                      onChange={(e) => updateItemRow(index, { requested_qty: e.target.value })}
+                      inputProps={{ min: 1 }}
+                      size="small"
+                      sx={{ width: { xs: '100%', md: 120 } }}
+                    />
+                    <Button
+                      color="error"
+                      variant="outlined"
+                      onClick={() => removeItemRow(index)}
+                      disabled={transferItems.length <= 1}
+                      sx={{ minWidth: 96, whiteSpace: 'nowrap' }}
+                    >
+                      Remove
+                    </Button>
+                  </Stack>
                 </Stack>
               ))}
               <Box>
@@ -677,7 +727,22 @@ export function TransferListView({ storeId }) {
               </Typography>
               <Stack spacing={1.5}>
                 {editItems.map((row, index) => (
-                  <Stack key={`edit-item-${index}`} direction="row" spacing={1.5}>
+                  <Stack
+                    key={`edit-item-${index}`}
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={1.25}
+                    alignItems={{ xs: 'stretch', md: 'flex-start' }}
+                  >
+                    {(() => {
+                      const selectedProduct = (editSourceProducts || []).find(
+                        (p) => Number(p.id) === Number(row.product_id)
+                      );
+                      const availableQty = Number(selectedProduct?.quantity || 0);
+                      const requestedQty = Number(row.requested_qty || 0);
+                      const hasQtyError =
+                        Boolean(selectedProduct) && requestedQty > 0 && requestedQty > availableQty;
+
+                      return (
                     <Autocomplete
                       disablePortal
                       options={editSourceProducts || []}
@@ -697,33 +762,48 @@ export function TransferListView({ storeId }) {
                       isOptionEqualToValue={(option, value) =>
                         Number(option.id) === Number(value.id)
                       }
-                      sx={{ flex: 1 }}
+                      sx={{ width: '100%', flex: { md: 1 } }}
                       renderInput={(params) => (
                         <TextField
                           {...params}
                           label={`Product ${index + 1}`}
                           placeholder="Search product name, SKU, or code"
+                          size="small"
+                          helperText={
+                            hasQtyError
+                              ? `Only ${availableQty} available in source store`
+                              : selectedProduct
+                                ? `Available: ${availableQty}`
+                                : ''
+                          }
+                          error={hasQtyError}
                         />
                       )}
                     />
-                    <TextField
-                      label="Qty"
-                      type="number"
-                      value={row.requested_qty}
-                      onChange={(e) =>
-                        updateEditItemRow(index, { requested_qty: e.target.value })
-                      }
-                      inputProps={{ min: 1 }}
-                      sx={{ width: 120 }}
-                    />
-                    <Button
-                      color="error"
-                      variant="outlined"
-                      onClick={() => removeEditItemRow(index)}
-                      disabled={editItems.length <= 1}
-                    >
-                      Remove
-                    </Button>
+                      );
+                    })()}
+                    <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                      <TextField
+                        label="Qty"
+                        type="number"
+                        value={row.requested_qty}
+                        onChange={(e) =>
+                          updateEditItemRow(index, { requested_qty: e.target.value })
+                        }
+                        inputProps={{ min: 1 }}
+                        size="small"
+                        sx={{ width: { xs: '100%', md: 120 } }}
+                      />
+                      <Button
+                        color="error"
+                        variant="outlined"
+                        onClick={() => removeEditItemRow(index)}
+                        disabled={editItems.length <= 1}
+                        sx={{ minWidth: 96, whiteSpace: 'nowrap' }}
+                      >
+                        Remove
+                      </Button>
+                    </Stack>
                   </Stack>
                 ))}
                 <Box>
