@@ -241,10 +241,10 @@ export const useNavData = () => {
         permissionKey: 'Customer Report',
       },
       {
-        title: 'Partner Report',
+        title: getNavLabel('partnerReport'),
         path: callIfFunction(paths.dashboard.reports.partners, currentStore),
         icon: ICONS.user,
-        permissionKey: 'Inventory',
+        permissionKey: 'Partner Report',
       },
     ],
   },
@@ -316,16 +316,16 @@ export const useNavData = () => {
         ],
       },
       {
-        title: 'Store Transfers',
+        title: getNavLabel('storeTransfers'),
         path: callIfFunction(paths.dashboard.transfer.root, currentStore),
         icon: ICONS.folder,
-        permissionKey: 'Inventory',
+        permissionKey: 'Store Transfers',
       },
       {
-        title: 'Consignment',
+        title: getNavLabel('consignment'),
         path: callIfFunction(paths.dashboard.consignment.root, currentStore),
         icon: ICONS.consignment,
-        permissionKey: 'Inventory',
+        permissionKey: 'Consignment',
       },
       { title: 'Usage dashboard', path: paths.dashboard.usageDashboard, icon: ICONS.analytics },
       {

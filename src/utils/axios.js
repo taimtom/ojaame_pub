@@ -353,6 +353,7 @@ export const endpoints = {
     skipStep: '/api/onboarding/skip-step',
     completeReportView: '/api/onboarding/complete-report-view',
     completeReceiptSetup: '/api/onboarding/complete-receipt-setup',
+    markLinkShared: '/api/onboarding/mark-link-shared',
     finish: '/api/onboarding/finish',
   },
 
@@ -409,5 +410,10 @@ export const endpoints = {
     partners: '/api/consignments/partners',
     partnerDetails: (id) => `/api/consignments/partners/${id}`,
     agreements: '/api/consignments/agreements',
+  },
+  voice: {
+    command: '/api/voice/command',
+    alias: '/api/voice/alias',
+    status: '/api/voice/status',
   },
 };

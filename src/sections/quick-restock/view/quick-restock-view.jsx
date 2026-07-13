@@ -35,6 +35,7 @@ import {
   buildSupplierPayload,
   isSupplierValid,
 } from 'src/components/supplier';
+import { VoiceInputBar } from 'src/sections/voice';
 
 // ---------------------------------------------------------------------------
 
@@ -163,6 +164,71 @@ export function QuickRestockView() {
         },
       ];
     });
+  }, []);
+
+  const applyVoiceRestockDraft = useCallback((draft) => {
+    const items = draft?.items || [];
+    if (!items.length) {
+      toast.warning('No products to restock from voice.');
+      return;
+    }
+
+    setRestockCart((prev) => {
+      let next = [...prev];
+      items.forEach((item) => {
+        if (!item.product_id) return;
+        const qty = Math.max(0.01, Number(item.quantity) || 1);
+        const existing = next.find((r) => r.productId === item.product_id);
+        const isPack = Boolean(item.is_pack);
+        const quantityPerPack = Number(item.quantity_per_pack ?? 0) || null;
+        const costPerUnit =
+          item.cost_price != null
+            ? Number(item.cost_price)
+            : Number(item.cost_price_per_pack ?? 0) / (quantityPerPack || 1) || 0;
+
+        if (existing) {
+          next = next.map((r) => {
+            if (r.productId !== item.product_id) return r;
+            if (r.isPack && r.quantityPerPack) {
+              const packs = Math.max(1, Math.round(qty));
+              return {
+                ...r,
+                packsToAdd: packs,
+                qty: packs * r.quantityPerPack,
+                costPerUnit: item.cost_price != null ? Number(item.cost_price) : r.costPerUnit,
+              };
+            }
+            return {
+              ...r,
+              qty,
+              costPerUnit: item.cost_price != null ? Number(item.cost_price) : r.costPerUnit,
+            };
+          });
+          return;
+        }
+
+        next = [
+          ...next,
+          {
+            productId: item.product_id,
+            name: item.name,
+            currentStock: item.stock ?? 0,
+            isPack,
+            quantityPerPack,
+            packsToAdd: isPack ? Math.max(1, Math.round(qty)) : null,
+            qty: isPack && quantityPerPack ? Math.max(1, Math.round(qty)) * quantityPerPack : qty,
+            costPerPack: isPack
+              ? Number(item.cost_price_per_pack ?? costPerUnit * (quantityPerPack || 1)) || 0
+              : null,
+            costPerUnit: costPerUnit || 0,
+            addAsExpense: false,
+          },
+        ];
+      });
+      return next;
+    });
+
+    toast.success('Added from voice — review quantities, then submit.');
   }, []);
 
   const handleProductCreated = useCallback(
@@ -305,17 +371,25 @@ export function QuickRestockView() {
               <CardContent>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
                   <Typography variant="subtitle1">Search Products</Typography>
-                  {canCreateProduct && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Iconify icon="eva:plus-fill" />}
-                      onClick={() => setAddProductOpen(true)}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <VoiceInputBar
+                      storeId={storeId}
+                      intentHint="restock"
                       disabled={!storeId}
-                    >
-                      Add product
-                    </Button>
-                  )}
+                      onConfirm={applyVoiceRestockDraft}
+                    />
+                    {canCreateProduct && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Iconify icon="eva:plus-fill" />}
+                        onClick={() => setAddProductOpen(true)}
+                        disabled={!storeId}
+                      >
+                        Add product
+                      </Button>
+                    )}
+                  </Stack>
                 </Stack>
 
                 <TextField

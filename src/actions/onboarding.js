@@ -60,3 +60,8 @@ export async function finishOnboarding() {
   const res = await axiosInstance.post(endpoints.onboarding.finish);
   return res.data;
 }
+
+export async function markOnboardingLinkShared() {
+  const res = await axiosInstance.post(endpoints.onboarding.markLinkShared);
+  return res.data;
+}

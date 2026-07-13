@@ -24,7 +24,17 @@ export function WelcomeGuidePopup({ userId }) {
         placement: 'bottom',
         content: (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            This is your store dashboard. The banner shows who you are and links to Quick Sale for fast checkout.
+            Your command center shows today&apos;s total at the top, recent activity, then shortcuts to every major page.
+          </Typography>
+        ),
+      },
+      {
+        target: '#overview-tour-shortcuts',
+        title: 'Quick shortcuts',
+        placement: 'top',
+        content: (
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Frequent actions up top, then a full service grid. Tap any icon to jump without using the sidebar.
           </Typography>
         ),
       },
@@ -44,7 +54,7 @@ export function WelcomeGuidePopup({ userId }) {
         placement: 'bottom',
         content: (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Today, week, and month totals update from your POS activity.
+            Weekly and monthly totals with trend charts. Today&apos;s figure is on the green card above.
           </Typography>
         ),
       },

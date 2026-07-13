@@ -267,6 +267,7 @@ export default function StoreCustomerReportDetailPage() {
 
   const metrics = detail?.metrics;
   const customer = detail?.customer;
+  const agingBuckets = detail?.aging_buckets || metrics?.aging_buckets;
 
   return (
     <>
@@ -293,6 +294,8 @@ export default function StoreCustomerReportDetailPage() {
               <Typography variant="body2" color="text.secondary">
                 {customer.phone_number}
                 {customer.email ? ` · ${customer.email}` : ''}
+                {customer.customer_type ? ` · ${customer.customer_type.replace('_', ' ')}` : ''}
+                {customer.payment_terms_days ? ` · ${customer.payment_terms_days} day terms` : ''}
               </Typography>
             )}
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
@@ -352,7 +355,43 @@ export default function StoreCustomerReportDetailPage() {
             color="success.main"
             loading={detailLoading}
           />
+          {customer?.credit_limit != null && (
+            <KpiCard
+              icon="solar:shield-check-bold"
+              label="Credit limit"
+              value={`${fCurrency(customer.credit_limit)} (${metrics?.credit_utilization_percent ?? 0}%)`}
+              color="error.main"
+              loading={detailLoading}
+            />
+          )}
         </Stack>
+
+        {agingBuckets && (metrics?.amount_owing ?? 0) > AMOUNT_EPS && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                Credit aging
+              </Typography>
+              <Stack direction="row" spacing={2} flexWrap="wrap">
+                {[
+                  { key: '0_30', label: '0–30 days' },
+                  { key: '31_60', label: '31–60 days' },
+                  { key: '61_90', label: '61–90 days' },
+                  { key: 'over_90', label: '90+ days' },
+                ].map((bucket) => (
+                  <Box key={bucket.key} sx={{ minWidth: 140 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {bucket.label}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>
+                      {fCurrency(agingBuckets[bucket.key] ?? 0)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
 
         {totalOwing > AMOUNT_EPS && (
           <Card sx={{ mb: 3 }}>

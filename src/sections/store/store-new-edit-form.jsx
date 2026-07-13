@@ -20,6 +20,7 @@ import { paths } from 'src/routes/paths';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { advanceToNextOnboardingStep } from 'src/actions/onboarding';
+import { clearSetupPrefill, getSetupPrefill } from 'src/utils/setup-prefill';
 import { fData } from 'src/utils/format-number';
 
 import { uploadFile } from 'src/actions/upload';
@@ -123,6 +124,13 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
     }
   }, [currentStore, reset]);
 
+  useEffect(() => {
+    if (currentStore) return;
+    const payload = getSetupPrefill();
+    if (!payload?.storeName) return;
+    setValue('storeName', payload.storeName, { shouldDirty: false });
+  }, [currentStore, setValue]);
+
   // Only show a spinner if we are in edit mode and currentStore is still loading.
   // In create mode, currentStore is explicitly set to null.
   if (currentStore === undefined) {
@@ -167,6 +175,7 @@ export function StoreNewEditForm({ currentStore = null, mutate }) {
       } else {
         // Create mode: add a new store.
         const created = await addStore(data);
+        clearSetupPrefill();
         toast.success('Store created successfully!');
         const storeId = created?.id;
         if (storeId && data.storeName) {

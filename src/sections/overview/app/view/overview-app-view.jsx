@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import { useTheme } from '@mui/material/styles';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
@@ -10,9 +11,9 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { fPercent, fCurrency } from 'src/utils/format-number';
+import { fToNow } from 'src/utils/format-time';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { SeoIllustration } from 'src/assets/illustrations';
 import {
   useStoreExpenses,
   useStoreFeatured,
@@ -31,9 +32,14 @@ import { WelcomeGuidePopup } from 'src/components/onboarding/welcome-guide-popup
 
 import { useAuthContext } from 'src/auth/hooks';
 import { useBusinessType } from 'src/hooks/use-business-type';
+import { useDashboardShortcuts } from 'src/hooks/use-dashboard-shortcuts';
 
-import { AppWelcome } from '../app-welcome';
 import { AppFeatured } from '../app-featured';
+import { AppHeroMetric } from '../app-hero-metric';
+import { AppQuickActions } from '../app-quick-actions';
+import { AppRecentActivity } from '../app-recent-activity';
+import { AppDashboardHeader } from '../app-dashboard-header';
+import { AppDashboardLauncher } from '../app-dashboard-launcher';
 import { AppNewInvoice } from '../app-new-invoice';
 import { AppNewProduct } from '../app-new-product';
 import { AppPerformance } from '../app-performance';
@@ -45,7 +51,6 @@ import { AppExpenseCategories } from '../app-expense-categories';
 
 // ----------------------------------------------------------------------
 
-// Reads active store name from localStorage
 function getStoreName() {
   try {
     const raw = localStorage.getItem('activeWorkspace');
@@ -59,10 +64,20 @@ function getStoreName() {
   return null;
 }
 
-// Normalize raw metric values to 0–100 relative to their max so the radar renders sensibly
 function normalizeRadarValues(rawValues) {
   const max = Math.max(...rawValues, 1);
   return rawValues.map((v) => Math.round((v / max) * 100));
+}
+
+function SectionLabel({ children }) {
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 1.2 }}>
+        {children}
+      </Typography>
+      <Divider sx={{ mt: 1 }} />
+    </Box>
+  );
 }
 
 // ----------------------------------------------------------------------
@@ -71,10 +86,10 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export function OverviewAppView({ storeId }) {
   const { user } = useAuthContext();
-  const { t } = useBusinessType();
+  const { t, tp, tPhrase, getNavLabel } = useBusinessType();
+  const { shortcuts, currentStore } = useDashboardShortcuts();
   const theme = useTheme();
 
-  // ── Shared period state (syncs Expenses + Top Products together) ───
   const [period, setPeriod]               = useState('month');
   const [limit, setLimit]                 = useState(10);
   const [invStatus, setInvStatus]         = useState('paid');
@@ -82,11 +97,8 @@ export function OverviewAppView({ storeId }) {
   const [paymentPeriod, setPaymentPeriod] = useState('month');
   const [selectedYear, setSelectedYear]   = useState(CURRENT_YEAR);
 
-  const handleYearChange = useCallback((year) => setSelectedYear(Number(year)), []);
-
-  // ── Data hooks ─────────────────────────────────────────────────────
-  const { recentInvoices, recentInvoicesLoading } =
-    useStoreRecentInvoices(storeId, { limit: invLimit, status_filter: invStatus });
+  const { recentInvoices: activityInvoices, recentInvoicesLoading: activityLoading } =
+    useStoreRecentInvoices(storeId, { limit: 3, status_filter: 'all' });
 
   const { salesByPaymentMethod, salesByPaymentMethodLoading } =
     useStoreSalesByPaymentMethod(storeId, paymentPeriod);
@@ -111,30 +123,23 @@ export function OverviewAppView({ storeId }) {
   const { data: yearlySalesData                 } = useStoreYearlySales(storeId, selectedYear);
   const { featuredProducts, featuredLoading     } = useStoreFeatured(storeId, 3);
 
-  // ── Sparkline data ─────────────────────────────────────────────────
-
-  // Today: hourly breakdown (already in API)
   const hourly  = dailySales.hourly_data || [];
   const hours   = hourly.map((h) => String(h.hour).padStart(2, '0'));
   const amounts = hourly.map((h) => h.amount);
 
-  // Weekly: per-day breakdown now returned by the updated API
   const weeklyDailyData  = weeklySales?.daily_data || [];
   const weeklyCategories = weeklyDailyData.map((d) => d.day);
   const weeklyAmounts    = weeklyDailyData.map((d) => d.amount);
 
-  // Monthly: per-week breakdown now returned by the updated API
   const monthlyDailyData  = monthlySales?.daily_data || [];
   const monthlyCategories = monthlyDailyData.map((d) => d.day);
   const monthlyAmounts    = monthlyDailyData.map((d) => d.amount);
 
-  // KPI totals
   const weeklyTotal  = weeklySales?.total_value       ?? 0;
   const weeklyPct    = weeklySales?.change_percentage ?? 0;
   const monthlyTotal = monthlySales?.total_value       ?? 0;
   const monthlyPct   = monthlySales?.change_percentage ?? 0;
 
-  // Yearly subheader — live year-over-year % from API
   const yoyChange = yearlySalesData?.year_over_year_change ?? null;
   const yearlySalesSubheader = useMemo(() => {
     if (yoyChange === null) return String(selectedYear);
@@ -142,7 +147,6 @@ export function OverviewAppView({ storeId }) {
     return `${sign}${fPercent(yoyChange)} vs last year`;
   }, [yoyChange, selectedYear]);
 
-  // ── Radar: normalize all metrics to 0–100 ─────────────────────────
   const perf = performance || {};
   const radarCategories = ['Revenue', 'Transactions', 'Returns', 'New Customers', 'Avg. Basket', 'Footfall'];
   const radarSeries = [{
@@ -157,7 +161,6 @@ export function OverviewAppView({ storeId }) {
     ]),
   }];
 
-  // ── Expense category chart ─────────────────────────────────────────
   const expenseCats   = expenses?.categories || [];
   const expenseSeries = expenseCats.map((item) => ({ label: item.category, value: item.amount }));
   const iconMap = {
@@ -181,13 +184,39 @@ export function OverviewAppView({ storeId }) {
   ));
   const expenseLabels = expenseCats.map((item) => item.category);
 
-  // ── Payment method donut ───────────────────────────────────────────
   const paymentSeries = salesByPaymentMethod.map((m) => ({
     label: m.method_type.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '),
     value: m.total_amount,
   }));
 
-  // ── No-store guard ─────────────────────────────────────────────────
+  const invoiceHistoryPath = currentStore
+    ? paths.dashboard.invoice.history(currentStore)
+    : null;
+
+  const recentActivityItems = useMemo(
+    () =>
+      (activityInvoices || []).map((inv) => ({
+        id: inv.invoice_id,
+        title: `${t('invoice')} #${inv.invoice_number}`,
+        subtitle: inv.category || inv.customer_name || '—',
+        timeAgo: inv.created_at ? fToNow(inv.created_at) : null,
+        amount: inv.price,
+        status: inv.status,
+        href: invoiceHistoryPath,
+      })),
+    [activityInvoices, t, invoiceHistoryPath]
+  );
+
+  const activityIsEmpty = !activityLoading && recentActivityItems.length === 0;
+
+  const heroActionHint = useMemo(() => {
+    const phrase = tPhrase('heroActionHint');
+    if (phrase && phrase !== 'heroActionHint') {
+      return phrase;
+    }
+    return `Tap to open ${getNavLabel('quickDashboard')}`;
+  }, [tPhrase, getNavLabel]);
+
   if (!storeId) {
     return (
       <DashboardContent>
@@ -222,7 +251,6 @@ export function OverviewAppView({ storeId }) {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────
   const storeName  = getStoreName();
   const todayLabel = new Date().toLocaleDateString([], {
     weekday: 'long',
@@ -235,54 +263,56 @@ export function OverviewAppView({ storeId }) {
     <DashboardContent maxWidth="xl">
       <WelcomeGuidePopup userId={user?.user_id} />
 
-      <Grid container spacing={3}>
-
-        {/* Welcome banner */}
-        <Grid xs={12} md={8} id="overview-tour-welcome">
-          <AppWelcome
-            title={`Welcome back 👋 \n ${user?.displayName}`}
-            description={
-              storeName
-                ? `You're viewing the dashboard for ${storeName}. Here's your store performance summary for ${todayLabel}.`
-                : `Here's your store performance summary for ${todayLabel}.`
-            }
-            img={<SeoIllustration hideBackground />}
-            action={
-              <Button
-                component={RouterLink}
+      <Grid container spacing={{ xs: 2, md: 3 }}>
+        <Grid xs={12}>
+          <AppDashboardLauncher
+            header={(
+              <AppDashboardHeader
+                userName={user?.displayName}
+                storeName={storeName}
+                dateLabel={todayLabel}
+              />
+            )}
+            hero={(
+              <AppHeroMetric
+                title={tPhrase('todaySalesTitle')}
+                total={dailySales.total_paid ?? dailySales.total_sales}
+                percent={dailySales.change_percentage}
+                secondaryLabel="Debt outside"
+                secondaryValue={dailySales.total_debt ?? 0}
+                actionHint={heroActionHint}
                 href={paths.dashboard.quickDashboard}
-                variant="contained"
-                color="primary"
-              >
-                Quick Sale
-              </Button>
-            }
+                loading={dailySalesLoading}
+                chart={{ categories: hours, series: amounts }}
+                sx={{ minHeight: { xs: 140, md: 160 } }}
+              />
+            )}
+            activity={{
+              collapseWhenEmpty: activityIsEmpty,
+              node: (
+                <AppRecentActivity
+                  title="Recent activity"
+                  items={recentActivityItems}
+                  loading={activityLoading}
+                  viewAllHref={invoiceHistoryPath}
+                  emptyMessage="No recent activity yet"
+                  sx={{ flex: 1, width: 1 }}
+                />
+              ),
+            }}
+            shortcuts={(
+              <AppQuickActions primary={shortcuts.primary} grid={shortcuts.grid} />
+            )}
           />
         </Grid>
 
-        <Grid xs={12} md={4} id="overview-tour-featured">
-          <AppFeatured list={featuredProducts} loading={featuredLoading} />
+        <Grid xs={12}>
+          <SectionLabel>Analytics</SectionLabel>
         </Grid>
 
-        {/* KPI summary cards */}
-        <Grid xs={12} container spacing={3} id="overview-tour-kpi">
-        <Grid xs={12} md={4}>
+        <Grid xs={12} md={6} id="overview-tour-kpi">
           <AppWidgetSummary
-            title={`Today's ${t('sale')}s`}
-            percent={dailySales.change_percentage}
-            total={dailySales.total_paid ?? dailySales.total_sales}
-            secondaryLabel="Debt outside"
-            secondaryValue={dailySales.total_debt ?? 0}
-            periodLabel={dailySales.period || 'last 7 days'}
-            formatAsCurrency
-            loading={dailySalesLoading}
-            chart={{ categories: hours, series: amounts }}
-          />
-        </Grid>
-
-        <Grid xs={12} md={4}>
-          <AppWidgetSummary
-            title={`Total Weekly ${t('sale')}s`}
+            title={tPhrase('weeklySalesTitle')}
             percent={weeklyPct}
             total={weeklyTotal}
             periodLabel={weeklySales?.period || 'last 7 days'}
@@ -292,9 +322,9 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} md={4}>
+        <Grid xs={12} md={6}>
           <AppWidgetSummary
-            title={`Total Monthly ${t('sale')}s`}
+            title={tPhrase('monthlySalesTitle')}
             percent={monthlyPct}
             total={monthlyTotal}
             periodLabel={monthlySales?.period || 'last month'}
@@ -307,12 +337,10 @@ export function OverviewAppView({ storeId }) {
             }}
           />
         </Grid>
-        </Grid>
 
-        {/* Payment method donut + Expense categories (share the `period` selector) */}
         <Grid xs={12} md={6} id="overview-tour-payment-method">
           <AppCurrentDownload
-            title={`${t('sale')}s by Payment Method`}
+            title={tPhrase('salesByPaymentTitle')}
             subheader={`${t('pos')} Transactions`}
             period={paymentPeriod}
             onPeriodChange={setPaymentPeriod}
@@ -332,7 +360,11 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        <Grid xs={12} md={6} id="overview-tour-expenses">
+        <Grid xs={12} md={6} id="overview-tour-featured">
+          <AppFeatured list={featuredProducts} loading={featuredLoading} />
+        </Grid>
+
+        <Grid xs={12} id="overview-tour-expenses">
           <AppExpenseCategories
             title={`Expenses (${expenses.period || period})`}
             subheader={fCurrency(expenses.total_expenses)}
@@ -343,16 +375,14 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        {/* Yearly income vs expenses area chart */}
         <Grid xs={12} id="overview-tour-yearly">
           <AppYearlySales
-            title={`Yearly ${t('sale')}s`}
+            title={`Yearly ${tp('sale')}`}
             subheader={yearlySalesSubheader}
             storeId={storeId}
           />
         </Grid>
 
-        {/* Performance radar (normalised 0–100) + top cashiers */}
         <Grid xs={12} md={6} id="overview-tour-performance">
           <AppPerformance
             title="Store Performance"
@@ -375,10 +405,9 @@ export function OverviewAppView({ storeId }) {
           />
         </Grid>
 
-        {/* Recent invoices + top products (both driven by shared `period`) */}
         <Grid xs={12} lg={6} id="overview-tour-invoices">
           <AppNewInvoice
-            title={`Recent ${t('invoice')}s`}
+            title={`Recent ${tp('invoice')}`}
             subheader="Filter by status"
             storeId={storeId}
             headLabel={[
@@ -397,8 +426,8 @@ export function OverviewAppView({ storeId }) {
 
         <Grid xs={12} lg={6} id="overview-tour-products">
           <AppNewProduct
-            title={`Top Selling ${t('product')}s`}
-            subheader={`${t('pos')} Top ${t('product')}s`}
+            title={`Top Selling ${tp('product')}`}
+            subheader={`${t('pos')} Top ${tp('product')}`}
             headLabel={[
               { id: 'invoiceNumber', label: 'Product'      },
               { id: 'category',     label: 'Qty Sold'     },
@@ -413,7 +442,6 @@ export function OverviewAppView({ storeId }) {
             onLimitChange={setLimit}
           />
         </Grid>
-
       </Grid>
     </DashboardContent>
   );

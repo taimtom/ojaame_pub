@@ -514,18 +514,26 @@ export const dashboardRoutes = [
             },
             {
               path: 'partners',
-              element: (
+              element: withPlanFeature(
+                'consignment',
+                'Partner Report',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
                   <StorePartnerReportPage />
                 </PermissionGuard>
+                )
               ),
             },
             {
               path: 'partners/:partnerId',
-              element: (
+              element: withPlanFeature(
+                'consignment',
+                'Partner Report',
+                (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
                   <StorePartnerReportDetailPage />
                 </PermissionGuard>
+                )
               ),
             },
           ],

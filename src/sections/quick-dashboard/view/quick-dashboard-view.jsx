@@ -50,6 +50,7 @@ import {
   QuickDashboardPayments,
   sumPaymentLines,
 } from 'src/sections/quick-dashboard/quick-dashboard-payments';
+import { VoiceInputBar } from 'src/sections/voice';
 import { normalizeReceiptFromSale } from 'src/utils/escpos/receipt-from-sale';
 import { getPreferredReceiptFormat } from 'src/utils/receipt-preferences';
 import {
@@ -1366,6 +1367,157 @@ export function QuickDashboardView() {
     });
   }, []);
 
+  const applyVoiceSaleDraft = useCallback(
+    (draft) => {
+      const items = draft?.items || [];
+      if (!items.length) {
+        toast.warning('No products to add from voice.');
+        return;
+      }
+
+      const amountModeIds = [];
+
+      setCart((prev) => {
+        let next = [...prev];
+        items.forEach((item) => {
+          const catalogPrice = Number(
+            item.base_unit_price ?? item.unit_price ?? item.price ?? 0
+          );
+          const row = normalizeQuickSearchProduct({
+            id: item.product_id ?? item.service_id,
+            name: item.name,
+            type: item.type || (item.service_id ? 'service' : 'product'),
+            price: catalogPrice,
+            stock: item.stock ?? null,
+            cost_price: item.cost_price ?? null,
+            allow_variable_price: item.allow_variable_price ?? false,
+            variable_price_min: item.variable_price_min ?? null,
+            variable_price_max: item.variable_price_max ?? null,
+            is_pack: item.is_pack,
+            quantity_per_pack: item.quantity_per_pack,
+            cost_price_per_pack: item.cost_price_per_pack,
+            pack_sell_price: item.pack_sell_price,
+            sku: item.sku,
+            code: item.code,
+            image_url: item.image_url,
+          });
+          const wantPack =
+            Boolean(row.is_pack && row.quantity_per_pack) &&
+            String(item.pack_sale_mode || 'unit').toLowerCase() === 'pack';
+          const packMode = wantPack ? 'pack' : 'unit';
+
+          let unitPrice = row.price;
+          if (wantPack) {
+            const qpp = row.quantity_per_pack || 1;
+            const raw =
+              row.pack_sell_price != null && String(row.pack_sell_price).trim() !== ''
+                ? Number(row.pack_sell_price)
+                : NaN;
+            unitPrice =
+              Number.isFinite(raw) && raw > 0
+                ? Math.round(raw * 100) / 100
+                : Math.round(qpp * row.price * 100) / 100;
+          } else if (
+            item.input_mode !== 'amount' &&
+            row.allow_variable_price &&
+            item.unit_price != null &&
+            item.line_amount == null
+          ) {
+            unitPrice = Number(item.unit_price);
+          }
+
+          const lineAmount =
+            item.line_amount != null && Number(item.line_amount) > 0
+              ? Number(item.line_amount)
+              : null;
+          let qty = Math.max(0.01, Number(item.quantity) || 1);
+          if (lineAmount != null && unitPrice > 0) {
+            qty = lineAmount / unitPrice;
+          }
+
+          const lineId = cartIdForSearchItem(row, packMode);
+          if (lineAmount != null || item.input_mode === 'amount') {
+            amountModeIds.push(lineId);
+          }
+          const existing = next.find((c) => c.cartId === lineId);
+
+          const maxQty = wantPack
+            ? row.stock != null && row.quantity_per_pack
+              ? Math.floor(row.stock / row.quantity_per_pack)
+              : Infinity
+            : row.stock != null
+              ? row.stock
+              : Infinity;
+
+          if (existing) {
+            const newQty = Math.min(existing.quantity + qty, maxQty);
+            next = next.map((c) =>
+              c.cartId === existing.cartId
+                ? { ...c, quantity: newQty, subtotal: newQty * c.unit_price }
+                : c
+            );
+          } else {
+            const clamped = Math.min(qty, maxQty === Infinity ? qty : Math.max(0, maxQty));
+            if (clamped < 0.01) return;
+            next = [
+              ...next,
+              {
+                cartId: lineId,
+                id: row.id,
+                type: row.type,
+                name: row.name,
+                unit_price: unitPrice,
+                quantity: clamped,
+                subtotal: clamped * unitPrice,
+                stock: row.stock ?? null,
+                cost_price: row.cost_price ?? null,
+                allow_variable_price: row.allow_variable_price ?? false,
+                variable_price_min: row.variable_price_min ?? null,
+                variable_price_max: row.variable_price_max ?? null,
+                is_pack: Boolean(row.is_pack),
+                quantity_per_pack: row.quantity_per_pack ?? null,
+                cost_price_per_pack: row.cost_price_per_pack ?? null,
+                pack_sell_price: row.pack_sell_price ?? null,
+                pack_sale_mode: packMode,
+                base_unit_price: row.price,
+              },
+            ];
+          }
+        });
+        return next;
+      });
+
+      if (amountModeIds.length) {
+        setRowModes((prev) => {
+          const next = { ...prev };
+          amountModeIds.forEach((id) => {
+            next[id] = 'amount';
+          });
+          return next;
+        });
+      }
+
+      const methodName = (draft.payment_method || '').toLowerCase();
+      if (methodName && paymentMethods?.length) {
+        const match = paymentMethods.find((m) =>
+          String(m.name || m.method || '')
+            .toLowerCase()
+            .includes(methodName)
+        );
+        if (match) {
+          paymentsTouchedRef.current = true;
+          setPaymentLines((prev) => {
+            const amount = prev[0]?.amount ?? 0;
+            return [{ payment_method_id: match.id, amount }];
+          });
+        }
+      }
+
+      toast.success('Added from voice — review cart, then checkout.');
+    },
+    [paymentMethods]
+  );
+
   const changeQty = useCallback((cartId, delta) => {
     setCart((prev) =>
       prev
@@ -2340,9 +2492,18 @@ export function QuickDashboardView() {
         <Grid xs={12} md={5}>
           <Card sx={{ height: '100%' }}>
             <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-                Search Products &amp; Services
-              </Typography>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Search Products &amp; Services
+                </Typography>
+                <VoiceInputBar
+                  storeId={storeId}
+                  intentHint="sale"
+                  offline={!isOnline}
+                  showCoach
+                  onConfirm={applyVoiceSaleDraft}
+                />
+              </Stack>
               <TextField
                 inputRef={searchRef}
                 fullWidth

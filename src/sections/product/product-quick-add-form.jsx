@@ -25,6 +25,7 @@ import { useGetCategories } from 'src/actions/category';
 import { CategoryQuickAddDialog } from './category-quick-add-dialog';
 import { toast } from 'src/components/snackbar';
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
+import { VoiceInputBar } from 'src/sections/voice';
 
 // ----------------------------------------------------------------------
 
@@ -234,6 +235,21 @@ export function ProductQuickAddForm({
     <Stack spacing={embedded ? 2 : 3}>
       <Card sx={{ p: embedded ? 0 : 3, boxShadow: embedded ? 'none' : undefined }}>
         <Stack spacing={3}>
+          <Stack direction="row" alignItems="center" justifyContent="flex-end">
+            <VoiceInputBar
+              storeId={storeId}
+              intentHint="add_product"
+              disabled={!storeId}
+              onConfirm={(draft) => {
+                if (draft?.name) set('name', draft.name);
+                if (draft?.quantity != null) set('quantity', draft.quantity);
+                if (draft?.price != null && draft.price !== '') set('price', draft.price);
+                if (draft?.cost != null && draft.cost !== '') set('costPrice', draft.cost);
+                toast.success('Filled from voice — review and save.');
+              }}
+            />
+          </Stack>
+
           {/* Inventory role toggle */}
           <Stack spacing={1}>
             <Typography variant="subtitle2">Inventory Role</Typography>

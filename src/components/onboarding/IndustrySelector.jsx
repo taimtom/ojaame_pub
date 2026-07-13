@@ -107,12 +107,12 @@ const INDUSTRY_TEMPLATES = [
     icon: <WholesaleIcon sx={{ fontSize: 60 }} />,
     description: 'Distributors, wholesalers, suppliers',
     features: [
-      'Bulk Pricing',
-      'Purchase Orders',
+      'Case & Pack Pricing',
+      'Goods Received',
       'Supplier Management',
       'Stock Transfer',
       'Credit Management',
-      'Route Planning'
+      'Multi-location Support'
     ],
     color: '#607d8b'
   },

@@ -23,6 +23,14 @@ const DEFAULT_CONFIG = {
     shipping: 'Shipping',
     taxes: 'Taxes',
     productionInput: 'Production input',
+    salePlural: 'Sales',
+    todaySalesTitle: "Today's Sales",
+    weeklySalesTitle: 'Total Weekly Sales',
+    monthlySalesTitle: 'Total Monthly Sales',
+    salesByPaymentTitle: 'Sales by Payment Method',
+    heroActionHint: 'Tap to open Quick Sales',
+    invoicePlural: 'Invoices',
+    productPlural: 'Products',
   },
   fields: {
     product: {
@@ -56,8 +64,118 @@ const DEFAULT_CONFIG = {
     quickRestock: 'Quick Restock',
     salesAndOrdersSection: 'Sales & Orders',
     inventorySection: 'Inventory',
+    storeTransfers: 'Store Transfers',
+    consignment: 'Consignment',
+    partnerReport: 'Partner Report',
   },
 };
+
+const WHOLESALE_PRODUCT_FIELDS = {
+  show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images', 'is_pack', 'quantity_per_pack', 'costPrice', 'expiry_date'],
+  hide: ['gender', 'colors', 'sizes', 'prescription_info', 'dosage', 'duration', 'appointment_time', 'harvest_date'],
+  labels: {
+    name: 'SKU name',
+    quantity: 'Stock on hand',
+    price: 'Unit price',
+    category: 'Product line',
+    code: 'Barcode',
+    costPrice: 'Landed cost',
+  },
+};
+
+const WHOLESALE_DISTRIBUTOR_NAV = {
+  productManagement: 'SKU Catalogue',
+  serviceManagement: 'Service Management',
+  pointOfSales: 'Sales Desk',
+  salesInvoice: 'Invoices',
+  usageDashboard: 'Usage dashboard',
+  quickDashboard: 'Quick Sales',
+  serviceLog: 'Service Log',
+  quickRestock: 'Goods Received',
+  salesAndOrdersSection: 'Sales & Dispatch',
+  inventorySection: 'Stock & Depots',
+  storeTransfers: 'Depot Dispatch',
+  consignment: 'Sub-dealer Stock',
+  partnerReport: 'Dealer Accounts',
+};
+
+const WHOLESALE_DISTRIBUTOR_TERMINOLOGY = {
+  product: 'SKU',
+  service: 'Service',
+  invoice: 'Sales Invoice',
+  sale: 'Dispatch',
+  quantity: 'Stock Qty',
+  price: 'Unit Price',
+  category: 'Product Line',
+  customer: 'Dealer',
+  pos: 'Sales Desk',
+  addItem: 'Add SKU',
+  item: 'SKU',
+  description: 'Description',
+  total: 'Total',
+  subtotal: 'Subtotal',
+  discount: 'Discount',
+  shipping: 'Delivery',
+  taxes: 'Taxes',
+  productionInput: 'Production input',
+  salePlural: 'Dispatches',
+  todaySalesTitle: "Today's Dispatches",
+  weeklySalesTitle: 'Total Weekly Dispatches',
+  monthlySalesTitle: 'Total Monthly Dispatches',
+  salesByPaymentTitle: 'Dispatches by Payment Method',
+  heroActionHint: 'Tap to open Quick Sales',
+  invoicePlural: 'Invoices',
+  productPlural: 'SKUs',
+};
+
+const IMPORT_TRADE_TERMINOLOGY = {
+  ...WHOLESALE_DISTRIBUTOR_TERMINOLOGY,
+  customer: 'Buyer',
+  sale: 'Sale',
+  invoice: 'Invoice',
+};
+
+const IMPORT_TRADE_NAV = {
+  ...WHOLESALE_DISTRIBUTOR_NAV,
+  quickRestock: 'Import Receipt',
+  salesAndOrdersSection: 'Sales & Trade',
+};
+
+function wholesaleDistributorConfig(terminologyOverrides = {}, navigationOverrides = {}) {
+  return {
+    terminology: { ...WHOLESALE_DISTRIBUTOR_TERMINOLOGY, ...terminologyOverrides },
+    fields: {
+      product: WHOLESALE_PRODUCT_FIELDS,
+      service: DEFAULT_CONFIG.fields.service,
+    },
+    navigation: { ...WHOLESALE_DISTRIBUTOR_NAV, ...navigationOverrides },
+    dashboardShortcuts: [
+      'quick-dispatch',
+      'goods-received',
+      'customers',
+      'pos',
+      'products',
+      'transfers',
+      'invoices',
+      'customer-report',
+      'consignment',
+      'partner-report',
+      'service-log',
+      'expenses',
+    ],
+  };
+}
+
+function importTradeConfig(terminologyOverrides = {}, navigationOverrides = {}) {
+  return {
+    terminology: { ...IMPORT_TRADE_TERMINOLOGY, ...terminologyOverrides },
+    fields: {
+      product: WHOLESALE_PRODUCT_FIELDS,
+      service: DEFAULT_CONFIG.fields.service,
+    },
+    navigation: { ...IMPORT_TRADE_NAV, ...navigationOverrides },
+  };
+}
 
 // Helper function to create a registry key
 const createKey = (industry, subIndustry, exactBusiness) => `${industry}|${subIndustry}|${exactBusiness}`;
@@ -195,6 +313,22 @@ const BUSINESS_TYPE_CONFIGS = {
       salesInvoice: 'Orders',
     },
   },
+
+  // ========== WHOLESALE / B2B / DISTRIBUTOR ==========
+  [createKey('Trade & Commerce', 'Wholesale trade', 'Wholesale distribution')]:
+    wholesaleDistributorConfig(),
+  [createKey('Trade & Commerce', 'Wholesale trade', 'B2B trading')]:
+    wholesaleDistributorConfig({ customer: 'Buyer', sale: 'Sale' }),
+  [createKey('Trade & Commerce', 'Wholesale trade', 'Wholesale supply')]:
+    wholesaleDistributorConfig({ sale: 'Supply' }),
+  [createKey('Trade & Commerce', 'Import & export', 'Import business')]:
+    importTradeConfig(),
+  [createKey('Trade & Commerce', 'Import & export', 'Trading company')]:
+    importTradeConfig({ customer: 'Dealer' }),
+  [createKey('Trade & Commerce', 'Import & export', 'Export business')]:
+    importTradeConfig({ customer: 'Buyer', pos: 'Export Desk' }, { pointOfSales: 'Export Desk' }),
+  [createKey('Trade & Commerce', 'Import & export', 'International trade')]:
+    importTradeConfig({ customer: 'Trade Partner' }),
 
   // ========== HEALTHCARE ==========
   [createKey('Health & Social Services', 'Hospitals', 'Private hospital')]: {

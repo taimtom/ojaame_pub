@@ -17,6 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { withOnboardingQuery } from 'src/utils/onboarding-routes';
+import { clearSetupPrefill, getSetupPrefill } from 'src/utils/setup-prefill';
 
 import { fData } from 'src/utils/format-number';
 
@@ -56,6 +57,7 @@ export function AccountCompany() {
 
   const [companyLogoUrlInput, setCompanyLogoUrlInput] = useState('');
   const [companyLogoUploading, setCompanyLogoUploading] = useState(false);
+  const [setupPrefill, setSetupPrefill] = useState(null);
   const isInitialLoad = useRef(true);
 
   const methods = useForm({
@@ -109,6 +111,27 @@ export function AccountCompany() {
         isInitialLoad.current = false;
       }, 100);
     }
+  }, [company, reset]);
+
+  useEffect(() => {
+    if (company) return;
+    const payload = getSetupPrefill();
+    if (!payload) return;
+
+    setSetupPrefill(payload);
+    isInitialLoad.current = true;
+    reset({
+      companyName: payload.companyName || '',
+      companyLogo: null,
+      companyLocation: '',
+      rcCacRegNumber: '',
+      primaryIndustry: payload.primaryIndustry || '',
+      subIndustry: payload.subIndustry || '',
+      exactBusiness: payload.exactBusiness || '',
+    });
+    setTimeout(() => {
+      isInitialLoad.current = false;
+    }, 100);
   }, [company, reset]);
 
   // Reset sub-industry and exact-business when industry changes
@@ -174,6 +197,12 @@ export function AccountCompany() {
       if (data.companyLogo) {
         formData.append('companyLogo', data.companyLogo);
       }
+      if (setupPrefill?.builderPrefill) {
+        formData.append('builder_prefill', 'true');
+      }
+      if (setupPrefill?.builderCompletedAt) {
+        formData.append('builder_completed_at', setupPrefill.builderCompletedAt);
+      }
 
       if (company && company.id) {
         // Update flow
@@ -185,6 +214,7 @@ export function AccountCompany() {
       } else {
         // Create flow
         await createCompany(formData);
+        setSetupPrefill(null);
         await checkUserSession?.();
         toast.success('Company created successfully!');
         window.location.href = withOnboardingQuery(`${paths.dashboard.user.account}?tab=billing`);
@@ -246,6 +276,22 @@ export function AccountCompany() {
 
         <Grid xs={12} md={8}>
           <Card sx={{ p: 3 }}>
+            {!company && setupPrefill && (
+              <Box
+                sx={{
+                  mb: 2.5,
+                  p: 2,
+                  borderRadius: 1.5,
+                  bgcolor: 'primary.lighter',
+                  color: 'primary.darker',
+                }}
+              >
+                <Typography variant="subtitle2">We saved your setup from ojaa.me.</Typography>
+                <Typography variant="body2">
+                  Confirm your business profile and continue to create your first store.
+                </Typography>
+              </Box>
+            )}
             <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
               <Field.Text name="companyName" label="Company Name" />
               <Field.Text name="companyLocation" label="Company Location" />
@@ -305,6 +351,18 @@ export function AccountCompany() {
             </Box>
 
             <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
+              {!company && setupPrefill && (
+                <Button
+                  color="inherit"
+                  sx={{ mr: 'auto' }}
+                  onClick={() => {
+                    clearSetupPrefill();
+                    setSetupPrefill(null);
+                  }}
+                >
+                  Clear saved setup
+                </Button>
+              )}
               <LoadingButton
                 type="submit"
                 variant="contained"

@@ -1,7 +1,10 @@
+import { useState } from 'react';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Stepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepButton from '@mui/material/StepButton';
@@ -18,6 +21,8 @@ import {
   getOnboardingStepIndex,
   getViewingOnboardingStep,
 } from 'src/utils/onboarding-routes';
+import { markOnboardingLinkShared } from 'src/actions/onboarding';
+import { toast } from 'src/components/snackbar';
 
 import { OnboardingSkipButton } from './onboarding-skip-button';
 
@@ -29,6 +34,8 @@ export function OnboardingProgressHeader({ progress, subtitle }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareMarked, setShareMarked] = useState(false);
 
   const currentKey = progress?.current_step;
   const furthestIndex =
@@ -50,6 +57,26 @@ export function OnboardingProgressHeader({ progress, subtitle }) {
       !currentStepState?.done &&
       SKIPPABLE_STEP_KEYS.includes(currentKey)
   );
+  const shareDone = shareMarked || Boolean(
+    progress?.activation_checklist?.find((item) => item.key === 'share')?.done
+  );
+
+  const handleCopyStoreLink = async () => {
+    if (!progress?.store_param) return;
+    const slug = String(progress.store_param).replace(/-\d+$/, '');
+    const link = `https://${slug}.ojaa.me`;
+    try {
+      setIsSharing(true);
+      await navigator.clipboard.writeText(link);
+      await markOnboardingLinkShared();
+      setShareMarked(true);
+      toast.success('Store link copied.');
+    } catch (error) {
+      toast.error('Unable to copy store link.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const handleStepClick = (stepKey, idx) => {
     if (idx > furthestIndex) {
@@ -76,6 +103,16 @@ export function OnboardingProgressHeader({ progress, subtitle }) {
           </Box>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             {canSkipCurrentStep && <OnboardingSkipButton step={currentKey} />}
+            {progress?.store_param && (
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={isSharing || shareDone}
+                onClick={handleCopyStoreLink}
+              >
+                {shareDone ? 'Link shared' : 'Copy store link'}
+              </Button>
+            )}
             <Chip label="Guided setup" color="primary" variant="soft" size="small" />
           </Stack>
         </Stack>

@@ -17,6 +17,7 @@ import { storeSiteRoutes } from './store-site';
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL || 'https://ojaa.me';
 
 const ReferralRedirectPage = lazy(() => import('src/pages/ReferralRedirectPage'));
+const SetupPrefillPage = lazy(() => import('src/pages/SetupPrefillPage'));
 
 // ----------------------------------------------------------------------
 
@@ -67,6 +68,14 @@ export function Router() {
       element: (
         <Suspense fallback={<SplashScreen />}>
           <ReferralRedirectPage />
+        </Suspense>
+      ),
+    },
+    {
+      path: 'setup/prefill',
+      element: (
+        <Suspense fallback={<SplashScreen />}>
+          <SetupPrefillPage />
         </Suspense>
       ),
     },

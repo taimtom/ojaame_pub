@@ -1,4 +1,5 @@
 import { OnboardingProgressHeader } from './onboarding-progress-header';
+import { ActivationChecklist } from './activation-checklist';
 import { useOnboardingActive } from 'src/hooks/use-onboarding-mode';
 
 // ----------------------------------------------------------------------
@@ -13,7 +14,10 @@ export function OnboardingSetupShell({ subtitle, children = null }) {
   return (
     <>
       {!progressLoading && progress && (
-        <OnboardingProgressHeader progress={progress} subtitle={subtitle} />
+        <>
+          <ActivationChecklist progress={progress} />
+          <OnboardingProgressHeader progress={progress} subtitle={subtitle} />
+        </>
       )}
       {children}
     </>

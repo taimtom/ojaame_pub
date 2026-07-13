@@ -315,7 +315,7 @@ const handleYearChange = useCallback((year) => {
 
         <Grid xs={12} sm={6} md={3}>
           <AnalyticsWidgetSummary
-            title={`Purchase orders (${poPeriod})`}
+            title={`Goods received (${poPeriod})`}
             total={poTotal}
             percent={poPct}
             color="warning"
