@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 const DEFAULT_MAX_MS = 12000;
 /** Shorter holds often yield header-less / truncated containers Chrome can't fix on stop. */
