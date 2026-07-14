@@ -37,10 +37,7 @@ export function normalizeAudioMime(mime) {
 
 function pickRecorderMime() {
   if (typeof MediaRecorder === 'undefined') return '';
-  for (const candidate of RECORDER_MIME_CANDIDATES) {
-    if (MediaRecorder.isTypeSupported(candidate)) return candidate;
-  }
-  return '';
+  return RECORDER_MIME_CANDIDATES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
 }
 
 function bytesMatch(arr, offset, magic) {
@@ -270,34 +267,36 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
     }
   }, [cleanupStream, finishStop, maxMs, tickLevel]);
 
-  const stopRecording = useCallback(() => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current;
-      if (!recorder || recorder.state === 'inactive') {
-        cleanupStream();
-        setIsRecording(false);
-        resolve(null);
-        return;
-      }
-      resolveStopRef.current = resolve;
+  const stopRecording = useCallback(
+    () =>
+      new Promise((resolve) => {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder || recorder.state === 'inactive') {
+          cleanupStream();
+          setIsRecording(false);
+          resolve(null);
+          return;
+        }
+        resolveStopRef.current = resolve;
 
-      const elapsed = Date.now() - (startedAtRef.current || 0);
-      const waitMs = Math.max(0, MIN_RECORD_MS - elapsed);
+        const elapsed = Date.now() - (startedAtRef.current || 0);
+        const waitMs = Math.max(0, MIN_RECORD_MS - elapsed);
 
-      const doStop = () => {
-        minHoldTimerRef.current = null;
-        finishStop(recorder);
-      };
+        const doStop = () => {
+          minHoldTimerRef.current = null;
+          finishStop(recorder);
+        };
 
-      if (waitMs > 0) {
-        // Keep recording briefly so Chrome writes a real init segment.
-        pendingStopRef.current = true;
-        minHoldTimerRef.current = setTimeout(doStop, waitMs);
-      } else {
-        doStop();
-      }
-    });
-  }, [cleanupStream, finishStop]);
+        if (waitMs > 0) {
+          // Keep recording briefly so Chrome writes a real init segment.
+          pendingStopRef.current = true;
+          minHoldTimerRef.current = setTimeout(doStop, waitMs);
+        } else {
+          doStop();
+        }
+      }),
+    [cleanupStream, finishStop]
+  );
 
   const cancelRecording = useCallback(async () => {
     if (resolveStopRef.current) {

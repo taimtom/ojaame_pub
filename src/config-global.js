@@ -81,4 +81,10 @@ export const CONFIG = {
     userId: import.meta.env.VITE_JUMIA_USER_ID ?? '',
     endpoint: import.meta.env.VITE_JUMIA_ENDPOINT ?? 'https://vendor-api-staging.jumia.com',
   },
+  /**
+   * AI agent chat (dev-gated — hidden in production until VITE_AI_AGENT_ENABLED=true)
+   */
+  aiAgent: {
+    enabled: import.meta.env.VITE_AI_AGENT_ENABLED === 'true',
+  },
 };

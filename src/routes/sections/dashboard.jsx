@@ -22,6 +22,7 @@ function withPlanFeature(feature, title, element) {
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const AiAgentPage = lazy(() => import('src/pages/dashboard/ai-agent'));
 const ServiceLogPage = lazy(() => import('src/pages/dashboard/service-log'));
 const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
 const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
@@ -216,6 +217,7 @@ export const dashboardRoutes = [
         ),
       },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'ai-agent', element: <AiAgentPage /> },
       { path: 'subscription-inactive', element: <SubscriptionInactiveStaffView /> },
       { path: 'service-log', element: withPlanFeature('service_log', 'Service Log', <ServiceLogPage />) },
       { path: 'quick-restock', element: <QuickRestockPage /> },

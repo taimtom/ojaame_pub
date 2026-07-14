@@ -47,6 +47,7 @@ export const NAV_PERMISSIONS = {
     'Company Dashboard': ['reports.read', 'stores.read', 'stores.update'],
     'Store Dashboard': ['stores.read', 'stores.update'],
     'Quick Dashboard': [],
+    'AI Assistant': [],
     'Service Log': [],
     'Usage dashboard': ['inventory.read', 'inventory.update', 'inventory.manage'],
     'Help & Support': [],

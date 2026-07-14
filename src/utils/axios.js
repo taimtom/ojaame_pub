@@ -416,4 +416,13 @@ export const endpoints = {
     alias: '/api/voice/alias',
     status: '/api/voice/status',
   },
+  aiAgent: {
+    status: '/api/ai-agent/status',
+    sessions: '/api/ai-agent/sessions',
+    session: (id) => `/api/ai-agent/sessions/${id}`,
+    message: (id) => `/api/ai-agent/sessions/${id}/message`,
+    voice: (id) => `/api/ai-agent/sessions/${id}/voice`,
+    confirm: (id) => `/api/ai-agent/actions/${id}/confirm`,
+    cancel: (id) => `/api/ai-agent/actions/${id}/cancel`,
+  },
 };

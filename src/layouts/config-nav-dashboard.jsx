@@ -232,6 +232,7 @@ export const useNavData = () => {
         icon: ICONS.dashboard,
       },
       { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
+      { title: 'AI Assistant', path: paths.dashboard.aiAgent, icon: ICONS.chat },
       { title: getNavLabel('serviceLog'), path: paths.dashboard.serviceLog, icon: ICONS.booking, permissionKey: 'Service Log' },
       { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
       {
