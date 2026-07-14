@@ -83,6 +83,10 @@ export function VoiceDraftPreview({
     setLines((prev) => prev.map((l) => (l._key === key ? { ...l, ...patch } : l)));
   };
 
+  const removeLine = (key) => {
+    setLines((prev) => prev.filter((l) => l._key !== key));
+  };
+
   const pickProduct = (key, product, spokenName) => {
     if (!product) return;
     if (product.forcePicker) {
@@ -273,6 +277,7 @@ export function VoiceDraftPreview({
                 })
               }
               onPick={(product) => pickProduct(line._key, product, line.spoken_name)}
+              onRemove={() => removeLine(line._key)}
             />
           ))}
           {!lines.length && (
@@ -303,7 +308,7 @@ export function VoiceDraftPreview({
   );
 }
 
-function DraftLine({ line, storeId, intentHint, onChangeQty, onChangePackMode, onPick }) {
+function DraftLine({ line, storeId, intentHint, onChangeQty, onChangePackMode, onPick, onRemove }) {
   const needsPicker = lineNeedsPicker(line);
   const [options, setOptions] = useState(line.candidates || []);
   const [loading, setLoading] = useState(false);
@@ -481,6 +486,9 @@ function DraftLine({ line, storeId, intentHint, onChangeQty, onChangePackMode, o
             <Iconify icon="solar:pen-bold" width={18} />
           </IconButton>
         )}
+        <IconButton size="small" color="error" aria-label="Remove line" onClick={onRemove}>
+          <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+        </IconButton>
       </Stack>
       {needsPicker && suggestions.length > 0 && (
         <Stack direction="row" spacing={0.75} mt={1} flexWrap="wrap" useFlexGap>
