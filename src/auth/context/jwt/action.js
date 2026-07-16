@@ -171,12 +171,12 @@ export const resetPassword = async ({ email, code, new_password, re_password}) =
     if (code.length < 6) {
       throw new Error('Code must be at least 6 characters long');
     }
-    // If all validations pass, proceed with the API call
+    // Backend ResetModel.otp is str; VerificationCode.code is also a string column
     const params = {
-    email,
-    otp: Number(code),          // ensure it’s numeric if your backend stores it as int
-    new_password,
-    re_password,
+      email,
+      otp: String(code),
+      new_password,
+      re_password,
     };
     const res = await axios.patch(endpoints.auth.resetPassword, params);
     if (res.status !== 200) {

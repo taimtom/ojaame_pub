@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
 import Stack from '@mui/material/Stack';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Switch from '@mui/material/Switch';
@@ -15,26 +16,95 @@ import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
+import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import OutlinedInput from '@mui/material/OutlinedInput';
+
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
 import axiosInstance, { endpoints } from 'src/utils/axios';
 import { fCurrency } from 'src/utils/format-number';
 import { resolveReportStoreId } from 'src/utils/report-scope';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
+import { useGetStores } from 'src/actions/store';
+import { useGetRoles } from 'src/actions/role';
 import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+
+const emptyForm = {
+  name: '',
+  email: '',
+  monthly_gross: '',
+  is_owner: false,
+  basic_salary: '',
+  housing_allowance: '',
+  transport_allowance: '',
+  other_allowances: '',
+  user_id: '',
+  role_id: '',
+  store_ids: [],
+};
+
+function num(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function apiErrorMessage(err) {
+  const detail = err?.data?.detail ?? err?.response?.data?.detail ?? err?.message;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map((d) => d.msg || d).join(', ');
+  return 'Request failed';
+}
 
 export default function PayrollPage() {
   const { storeParam } = useParams();
   const storeId = resolveReportStoreId(storeParam);
   const { user } = useAuthContext();
   const companyId = user?.company_id;
+  const { stores } = useGetStores();
+  const { roles } = useGetRoles();
+
   const [employees, setEmployees] = useState([]);
+  const [linkableUsers, setLinkableUsers] = useState([]);
   const [run, setRun] = useState(null);
-  const [form, setForm] = useState({
-    name: '',
-    monthly_gross: '',
-    is_owner: false,
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [staffKind, setStaffKind] = useState('non_user');
+  const [form, setForm] = useState(emptyForm);
+  const [seatError, setSeatError] = useState(null);
+
+  const [convertTarget, setConvertTarget] = useState(null);
+  const [convertForm, setConvertForm] = useState({
+    email: '',
+    role_id: '',
+    store_ids: [],
   });
+  const [converting, setConverting] = useState(false);
+
+  const breakdownTotal = useMemo(() => {
+    if (!showAdvanced) return 0;
+    return (
+      num(form.basic_salary) +
+      num(form.housing_allowance) +
+      num(form.transport_allowance) +
+      num(form.other_allowances)
+    );
+  }, [form, showAdvanced]);
+
+  const effectiveGross = showAdvanced && breakdownTotal > 0 ? breakdownTotal : num(form.monthly_gross);
 
   const loadEmployees = useCallback(async () => {
     if (!companyId) return;
@@ -44,27 +114,168 @@ export default function PayrollPage() {
     setEmployees(data || []);
   }, [companyId]);
 
-  useEffect(() => {
-    loadEmployees().catch(() => toast.error('Could not load employees'));
-  }, [loadEmployees]);
-
-  const addEmployee = async () => {
+  const loadLinkable = useCallback(async () => {
+    if (!companyId) return;
     try {
-      await axiosInstance.post(endpoints.payroll.employees, {
-        company_id: companyId,
-        name: form.name,
-        monthly_gross: Number(form.monthly_gross),
-        is_owner: form.is_owner,
+      const { data } = await axiosInstance.get(endpoints.payroll.linkableUsers, {
+        params: { company_id: companyId },
       });
-      toast.success('Employee added');
-      setForm({ name: '', monthly_gross: '', is_owner: false });
-      loadEmployees();
+      setLinkableUsers(data || []);
     } catch {
-      toast.error('Failed to add employee');
+      setLinkableUsers([]);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    loadEmployees().catch(() => toast.error('Could not load staff'));
+    loadLinkable();
+  }, [loadEmployees, loadLinkable]);
+
+  const salaryPayload = () => ({
+    monthly_gross: effectiveGross,
+    basic_salary: showAdvanced ? num(form.basic_salary) : 0,
+    housing_allowance: showAdvanced ? num(form.housing_allowance) : 0,
+    transport_allowance: showAdvanced ? num(form.transport_allowance) : 0,
+    other_allowances: showAdvanced ? num(form.other_allowances) : 0,
+  });
+
+  const addStaff = async () => {
+    setSeatError(null);
+    if (effectiveGross <= 0) {
+      toast.error(showAdvanced ? 'Enter at least one salary component' : 'Enter a monthly gross greater than 0');
+      return;
+    }
+
+    if (staffKind === 'non_user' && !form.name.trim()) {
+      toast.error('Enter a staff name');
+      return;
+    }
+    if (staffKind === 'user') {
+      if (!form.email.trim()) {
+        toast.error('Email is required for user staff');
+        return;
+      }
+      if (!form.store_ids.length) {
+        toast.error('Select at least one store (seats are per store)');
+        return;
+      }
+    }
+    if (staffKind === 'link_user' && !form.user_id) {
+      toast.error('Select a team user to link');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const payload = {
+        company_id: companyId,
+        staff_kind: staffKind,
+        is_owner: form.is_owner,
+        ...salaryPayload(),
+      };
+
+      if (staffKind === 'non_user') {
+        payload.name = form.name.trim();
+        if (form.email.trim()) payload.email = form.email.trim();
+      } else if (staffKind === 'user') {
+        payload.name = form.name.trim() || undefined;
+        payload.email = form.email.trim();
+        payload.store_ids = form.store_ids;
+        if (form.role_id) payload.role_id = Number(form.role_id);
+      } else {
+        payload.user_id = Number(form.user_id);
+      }
+
+      await axiosInstance.post(endpoints.payroll.employees, payload);
+      toast.success('Staff added');
+      setForm(emptyForm);
+      setShowAdvanced(false);
+      loadEmployees();
+      loadLinkable();
+    } catch (err) {
+      if (err?._httpStatus === 402) {
+        setSeatError(apiErrorMessage(err));
+        return;
+      }
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeEmployee = async (employeeId) => {
+    try {
+      await axiosInstance.delete(`${endpoints.payroll.employees}/${employeeId}`);
+      toast.success('Staff removed from payroll');
+      loadEmployees();
+      loadLinkable();
+    } catch {
+      toast.error('Failed to remove staff');
+    }
+  };
+
+  const openConvertToUser = (emp) => {
+    setSeatError(null);
+    setConvertTarget(emp);
+    setConvertForm({
+      email: emp.email || '',
+      role_id: '',
+      store_ids: emp.primary_store_id ? [emp.primary_store_id] : storeId ? [Number(storeId)] : [],
+    });
+  };
+
+  const demoteToNonUser = async (emp) => {
+    setSeatError(null);
+    try {
+      await axiosInstance.post(endpoints.payroll.convertStaff(emp.id), { target: 'non_user' });
+      toast.success('Converted to non-user staff — login deactivated and seat released');
+      loadEmployees();
+      loadLinkable();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const confirmConvertToUser = async () => {
+    if (!convertTarget) return;
+    if (!convertForm.store_ids.length) {
+      toast.error('Select at least one store');
+      return;
+    }
+    if (!convertTarget.user_id && !convertForm.email.trim()) {
+      toast.error('Email is required to grant login');
+      return;
+    }
+
+    try {
+      setConverting(true);
+      setSeatError(null);
+      await axiosInstance.post(endpoints.payroll.convertStaff(convertTarget.id), {
+        target: 'user',
+        email: convertForm.email.trim() || undefined,
+        role_id: convertForm.role_id ? Number(convertForm.role_id) : undefined,
+        store_ids: convertForm.store_ids,
+      });
+      toast.success('Converted to user staff');
+      setConvertTarget(null);
+      loadEmployees();
+      loadLinkable();
+    } catch (err) {
+      if (err?._httpStatus === 402) {
+        setSeatError(apiErrorMessage(err));
+        return;
+      }
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setConverting(false);
     }
   };
 
   const createRun = async () => {
+    if (!employees.length) {
+      toast.error('Add at least one staff member first');
+      return;
+    }
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -76,8 +287,8 @@ export default function PayrollPage() {
       });
       setRun(data);
       toast.success('Payroll draft created');
-    } catch {
-      toast.error('Failed to create payroll run');
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -93,9 +304,18 @@ export default function PayrollPage() {
       setRun(data);
       toast.success('Payroll approved and staff gross posted as expense');
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Approve failed');
+      toast.error(apiErrorMessage(err));
     }
   };
+
+  const hasBreakdown = (emp) =>
+    num(emp.basic_salary) +
+      num(emp.housing_allowance) +
+      num(emp.transport_allowance) +
+      num(emp.other_allowances) >
+    0;
+
+  const billingHref = `${paths.dashboard.user.account}?tab=billing`;
 
   return (
     <>
@@ -106,21 +326,204 @@ export default function PayrollPage() {
         <Stack spacing={3}>
           <Typography variant="h4">Payroll / PAYE</Typography>
           <Alert severity="info">
-            PAYE is estimated from salary bands and reliefs. Low salaries often show ₦0 PAYE.
-            Owner drawings on a sole proprietorship are excluded from staff PAYE and deductible payroll expense.
-            Withholding Tax is a separate module — never deduct WHT from staff salaries.
+            Select staff from your directory — user staff have login and use a seat; non-user staff are
+            payroll-only. Converting user → non-user deactivates login and frees the seat. Converting
+            non-user → user needs an available seat.
           </Alert>
 
+          {seatError && (
+            <Alert
+              severity="warning"
+              action={
+                <Button
+                  component={RouterLink}
+                  href={billingHref}
+                  size="small"
+                  color="warning"
+                  variant="contained"
+                >
+                  Update seats
+                </Button>
+              }
+            >
+              {seatError}
+            </Alert>
+          )}
+
           <Card sx={{ p: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 2 }}>Add employee</Typography>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-              <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <TextField label="Monthly gross" type="number" value={form.monthly_gross} onChange={(e) => setForm({ ...form, monthly_gross: e.target.value })} />
+            <Stack spacing={2}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                <Typography variant="subtitle1">Add staff</Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={staffKind}
+                  onChange={(_, v) => v && setStaffKind(v)}
+                >
+                  <ToggleButton value="non_user">Non-user</ToggleButton>
+                  <ToggleButton value="link_user">Link team user</ToggleButton>
+                  <ToggleButton value="user">Invite user</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
               <FormControlLabel
-                control={<Switch checked={form.is_owner} onChange={(e) => setForm({ ...form, is_owner: e.target.checked })} />}
-                label="Owner / drawings"
+                control={
+                  <Switch
+                    checked={showAdvanced}
+                    onChange={(e) => {
+                      setShowAdvanced(e.target.checked);
+                      if (e.target.checked && form.monthly_gross && !form.basic_salary) {
+                        setForm((prev) => ({ ...prev, basic_salary: prev.monthly_gross }));
+                      }
+                    }}
+                  />
+                }
+                label="Advanced salary breakdown"
               />
-              <Button variant="contained" onClick={addEmployee}>Add</Button>
+
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+                {staffKind === 'non_user' && (
+                  <TextField
+                    label="Name"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    sx={{ minWidth: 200 }}
+                  />
+                )}
+
+                {staffKind === 'user' && (
+                  <>
+                    <TextField
+                      label="Name (optional)"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      sx={{ minWidth: 160 }}
+                    />
+                    <TextField
+                      label="Email"
+                      required
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      sx={{ minWidth: 200 }}
+                    />
+                    <FormControl sx={{ minWidth: 160 }}>
+                      <InputLabel>Role</InputLabel>
+                      <Select
+                        label="Role"
+                        value={form.role_id}
+                        onChange={(e) => setForm({ ...form, role_id: e.target.value })}
+                      >
+                        <MenuItem value="">Default (cashier)</MenuItem>
+                        {(roles || []).map((role) => (
+                          <MenuItem key={role.id} value={String(role.id)}>
+                            {role.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl sx={{ minWidth: 200 }}>
+                      <InputLabel>Stores</InputLabel>
+                      <Select
+                        multiple
+                        label="Stores"
+                        value={form.store_ids}
+                        onChange={(e) => setForm({ ...form, store_ids: e.target.value })}
+                        input={<OutlinedInput label="Stores" />}
+                        renderValue={(selected) =>
+                          (stores || [])
+                            .filter((s) => selected.includes(s.id))
+                            .map((s) => s.storeName)
+                            .join(', ')
+                        }
+                      >
+                        {(stores || []).map((s) => (
+                          <MenuItem key={s.id} value={s.id}>
+                            {s.storeName}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </>
+                )}
+
+                {staffKind === 'link_user' && (
+                  <FormControl sx={{ minWidth: 260 }}>
+                    <InputLabel>Team user</InputLabel>
+                    <Select
+                      label="Team user"
+                      value={form.user_id}
+                      onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+                    >
+                      <MenuItem value="" disabled>
+                        Select user
+                      </MenuItem>
+                      {linkableUsers.map((u) => (
+                        <MenuItem key={u.user_id} value={String(u.user_id)}>
+                          {u.name} · {u.email}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                {!showAdvanced && (
+                  <TextField
+                    label="Monthly gross"
+                    type="number"
+                    required
+                    value={form.monthly_gross}
+                    onChange={(e) => setForm({ ...form, monthly_gross: e.target.value })}
+                    sx={{ minWidth: 160 }}
+                  />
+                )}
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.is_owner}
+                      onChange={(e) => setForm({ ...form, is_owner: e.target.checked })}
+                    />
+                  }
+                  label="Owner / drawings"
+                />
+                <Button variant="contained" onClick={addStaff} disabled={saving}>
+                  Add
+                </Button>
+              </Stack>
+
+              <Collapse in={showAdvanced}>
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                    <TextField
+                      label="Basic salary"
+                      type="number"
+                      value={form.basic_salary}
+                      onChange={(e) => setForm({ ...form, basic_salary: e.target.value })}
+                    />
+                    <TextField
+                      label="Housing allowance"
+                      type="number"
+                      value={form.housing_allowance}
+                      onChange={(e) => setForm({ ...form, housing_allowance: e.target.value })}
+                    />
+                    <TextField
+                      label="Transport allowance"
+                      type="number"
+                      value={form.transport_allowance}
+                      onChange={(e) => setForm({ ...form, transport_allowance: e.target.value })}
+                    />
+                    <TextField
+                      label="Other allowances"
+                      type="number"
+                      value={form.other_allowances}
+                      onChange={(e) => setForm({ ...form, other_allowances: e.target.value })}
+                    />
+                  </Stack>
+                  <Typography variant="subtitle2">Monthly gross: {fCurrency(effectiveGross)}</Typography>
+                </Stack>
+              </Collapse>
             </Stack>
           </Card>
 
@@ -129,24 +532,87 @@ export default function PayrollPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
+                  <TableCell>Type</TableCell>
                   <TableCell align="right">Monthly gross</TableCell>
+                  <TableCell>Breakdown</TableCell>
                   <TableCell>Owner</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {employees.map((emp) => (
                   <TableRow key={emp.id}>
-                    <TableCell>{emp.name}</TableCell>
+                    <TableCell>
+                      <Stack spacing={0.25}>
+                        <Typography variant="body2">{emp.name || '—'}</Typography>
+                        {emp.email && (
+                          <Typography variant="caption" color="text.secondary">
+                            {emp.email}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={emp.has_login ? 'User staff' : 'Non-user'}
+                        color={emp.has_login ? 'primary' : 'default'}
+                        variant={emp.has_login ? 'filled' : 'outlined'}
+                      />
+                    </TableCell>
                     <TableCell align="right">{fCurrency(emp.monthly_gross)}</TableCell>
+                    <TableCell>
+                      {hasBreakdown(emp) ? (
+                        <Typography variant="caption" color="text.secondary">
+                          Basic {fCurrency(emp.basic_salary)} · Housing {fCurrency(emp.housing_allowance)} ·
+                          Transport {fCurrency(emp.transport_allowance)} · Other{' '}
+                          {fCurrency(emp.other_allowances)}
+                        </Typography>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
                     <TableCell>{emp.is_owner ? 'Yes' : 'No'}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        {emp.has_login ? (
+                          <Button size="small" onClick={() => demoteToNonUser(emp)}>
+                            Make non-user
+                          </Button>
+                        ) : (
+                          <Button size="small" onClick={() => openConvertToUser(emp)}>
+                            Grant login
+                          </Button>
+                        )}
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => removeEmployee(emp.id)}
+                          aria-label={`Remove ${emp.name || 'staff'}`}
+                        >
+                          <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                        </IconButton>
+                      </Stack>
+                    </TableCell>
                   </TableRow>
                 ))}
+                {!employees.length && (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        No staff yet. Add a non-user, link a team user, or invite someone with login.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
 
           <Stack direction="row" spacing={2}>
-            <Button variant="outlined" onClick={createRun}>Create this-month draft</Button>
+            <Button variant="outlined" onClick={createRun} disabled={!employees.length}>
+              Create this-month draft
+            </Button>
             <Button variant="contained" disabled={!run || run.status !== 'draft'} onClick={approveRun}>
               Approve draft
             </Button>
@@ -157,7 +623,9 @@ export default function PayrollPage() {
               <Typography variant="subtitle1" sx={{ p: 2 }}>
                 Run #{run.id} · {run.status} · PAYE due {fCurrency(run.paye_due)}
               </Typography>
-              <Alert severity="warning" sx={{ mx: 2, mb: 1 }}>{run.disclaimer}</Alert>
+              <Alert severity="warning" sx={{ mx: 2, mb: 1 }}>
+                {run.disclaimer}
+              </Alert>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -171,7 +639,10 @@ export default function PayrollPage() {
                 <TableBody>
                   {(run.lines || []).map((line) => (
                     <TableRow key={line.id || `${line.employee_id}-${line.gross}`}>
-                      <TableCell>{line.employee_name}{line.is_owner ? ' (owner)' : ''}</TableCell>
+                      <TableCell>
+                        {line.employee_name}
+                        {line.is_owner ? ' (owner)' : ''}
+                      </TableCell>
                       <TableCell align="right">{fCurrency(line.gross)}</TableCell>
                       <TableCell align="right">{fCurrency(line.paye_estimate)}</TableCell>
                       <TableCell align="right">{fCurrency(line.net)}</TableCell>
@@ -184,6 +655,81 @@ export default function PayrollPage() {
           )}
         </Stack>
       </DashboardContent>
+
+      <Dialog open={Boolean(convertTarget)} onClose={() => setConvertTarget(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Grant login (user staff)</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {convertTarget?.name} will get a login and occupy a seat on the selected store(s).
+            </Typography>
+            {!convertTarget?.user_id && (
+              <TextField
+                label="Email"
+                required
+                type="email"
+                value={convertForm.email}
+                onChange={(e) => setConvertForm({ ...convertForm, email: e.target.value })}
+              />
+            )}
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                label="Role"
+                value={convertForm.role_id}
+                onChange={(e) => setConvertForm({ ...convertForm, role_id: e.target.value })}
+              >
+                <MenuItem value="">Default (cashier)</MenuItem>
+                {(roles || []).map((role) => (
+                  <MenuItem key={role.id} value={String(role.id)}>
+                    {role.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Stores</InputLabel>
+              <Select
+                multiple
+                label="Stores"
+                value={convertForm.store_ids}
+                onChange={(e) => setConvertForm({ ...convertForm, store_ids: e.target.value })}
+                input={<OutlinedInput label="Stores" />}
+                renderValue={(selected) =>
+                  (stores || [])
+                    .filter((s) => selected.includes(s.id))
+                    .map((s) => s.storeName)
+                    .join(', ')
+                }
+              >
+                {(stores || []).map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.storeName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {seatError && (
+              <Alert
+                severity="warning"
+                action={
+                  <Button component={RouterLink} href={billingHref} size="small" color="warning" variant="contained">
+                    Update seats
+                  </Button>
+                }
+              >
+                {seatError}
+              </Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConvertTarget(null)}>Cancel</Button>
+          <Button variant="contained" onClick={confirmConvertToUser} disabled={converting}>
+            Grant login
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

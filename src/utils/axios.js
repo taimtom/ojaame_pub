@@ -295,6 +295,8 @@ export const endpoints = {
   },
   payroll: {
     employees: '/api/payroll/employees',
+    linkableUsers: '/api/payroll/employees/linkable-users',
+    convertStaff: (employeeId) => `/api/payroll/employees/${employeeId}/convert`,
     runs: '/api/payroll/runs',
     approve: (runId) => `/api/payroll/runs/${runId}/approve`,
     remit: (runId) => `/api/payroll/runs/${runId}/remit`,
