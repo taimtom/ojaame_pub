@@ -196,6 +196,85 @@ export function useStoreProfitLoss(companyId, storeId, period = 'this_month', mo
   );
 }
 
+export function useStoreTaxEstimate(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = reportScopeKey(companyId, storeId)
+    ? [
+        endpoints.reports.tax,
+        {
+          params: periodParams(
+            reportScopeParams(companyId, storeId),
+            period,
+            month,
+            year,
+            date
+          ),
+        },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      taxEstimate: data || null,
+      taxEstimateLoading: isLoading,
+      taxEstimateError: error,
+      refetchTaxEstimate: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useStoreVatReturn(companyId, storeId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
+  const key = reportScopeKey(companyId, storeId)
+    ? [
+        endpoints.reports.vatReturn,
+        {
+          params: periodParams(
+            reportScopeParams(companyId, storeId),
+            period,
+            month,
+            year,
+            date
+          ),
+        },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      vatReturn: data || null,
+      vatReturnLoading: isLoading,
+      vatReturnError: error,
+      refetchVatReturn: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+export function useTaxAnnual(companyId, year, storeId) {
+  const key = companyId && year
+    ? [
+        endpoints.reports.taxAnnual,
+        { params: { company_id: companyId, year, ...(storeId ? { store_id: storeId } : {}) } },
+      ]
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR(key, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      taxAnnual: data || null,
+      taxAnnualLoading: isLoading,
+      taxAnnualError: error,
+      refetchTaxAnnual: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
 export function useCompanyProfitLoss(companyId, period = 'this_month', month = undefined, year = undefined, date = undefined) {
   const key = companyId
     ? [

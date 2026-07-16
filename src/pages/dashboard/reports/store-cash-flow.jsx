@@ -63,6 +63,9 @@ export default function StoreCashFlowReportPage() {
               <Row label="Inventory shrinkage" value={-(cashFlow?.cash_paid_for_inventory_shrinkage ?? 0)} />
               <Row label="Inventory purchases" value={-(cashFlow?.cash_paid_for_inventory ?? 0)} />
               <Row label="Net cash from operations" value={cashFlow?.net_cash_from_operations} bold />
+              <Row label="Cash from financing" value={cashFlow?.cash_from_financing} />
+              <Row label="Cash for financing (loans)" value={-(cashFlow?.cash_for_financing ?? 0)} />
+              <Row label="Net cash from financing" value={cashFlow?.net_cash_from_financing} bold />
               <Row label="Net change in cash" value={cashFlow?.net_change_in_cash} bold />
             </TableBody>
           </Table>

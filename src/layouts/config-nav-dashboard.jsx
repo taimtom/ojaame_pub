@@ -398,6 +398,12 @@ export const useNavData = () => {
             permissionKey: 'Advanced Reports',
             children: [
               { title: 'Cash Flow', path: callIfFunction(paths.dashboard.reports.cashFlow, currentStore), permissionKey: 'Cash Flow' },
+              { title: 'Tax Estimates', path: callIfFunction(paths.dashboard.reports.taxEstimates, currentStore), permissionKey: 'Tax Estimates' },
+              { title: 'VAT Return', path: callIfFunction(paths.dashboard.reports.vatReturn, currentStore), permissionKey: 'VAT Return' },
+              { title: 'Annual Tax Summary', path: callIfFunction(paths.dashboard.reports.taxAnnual, currentStore), permissionKey: 'Annual Tax Summary' },
+              { title: 'Loans', path: callIfFunction(paths.dashboard.reports.loans, currentStore), permissionKey: 'Loans' },
+              { title: 'Payroll / PAYE', path: callIfFunction(paths.dashboard.reports.payroll, currentStore), permissionKey: 'Payroll' },
+              { title: 'Withholding Tax', path: callIfFunction(paths.dashboard.reports.wht, currentStore), permissionKey: 'Withholding Tax' },
               { title: 'Balance Sheet', path: callIfFunction(paths.dashboard.reports.balanceSheet, currentStore), permissionKey: 'Balance Sheet' },
               { title: 'Trial Balance', path: callIfFunction(paths.dashboard.reports.trialBalance, currentStore), permissionKey: 'Trial Balance' },
               { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore), permissionKey: 'Sales Trends' },

@@ -15,6 +15,8 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import FormControl from '@mui/material/FormControl';
 import FormHelperText from '@mui/material/FormHelperText';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -45,6 +47,13 @@ export const NewExpenseSchema = zod.object({
   }),
   linked_item_type: zod.string().optional().nullable(),
   linked_item_id: zod.number().optional().nullable(),
+  is_tax_deductible: zod.boolean().optional().default(true),
+  exclude_from_pnl: zod.boolean().optional().default(false),
+  vat_amount: zod.number().min(0).optional().default(0),
+  vat_claimable: zod.boolean().optional().default(true),
+  wht_applicable: zod.boolean().optional().default(false),
+  wht_rate: zod.number().min(0).max(1).optional().default(0),
+  wht_amount: zod.number().min(0).optional().default(0),
 });
 
 export function ExpenseNewEditForm({ currentExpense, storeId }) {
@@ -66,6 +75,13 @@ export function ExpenseNewEditForm({ currentExpense, storeId }) {
       expense_date: currentExpense ? new Date(currentExpense.expense_date) : new Date(),
       linked_item_type: currentExpense?.linked_item_type || null,
       linked_item_id: currentExpense?.linked_item_id || null,
+      is_tax_deductible: currentExpense?.is_tax_deductible ?? true,
+      exclude_from_pnl: currentExpense?.exclude_from_pnl ?? false,
+      vat_amount: currentExpense?.vat_amount || 0,
+      vat_claimable: currentExpense?.vat_claimable ?? true,
+      wht_applicable: currentExpense?.wht_applicable ?? false,
+      wht_rate: currentExpense?.wht_rate || 0,
+      wht_amount: currentExpense?.wht_amount || 0,
     }),
     [currentExpense]
   );
@@ -107,6 +123,17 @@ export function ExpenseNewEditForm({ currentExpense, storeId }) {
         expense_date: dateOnly,
         linked_item_type: data.linked_item_type || null,
         linked_item_id: data.linked_item_id || null,
+        is_tax_deductible: data.is_tax_deductible ?? true,
+        exclude_from_pnl: data.exclude_from_pnl ?? false,
+        vat_amount: data.vat_amount || 0,
+        vat_claimable: data.vat_claimable ?? true,
+        wht_applicable: data.wht_applicable ?? false,
+        wht_rate: data.wht_rate || 0,
+        wht_amount: data.wht_amount || 0,
+        net_paid_to_vendor:
+          data.wht_applicable
+            ? Number(data.amount) - Number(data.wht_amount || 0)
+            : null,
       };
 
       try {
@@ -243,6 +270,54 @@ export function ExpenseNewEditForm({ currentExpense, storeId }) {
                   ),
                 }}
               />
+            </Stack>
+
+            {/* Tax treatment */}
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2">Tax treatment</Typography>
+              <Controller
+                name="is_tax_deductible"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Switch checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label="Tax deductible"
+                  />
+                )}
+              />
+              <Controller
+                name="exclude_from_pnl"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Switch checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label="Exclude from P&L (e.g. loan principal)"
+                  />
+                )}
+              />
+              <Field.Text name="vat_amount" label="Input VAT amount" type="number" />
+              <Controller
+                name="vat_claimable"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Switch checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label="VAT claimable"
+                  />
+                )}
+              />
+              <Controller
+                name="wht_applicable"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={<Switch checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />}
+                    label="Withholding tax applicable (suppliers/contractors only)"
+                  />
+                )}
+              />
+              <Field.Text name="wht_rate" label="WHT rate (e.g. 0.10)" type="number" />
+              <Field.Text name="wht_amount" label="WHT amount" type="number" />
             </Stack>
 
             {/* Associated Product / Service (Optional) */}

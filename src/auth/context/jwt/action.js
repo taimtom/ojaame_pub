@@ -178,11 +178,7 @@ export const resetPassword = async ({ email, code, new_password, re_password}) =
     new_password,
     re_password,
     };
-    // console.log('Reset Password Params:', params);
-    // console.log('Reset Password Endpoint:', endpoints.auth.resetPassword);
-    // console.log('Reset Password URL:', endpoints.auth.resetPassword);
-    // const res = await axiosInstance.patch(endpoints.auth.resetPassword, payload);
-    const res = await axios.post(endpoints.auth.resetPassword, params);
+    const res = await axios.patch(endpoints.auth.resetPassword, params);
     if (res.status !== 200) {
       throw new Error('Password reset failed');
     }

@@ -229,6 +229,127 @@ function AccountingMethodSection() {
   );
 }
 
+function TaxProfileSection() {
+  const { user } = useAuthContext();
+  const companyId = user?.company_id;
+  const [taxEntityType, setTaxEntityType] = useState('sole_proprietorship');
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [taxId, setTaxId] = useState('');
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
+  const [threshold, setThreshold] = useState(25000000);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      setLoading(true);
+      const { data } = await axiosInstance.get(`/api/companies/${companyId}/settings/tax`);
+      setTaxEntityType(data?.tax_entity_type || 'sole_proprietorship');
+      setVatRegistered(Boolean(data?.vat_registered));
+      setTaxId(data?.tax_id || '');
+      setFiscalYearStartMonth(Number(data?.fiscal_year_start_month || 1));
+      setThreshold(Number(data?.vat_registration_turnover_threshold || 25000000));
+    } catch {
+      toast.error('Could not load tax settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleSave = async () => {
+    if (!companyId) return;
+    try {
+      setSaving(true);
+      await axiosInstance.patch(`/api/companies/${companyId}/settings/tax`, {
+        tax_entity_type: taxEntityType,
+        vat_registered: vatRegistered,
+        tax_id: taxId,
+        fiscal_year_start_month: fiscalYearStartMonth,
+      });
+      toast.success('Tax profile updated.');
+      loadSettings();
+    } catch {
+      toast.error('Failed to update tax profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <Iconify icon="solar:bill-list-bold-duotone" width={24} />
+        <Typography variant="h6">Tax Profile (Nigeria)</Typography>
+      </Stack>
+      {!companyId ? (
+        <Alert severity="info">Sign in with a company account to configure tax settings.</Alert>
+      ) : (
+        <Stack spacing={2}>
+          {loading ? <LinearProgress /> : null}
+          <Alert severity="info">
+            Estimates for planning only. Confirm with your accountant before filing.
+          </Alert>
+          <TextField
+            select
+            label="Business entity"
+            value={taxEntityType}
+            onChange={(e) => setTaxEntityType(e.target.value)}
+            helperText="Business Name → personal income tax estimates. Limited company → CIT estimates."
+          >
+            <MenuItem value="sole_proprietorship">Business Name (sole proprietorship)</MenuItem>
+            <MenuItem value="limited_company">Limited company (Ltd)</MenuItem>
+          </TextField>
+          <TextField
+            select
+            label="VAT registered"
+            value={vatRegistered ? 'yes' : 'no'}
+            onChange={(e) => setVatRegistered(e.target.value === 'yes')}
+            helperText={
+              vatRegistered
+                ? 'VAT will be tracked on sales and expenses.'
+                : `Registration generally required above ₦${Number(threshold).toLocaleString()} annual turnover.`
+            }
+          >
+            <MenuItem value="no">No</MenuItem>
+            <MenuItem value="yes">Yes</MenuItem>
+          </TextField>
+          <TextField
+            label="Tax ID / TIN"
+            value={taxId}
+            onChange={(e) => setTaxId(e.target.value)}
+            helperText="Stored on your business registry (same field as onboarding)."
+          />
+          <TextField
+            select
+            label="Fiscal year start month"
+            value={fiscalYearStartMonth}
+            onChange={(e) => setFiscalYearStartMonth(Number(e.target.value))}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <MenuItem key={m} value={m}>
+                {new Date(2000, m - 1, 1).toLocaleString('en', { month: 'long' })}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={saving || loading}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            Save tax profile
+          </Button>
+        </Stack>
+      )}
+    </Card>
+  );
+}
+
 // ----------------------------------------------------------------------
 // Currency Section
 // ----------------------------------------------------------------------
@@ -1169,6 +1290,8 @@ export function AccountFinance() {
   return (
     <Stack spacing={4}>
       <AccountingMethodSection />
+      <Divider />
+      <TaxProfileSection />
       <Divider />
       <ReportPeriodTypeSection />
       <Divider />

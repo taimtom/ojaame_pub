@@ -181,6 +181,12 @@ const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/
 const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
 const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
 const StoreCashFlowReportPage = lazy(() => import('src/pages/dashboard/reports/store-cash-flow'));
+const StoreTaxEstimatesPage = lazy(() => import('src/pages/dashboard/reports/store-tax-estimates'));
+const StoreVatReturnPage = lazy(() => import('src/pages/dashboard/reports/store-vat-return'));
+const StoreTaxAnnualPage = lazy(() => import('src/pages/dashboard/reports/store-tax-annual'));
+const LoansPage = lazy(() => import('src/pages/dashboard/finance/loans'));
+const PayrollPage = lazy(() => import('src/pages/dashboard/finance/payroll'));
+const WhtLedgerPage = lazy(() => import('src/pages/dashboard/finance/wht-ledger'));
 const StoreBalanceSheetReportPage = lazy(() => import('src/pages/dashboard/reports/store-balance-sheet'));
 const StoreTrialBalanceReportPage = lazy(() => import('src/pages/dashboard/reports/store-trial-balance'));
 const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
@@ -446,6 +452,78 @@ export const dashboardRoutes = [
                 (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <StoreCashFlowReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'tax-estimates',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Tax Estimates',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTaxEstimatesPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'vat-return',
+              element: withPlanFeature(
+                'advanced_reports',
+                'VAT Return',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreVatReturnPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'tax-annual',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Annual Tax Summary',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTaxAnnualPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'loans',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Loans',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <LoansPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'payroll',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Payroll',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <PayrollPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'wht',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Withholding Tax',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <WhtLedgerPage />
                 </PermissionGuard>
                 )
               ),

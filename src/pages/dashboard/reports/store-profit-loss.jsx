@@ -211,14 +211,19 @@ export default function StoreProfitLossReportPage() {
 
                 <SectionHeader label="Operating Expenses" />
                 <PLRow label="Operating Expenses" value={profitLoss.operating_expenses} indent color="error.main" />
+                {(profitLoss.interest_expense ?? 0) > 0 && (
+                  <PLRow label="Interest expense (included above)" value={profitLoss.interest_expense} indent color="text.secondary" />
+                )}
                 <PLRow label="Total Costs" value={profitLoss.total_costs} bold color="error.main" />
 
                 <TableRow><TableCell colSpan={2}><Divider /></TableCell></TableRow>
 
-                <SectionHeader label="Net Profit" />
-                <PLRow label="Net Profit / (Loss)" value={profitLoss.net_profit} bold color={isProfit ? 'success.main' : 'error.main'} />
+                <SectionHeader label="Profit before tax" />
+                <PLRow label="Profit before tax" value={profitLoss.net_profit} bold color={isProfit ? 'success.main' : 'error.main'} />
                 <TableRow>
-                  <TableCell sx={{ pl: 2, color: 'text.secondary', fontSize: 12 }}>Net Profit Margin</TableCell>
+                  <TableCell sx={{ pl: 2, color: 'text.secondary', fontSize: 12 }}>
+                    Income tax is estimated on the Tax Estimates report
+                  </TableCell>
                   <TableCell align="right" sx={{ color: isProfit ? 'success.main' : 'error.main', fontSize: 12, fontWeight: 600 }}>{profitLoss.net_profit_margin?.toFixed(1)}%</TableCell>
                 </TableRow>
               </TableBody>

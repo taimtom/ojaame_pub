@@ -268,6 +268,8 @@ export const endpoints = {
     profitLossSummary: '/api/reports/profit-loss/summary',
     cashFlow: '/api/reports/cash-flow',
     tax: '/api/reports/tax',
+    vatReturn: '/api/reports/vat-return',
+    taxAnnual: '/api/reports/tax-annual',
     customers: '/api/reports/customers',
     mergeCustomers: '/api/reports/customers/merge',
     customerDetail: (customerId) => `/api/reports/customers/${customerId}`,
@@ -281,10 +283,26 @@ export const endpoints = {
   },
   accounting: {
     settings: (companyId) => `/api/companies/${companyId}/settings/accounting`,
+    taxSettings: (companyId) => `/api/companies/${companyId}/settings/tax`,
     journalEntries: '/api/accounting/journal-entries',
     vendorBills: '/api/accounting/vendor-bills',
     periods: '/api/accounting/periods',
     arAging: '/api/accounting/ar-aging',
+  },
+  loans: {
+    list: '/api/loans',
+    payments: (loanId) => `/api/loans/${loanId}/payments`,
+  },
+  payroll: {
+    employees: '/api/payroll/employees',
+    runs: '/api/payroll/runs',
+    approve: (runId) => `/api/payroll/runs/${runId}/approve`,
+    remit: (runId) => `/api/payroll/runs/${runId}/remit`,
+  },
+  wht: {
+    ledger: '/api/wht/ledger',
+    suggestRate: '/api/wht/suggest-rate',
+    remittances: '/api/wht/remittances',
   },
 
   paymentMethod:{
