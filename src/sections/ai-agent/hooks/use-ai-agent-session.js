@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { toast } from 'src/components/snackbar';
 import {
   cancelAiAgentAction,
   confirmAiAgentAction,
@@ -13,8 +14,7 @@ import {
 
 // ----------------------------------------------------------------------
 
-export function useAiAgentSession(initialStoreId, options = {}) {
-  const storesReady = options.storesReady !== false;
+export function useAiAgentSession(activeStoreId) {
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [pendingAction, setPendingAction] = useState(null);
@@ -23,7 +23,8 @@ export function useAiAgentSession(initialStoreId, options = {}) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [backendEnabled, setBackendEnabled] = useState(null);
-  const [storeId, setStoreId] = useState(initialStoreId ?? null);
+
+  const storeId = activeStoreId ?? null;
 
   const refreshSessionList = useCallback(async (sid) => {
     try {
@@ -42,21 +43,16 @@ export function useAiAgentSession(initialStoreId, options = {}) {
     const data = await getAiAgentSession(sid);
     setMessages(data.messages || []);
     setPendingAction(data.pending_action || null);
-    if (data.session?.store_id != null) {
-      setStoreId(data.session.store_id);
-    }
   }, []);
-
-  useEffect(() => {
-    if (initialStoreId != null && storeId == null) {
-      setStoreId(initialStoreId);
-    }
-  }, [initialStoreId, storeId]);
 
   useEffect(() => {
     let cancelled = false;
     if (!storeId) {
-      setLoading(storesReady);
+      setSessionId(null);
+      setMessages([]);
+      setPendingAction(null);
+      setSessions([]);
+      setLoading(false);
       return () => {
         cancelled = true;
       };
@@ -65,6 +61,10 @@ export function useAiAgentSession(initialStoreId, options = {}) {
     (async () => {
       try {
         setLoading(true);
+        setSessionId(null);
+        setMessages([]);
+        setPendingAction(null);
+
         const status = await fetchAiAgentStatus();
         if (cancelled) return;
         setBackendEnabled(Boolean(status?.enabled));
@@ -99,7 +99,7 @@ export function useAiAgentSession(initialStoreId, options = {}) {
     return () => {
       cancelled = true;
     };
-  }, [refreshSession, refreshSessionList, storeId, storesReady]);
+  }, [refreshSession, refreshSessionList, storeId]);
 
   const sendMessage = useCallback(
     async (content) => {
@@ -130,7 +130,13 @@ export function useAiAgentSession(initialStoreId, options = {}) {
         });
         setMessages(data.messages || []);
         setPendingAction(data.pending_action || null);
+        if (data?.warnings?.length) {
+          data.warnings.forEach((w) => {
+            if (w) toast.warning(w);
+          });
+        }
         await refreshSessionList();
+        return data;
       } finally {
         setSending(false);
       }
@@ -138,18 +144,21 @@ export function useAiAgentSession(initialStoreId, options = {}) {
     [refreshSessionList, sessionId]
   );
 
-  const confirmAction = useCallback(async () => {
-    if (!pendingAction?.id) return;
-    setSending(true);
-    try {
-      const data = await confirmAiAgentAction(pendingAction.id);
-      setMessages(data.messages || []);
-      setPendingAction(null);
-      await refreshSessionList();
-    } finally {
-      setSending(false);
-    }
-  }, [pendingAction, refreshSessionList]);
+  const confirmAction = useCallback(
+    async (payloadOverride) => {
+      if (!pendingAction?.id) return;
+      setSending(true);
+      try {
+        const data = await confirmAiAgentAction(pendingAction.id, payloadOverride);
+        setMessages(data.messages || []);
+        setPendingAction(null);
+        await refreshSessionList();
+      } finally {
+        setSending(false);
+      }
+    },
+    [pendingAction, refreshSessionList]
+  );
 
   const cancelAction = useCallback(async () => {
     if (!pendingAction?.id) return;
@@ -164,6 +173,7 @@ export function useAiAgentSession(initialStoreId, options = {}) {
   }, [pendingAction, refreshSession, sessionId]);
 
   const resetSession = useCallback(async () => {
+    if (!storeId) return;
     setSending(true);
     try {
       const session = await createAiAgentSession({ storeId });
@@ -200,7 +210,6 @@ export function useAiAgentSession(initialStoreId, options = {}) {
     sending,
     backendEnabled,
     storeId,
-    setStoreId,
     sendMessage,
     sendVoice,
     confirmAction,

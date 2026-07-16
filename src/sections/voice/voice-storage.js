@@ -45,8 +45,26 @@ export function markVoiceCoachSeen() {
 
 export function voiceCoachExamples(lang) {
   const en = 'Sell 2 Peak milk cash';
-  if (lang === 'yo') return [en, 'Ta Garri meji', 'Add product Indomie'];
-  if (lang === 'ha') return [en, 'Sayi Peak guda biyu', 'Add product Indomie'];
-  if (lang === 'ig') return [en, 'Ree Peak milk abụọ', 'Add product Indomie'];
-  return [en, 'Restock Peak milk 10', 'Add product Indomie carton'];
+  if (lang === 'yo') {
+    return [
+      'Ta Garri meji',
+      'Ta Citrus Fizz meji and Viva Detergent meji',
+      'Ta chicken 5000 naira cash',
+    ];
+  }
+  if (lang === 'ha') {
+    return [
+      'Sayi Peak guda biyu',
+      'Sayi Peak biyu da Indomie uku',
+      'Sayi chicken 5000 naira cash',
+    ];
+  }
+  if (lang === 'ig') {
+    return [
+      'Ree Peak milk abụọ',
+      'Ree Citrus Fizz abụọ and Viva Detergent abụọ',
+      'Ree chicken 5000 naira cash',
+    ];
+  }
+  return [en, 'Sell Citrus Fizz and Viva Detergent', 'Restock Peak milk 10'];
 }

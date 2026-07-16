@@ -488,14 +488,10 @@ export const dashboardRoutes = [
             },
             {
               path: 'end-of-day',
-              element: withPlanFeature(
-                'advanced_reports',
-                'End of period',
-                (
+              element: (
                 <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
                   <EndOfDayReportPage />
                 </PermissionGuard>
-                )
               ),
             },
             {

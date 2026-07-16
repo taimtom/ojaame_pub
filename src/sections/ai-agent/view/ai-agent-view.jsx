@@ -1,14 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Drawer from '@mui/material/Drawer';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
@@ -18,7 +15,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { EmptyContent } from 'src/components/empty-content';
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
-import { useGetStores } from 'src/actions/store';
 
 import { AiAgentInput } from '../ai-agent-input';
 import { AiAgentMessageList } from '../ai-agent-message-list';
@@ -33,6 +29,19 @@ import {
 
 // ----------------------------------------------------------------------
 
+function getStoreIdFromStorage() {
+  try {
+    const raw = localStorage.getItem('activeWorkspace');
+    if (raw) {
+      const { id } = JSON.parse(raw);
+      return id ? Number(id) : null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 function buildSpeakText(assistantContent, pendingAction) {
   const parts = [];
   if ((assistantContent || '').trim()) parts.push(assistantContent.trim());
@@ -40,7 +49,6 @@ function buildSpeakText(assistantContent, pendingAction) {
     parts.push(pendingAction.summary);
     parts.push('Please confirm or cancel.');
   }
-  // Blank line between sections → paragraph pause in stripForSpeech
   return parts.join('\n\n');
 }
 
@@ -48,9 +56,20 @@ export function AiAgentView() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeStoreId, setActiveStoreId] = useState(() => getStoreIdFromStorage());
 
-  const { stores, storesLoading } = useGetStores();
-  const defaultStoreId = useMemo(() => stores?.[0]?.id ?? null, [stores]);
+  // Keep store in sync with the main app workspace switcher
+  useEffect(() => {
+    const sync = () => setActiveStoreId(getStoreIdFromStorage());
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', sync);
+    const interval = setInterval(sync, 2500);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', sync);
+      clearInterval(interval);
+    };
+  }, []);
 
   const {
     sessionId,
@@ -61,25 +80,20 @@ export function AiAgentView() {
     loading,
     sending,
     backendEnabled,
-    storeId,
-    setStoreId,
     sendMessage,
     sendVoice,
     confirmAction,
     cancelAction,
     resetSession,
     selectSession,
-  } = useAiAgentSession(defaultStoreId, { storesReady: !storesLoading });
+  } = useAiAgentSession(activeStoreId);
 
   const { supported: ttsSupported, speaking, speak, cancel: cancelSpeech } = useBrowserTts();
   const [readAloud, setReadAloud] = useState(() => getStickyReadAloud());
 
-  /** Only auto-speak after voice turns (and confirm/cancel that follow them). */
   const lastInputWasVoiceRef = useRef(false);
   const lastSpokenKeyRef = useRef(null);
   const skipSpeakRef = useRef(true);
-
-  const effectiveStoreId = storeId ?? defaultStoreId;
 
   const markSpokenCursor = useCallback((msgs, pending) => {
     const last = [...(msgs || [])].reverse().find(
@@ -92,7 +106,6 @@ export function AiAgentView() {
         : null;
   }, []);
 
-  // Don't narrate history when loading / switching chats
   useEffect(() => {
     skipSpeakRef.current = true;
     markSpokenCursor(messages, pendingAction);
@@ -101,40 +114,40 @@ export function AiAgentView() {
   }, [sessionId]);
 
   useEffect(() => {
+    setStickyReadAloud(readAloud);
+  }, [readAloud]);
+
+  useEffect(() => {
+    if (!readAloud || !ttsSupported) return undefined;
     if (skipSpeakRef.current) {
       skipSpeakRef.current = false;
-      markSpokenCursor(messages, pendingAction);
-      return;
+      return undefined;
     }
-    if (!readAloud || !ttsSupported || !lastInputWasVoiceRef.current) return;
+    if (!lastInputWasVoiceRef.current) return undefined;
 
-    const last = [...messages].reverse().find(
+    const last = [...(messages || [])].reverse().find(
       (m) => m.role === 'assistant' && (m.content || '').trim()
     );
-    if (!last && !pendingAction) return;
+    if (!last && !pendingAction) return undefined;
 
     const key = last
       ? `${last.id}:${pendingAction?.id || ''}:${(last.content || '').slice(0, 40)}`
       : `pending:${pendingAction.id}`;
-    if (key === lastSpokenKeyRef.current) return;
+    if (key === lastSpokenKeyRef.current) return undefined;
 
     const text = buildSpeakText(last?.content || '', pendingAction);
-    if (!text) return;
+    if (!text) return undefined;
 
     lastSpokenKeyRef.current = key;
     speak(text);
-  }, [messages, pendingAction, readAloud, ttsSupported, speak, markSpokenCursor]);
+    return undefined;
+  }, [messages, pendingAction, readAloud, ttsSupported, speak]);
 
   const toggleReadAloud = () => {
     const next = !readAloud;
     setReadAloud(next);
     setStickyReadAloud(next);
     if (!next) cancelSpeech();
-  };
-
-  const handleStoreChange = (event) => {
-    const next = Number(event.target.value);
-    setStoreId(next);
   };
 
   const handleSendText = async (content) => {
@@ -161,10 +174,10 @@ export function AiAgentView() {
     }
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (payloadOverride) => {
     cancelSpeech();
     try {
-      await confirmAction();
+      await confirmAction(payloadOverride);
       toast.success('Action completed');
     } catch (err) {
       toast.error(err?.response?.data?.detail || err?.message || 'Confirm failed');
@@ -187,8 +200,11 @@ export function AiAgentView() {
     cancelSpeech();
     skipSpeakRef.current = true;
     lastInputWasVoiceRef.current = false;
-    setHistoryOpen(false);
-    await resetSession();
+    try {
+      await resetSession();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || err?.message || 'Could not start a new chat');
+    }
   };
 
   const handleSelectSession = async (sid) => {
@@ -196,10 +212,25 @@ export function AiAgentView() {
     skipSpeakRef.current = true;
     lastInputWasVoiceRef.current = false;
     setHistoryOpen(false);
-    await selectSession(sid);
+    try {
+      await selectSession(sid);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || err?.message || 'Could not open chat');
+    }
   };
 
-  if (loading || storesLoading) {
+  if (!activeStoreId) {
+    return (
+      <DashboardContent maxWidth={false}>
+        <EmptyContent
+          title="Select a store"
+          description="Choose a store from the workspace switcher in the top bar, then open AI Assistant again."
+        />
+      </DashboardContent>
+    );
+  }
+
+  if (loading) {
     return (
       <DashboardContent maxWidth={false}>
         <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 360 }}>
@@ -219,50 +250,6 @@ export function AiAgentView() {
       </DashboardContent>
     );
   }
-
-  const storeSelect = (
-    <TextField
-      select
-      size="small"
-      label={isMobile ? undefined : 'Store'}
-      value={effectiveStoreId || ''}
-      onChange={handleStoreChange}
-      SelectProps={{
-        displayEmpty: true,
-        renderValue: (value) => {
-          const store = (stores || []).find((s) => s.id === value);
-          return store?.storeName || store?.name || 'Store';
-        },
-      }}
-      sx={{
-        minWidth: isMobile ? 0 : 200,
-        flex: isMobile ? '1 1 auto' : '0 0 auto',
-        maxWidth: isMobile ? '100%' : 260,
-        '& .MuiInputBase-root': {
-          bgcolor: isMobile ? 'background.neutral' : undefined,
-          borderRadius: 1.5,
-        },
-        '& .MuiOutlinedInput-notchedOutline': {
-          borderColor: isMobile ? 'transparent' : undefined,
-        },
-      }}
-      InputProps={{
-        ...(isMobile && {
-          startAdornment: (
-            <InputAdornment position="start">
-              <Iconify icon="solar:shop-2-bold" width={16} sx={{ color: 'text.secondary' }} />
-            </InputAdornment>
-          ),
-        }),
-      }}
-    >
-      {(stores || []).map((store) => (
-        <MenuItem key={store.id} value={store.id}>
-          {store.storeName || store.name}
-        </MenuItem>
-      ))}
-    </TextField>
-  );
 
   const ttsControls = (
     <>
@@ -350,7 +337,6 @@ export function AiAgentView() {
         }),
       }}
     >
-      {/* ── Header ───────────────────────────────────────────────────── */}
       {isMobile ? (
         <Stack
           spacing={1}
@@ -404,8 +390,6 @@ export function AiAgentView() {
               <Iconify icon="solar:pen-new-square-bold" width={20} />
             </IconButton>
           </Stack>
-
-          <Box sx={{ px: 0.25 }}>{storeSelect}</Box>
         </Stack>
       ) : (
         <Stack
@@ -434,7 +418,6 @@ export function AiAgentView() {
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            {storeSelect}
             {ttsControls}
             <IconButton onClick={handleResetSession} title="New conversation" disabled={sending}>
               <Iconify icon="solar:pen-new-square-bold" />
@@ -443,48 +426,35 @@ export function AiAgentView() {
         </Stack>
       )}
 
-      {/* ── Chat shell ───────────────────────────────────────────────── */}
       <Box
         sx={{
           flex: '1 1 0',
           minHeight: 0,
           display: 'flex',
-          flexDirection: 'row',
-          overflow: 'hidden',
+          gap: 2,
           ...(isMobile
-            ? {
-                bgcolor: 'background.default',
-              }
-            : {
-                borderRadius: 2,
-                bgcolor: 'background.paper',
-                boxShadow: (t) => t.customShadows?.card,
-                border: 1,
-                borderColor: 'divider',
-              }),
+            ? { flexDirection: 'column', overflow: 'hidden' }
+            : { height: 'calc(100vh - 200px)' }),
         }}
       >
-        {chatPane}
-
         {!isMobile && (
-          <AiAgentSessionSidebar {...sidebarProps} />
+          <Box sx={{ width: 280, flexShrink: 0, minHeight: 0 }}>
+            <AiAgentSessionSidebar {...sidebarProps} />
+          </Box>
         )}
+        {chatPane}
       </Box>
 
-      {/* ── Mobile history drawer ─────────────────────────────────────── */}
-      <Drawer
-        anchor="right"
-        open={isMobile && historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        PaperProps={{
-          sx: {
-            width: 'min(100vw - 48px, 320px)',
-            maxWidth: '100%',
-          },
-        }}
-      >
-        <AiAgentSessionSidebar {...sidebarProps} fillHeight />
-      </Drawer>
+      {isMobile && (
+        <Drawer
+          anchor="left"
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          PaperProps={{ sx: { width: 'min(320px, 88vw)' } }}
+        >
+          <AiAgentSessionSidebar {...sidebarProps} />
+        </Drawer>
+      )}
     </DashboardContent>
   );
 }

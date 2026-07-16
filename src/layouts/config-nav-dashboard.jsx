@@ -389,6 +389,7 @@ export const useNavData = () => {
               { title: 'Financial Report', path: callIfFunction(paths.dashboard.reports.financial, currentStore), permissionKey: 'Financial Report' },
               { title: 'Profit & Loss', path: callIfFunction(paths.dashboard.reports.profitAndLoss, currentStore), permissionKey: 'Profit & Loss' },
               { title: 'Customer Report', path: callIfFunction(paths.dashboard.reports.customers, currentStore), permissionKey: 'Customer Report' },
+              { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore), permissionKey: 'End of period' },
             ],
           },
           {
@@ -400,7 +401,6 @@ export const useNavData = () => {
               { title: 'Balance Sheet', path: callIfFunction(paths.dashboard.reports.balanceSheet, currentStore), permissionKey: 'Balance Sheet' },
               { title: 'Trial Balance', path: callIfFunction(paths.dashboard.reports.trialBalance, currentStore), permissionKey: 'Trial Balance' },
               { title: 'Sales Trends', path: callIfFunction(paths.dashboard.reports.salesTrends, currentStore), permissionKey: 'Sales Trends' },
-              { title: 'End of period', path: callIfFunction(paths.dashboard.reports.endOfDay, currentStore), permissionKey: 'End of period' },
             ],
           },
         ],

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Menu from '@mui/material/Menu';
 import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -12,10 +15,16 @@ import Tooltip from '@mui/material/Tooltip';
 import { Iconify } from 'src/components/iconify';
 import { toast } from 'src/components/snackbar';
 import { useVoiceCapture } from 'src/sections/voice/use-voice-capture';
+import {
+  VOICE_LANGUAGES,
+  getStickyVoiceLanguage,
+  setStickyVoiceLanguage,
+  voiceCoachExamples,
+} from 'src/sections/voice/voice-storage';
 
 // ----------------------------------------------------------------------
 
-const MAX_RECORD_MS = 12000;
+const MAX_RECORD_MS = 24000;
 /** Accidental tap — cancel silently (matches Quick Sale voice). */
 const SILENT_CANCEL_MS = 350;
 
@@ -58,6 +67,8 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
   // idle | starting | recording | processing
   const [phase, setPhase] = useState('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [language, setLanguage] = useState(() => getStickyVoiceLanguage());
+  const [langAnchor, setLangAnchor] = useState(null);
 
   const pressActiveRef = useRef(false);
   const recorderReadyRef = useRef(false);
@@ -101,6 +112,12 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
       }
     };
   }, [phase]);
+
+  const changeLanguage = (value) => {
+    setLanguage(value);
+    setStickyVoiceLanguage(value);
+    setLangAnchor(null);
+  };
 
   const handleSend = useCallback(async () => {
     const value = text.trim();
@@ -185,11 +202,15 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
       return;
     }
 
+    if (recorded?.hitMaxDuration) {
+      toast.info('Max recording length reached (24s) — sending what you said');
+    }
+
     submittingRef.current = true;
     try {
       await onSendVoice({
         audioBlob: blob,
-        language: 'auto',
+        language,
         filename: recorded?.filename,
       });
     } catch (err) {
@@ -198,7 +219,7 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
       submittingRef.current = false;
       setPhase('idle');
     }
-  }, [phase, isRecording, stopRecording, cancelRecording, onSendVoice]);
+  }, [phase, isRecording, stopRecording, cancelRecording, onSendVoice, language]);
 
   const handlePointerCancel = useCallback(async () => {
     if (submittingRef.current || phase === 'processing') return;
@@ -211,6 +232,9 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
   const isBusy = phase === 'starting' || phase === 'recording' || phase === 'processing';
   const showPulse = phase === 'recording' && isRecording;
   const progress = Math.min(100, (elapsedMs / MAX_RECORD_MS) * 100);
+  const saleExample =
+    voiceCoachExamples(language).find((ex) => /sell|ta |sayi|ree/i.test(ex)) ||
+    voiceCoachExamples(language)[0];
   const statusLabel =
     phase === 'starting'
       ? 'Starting…'
@@ -218,7 +242,9 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
         ? `Listening… ${formatElapsed(elapsedMs)} — release to send`
         : phase === 'processing'
           ? 'Transcribing…'
-          : 'Hold to speak';
+          : saleExample
+            ? `Hold to speak — e.g. “${saleExample}”`
+            : 'Hold to speak';
 
   return (
     <Box
@@ -297,6 +323,29 @@ export function AiAgentInput({ disabled, onSendText, onSendVoice, onBargeIn, com
           transition: 'border-color 120ms ease, background-color 120ms ease',
         }}
       >
+        <Chip
+          size="small"
+          label={VOICE_LANGUAGES.find((l) => l.value === language)?.label || 'Auto'}
+          onClick={(e) => setLangAnchor(e.currentTarget)}
+          disabled={disabled || isBusy}
+          sx={{ height: 28, fontWeight: 600, alignSelf: 'center', flexShrink: 0 }}
+        />
+        <Menu
+          anchorEl={langAnchor}
+          open={Boolean(langAnchor)}
+          onClose={() => setLangAnchor(null)}
+        >
+          {VOICE_LANGUAGES.map((l) => (
+            <MenuItem
+              key={l.value}
+              selected={l.value === language}
+              onClick={() => changeLanguage(l.value)}
+            >
+              {l.label}
+            </MenuItem>
+          ))}
+        </Menu>
+
         <InputBase
           multiline
           maxRows={compact ? 3 : 4}

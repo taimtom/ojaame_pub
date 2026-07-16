@@ -20,7 +20,7 @@ export const NAV_PLAN_FEATURES = {
   'Balance Sheet': 'advanced_reports',
   'Trial Balance': 'advanced_reports',
   'Sales Trends': 'advanced_reports',
-  'End of period': 'advanced_reports',
+  'End of period': null,
   'Company Reports': 'company_reports',
   'All Company Reports': 'company_reports',
   Integrations: 'integrations',

@@ -78,8 +78,9 @@ export async function sendAiAgentVoice(sessionId, { language = 'auto', audioBlob
   return res.data;
 }
 
-export async function confirmAiAgentAction(actionId) {
-  const res = await axiosInstance.post(endpoints.aiAgent.confirm(actionId));
+export async function confirmAiAgentAction(actionId, payload) {
+  const body = payload ? { payload } : {};
+  const res = await axiosInstance.post(endpoints.aiAgent.confirm(actionId), body);
   return res.data;
 }
 

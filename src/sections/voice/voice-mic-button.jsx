@@ -24,7 +24,7 @@ import {
 
 // ----------------------------------------------------------------------
 
-const MAX_RECORD_MS = 12000;
+const MAX_RECORD_MS = 24000;
 /** Below this, treat as accidental tap — cancel silently (no toast). */
 const SILENT_CANCEL_MS = 350;
 
@@ -270,6 +270,10 @@ export function VoiceMicButton({
       setPhase('idle');
       toast.error('Hold the mic a bit longer, then try again');
       return;
+    }
+
+    if (recorded?.hitMaxDuration) {
+      toast.info('Max recording length reached (24s) — sending what you said');
     }
 
     await finishSubmit(blob, filename);

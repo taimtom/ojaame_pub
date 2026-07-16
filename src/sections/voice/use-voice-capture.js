@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 
-const DEFAULT_MAX_MS = 12000;
+const DEFAULT_MAX_MS = 24000;
 /** Shorter holds often yield header-less / truncated containers Chrome can't fix on stop. */
 const MIN_RECORD_MS = 700;
 const MIN_BLOB_BYTES = 800;
@@ -99,7 +99,10 @@ export async function repairAudioBlobIfNeeded(blob, mimeType) {
 
 /**
  * Hold-to-talk MediaRecorder. stopRecording resolves to
- * { blob, mimeType, filename } or null.
+ * { blob, mimeType, filename, hitMaxDuration? } or null.
+ *
+ * If the max-duration timer stops the recorder while the user is still holding,
+ * the last good blob is kept until stopRecording() / cancelRecording().
  */
 export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
   const [isRecording, setIsRecording] = useState(false);
@@ -117,6 +120,25 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
   const startedAtRef = useRef(0);
   const minHoldTimerRef = useRef(null);
   const pendingStopRef = useRef(false);
+  const hitMaxRef = useRef(false);
+  const lastResultRef = useRef(null);
+  /** Resolves when the current recorder's onstop finishes (incl. async container check). */
+  const onstopDoneRef = useRef(null);
+  const resolveOnstopDoneRef = useRef(null);
+
+  const beginOnstopWait = useCallback(() => {
+    if (onstopDoneRef.current) return;
+    onstopDoneRef.current = new Promise((resolve) => {
+      resolveOnstopDoneRef.current = resolve;
+    });
+  }, []);
+
+  const settleOnstopWait = useCallback((result) => {
+    const resolve = resolveOnstopDoneRef.current;
+    resolveOnstopDoneRef.current = null;
+    onstopDoneRef.current = null;
+    if (resolve) resolve(result);
+  }, []);
 
   const cleanupStream = useCallback(() => {
     if (rafRef.current) {
@@ -170,22 +192,28 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
       try {
         // Do NOT call requestData() before stop — it can emit a cluster
         // without the EBML header and corrupt the concatenated blob.
+        beginOnstopWait();
         recorder.stop();
       } catch {
         cleanupStream();
         setIsRecording(false);
+        settleOnstopWait(null);
         if (resolveStopRef.current) {
           resolveStopRef.current(null);
           resolveStopRef.current = null;
         }
       }
     },
-    [cleanupStream]
+    [beginOnstopWait, cleanupStream, settleOnstopWait]
   );
 
   const startRecording = useCallback(async () => {
     setError(null);
     pendingStopRef.current = false;
+    hitMaxRef.current = false;
+    lastResultRef.current = null;
+    onstopDoneRef.current = null;
+    resolveOnstopDoneRef.current = null;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setError('Microphone is not available on this device.');
       return false;
@@ -239,11 +267,24 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
         const filename = `voice.${extensionForMime(outMime)}`;
         cleanupStream();
         setIsRecording(false);
+        const ok =
+          blob.size >= MIN_BLOB_BYTES && (await isValidAudioContainer(blob));
+        const result = ok
+          ? {
+              blob,
+              mimeType: outMime,
+              filename,
+              hitMaxDuration: hitMaxRef.current,
+            }
+          : null;
+        settleOnstopWait(result);
         if (resolveStopRef.current) {
-          const ok =
-            blob.size >= MIN_BLOB_BYTES && (await isValidAudioContainer(blob));
-          resolveStopRef.current(ok ? { blob, mimeType: outMime, filename } : null);
+          resolveStopRef.current(result);
           resolveStopRef.current = null;
+          lastResultRef.current = null;
+        } else {
+          // Max-duration auto-stop while still holding — keep for stopRecording().
+          lastResultRef.current = result;
         }
       };
 
@@ -254,6 +295,7 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
 
       maxTimerRef.current = setTimeout(() => {
         if (mediaRecorderRef.current?.state === 'recording') {
+          hitMaxRef.current = true;
           finishStop(mediaRecorderRef.current);
         }
       }, maxMs);
@@ -265,19 +307,31 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
       setError('Microphone permission is needed for voice.');
       return false;
     }
-  }, [cleanupStream, finishStop, maxMs, tickLevel]);
+  }, [cleanupStream, finishStop, maxMs, settleOnstopWait, tickLevel]);
 
   const stopRecording = useCallback(
     () =>
       new Promise((resolve) => {
+        const deliver = (result) => {
+          lastResultRef.current = null;
+          resolve(result);
+        };
+
         const recorder = mediaRecorderRef.current;
         if (!recorder || recorder.state === 'inactive') {
           cleanupStream();
           setIsRecording(false);
-          resolve(null);
+          const pending = onstopDoneRef.current;
+          if (pending) {
+            pending.then((result) => {
+              deliver(result ?? lastResultRef.current);
+            });
+            return;
+          }
+          deliver(lastResultRef.current);
           return;
         }
-        resolveStopRef.current = resolve;
+        resolveStopRef.current = deliver;
 
         const elapsed = Date.now() - (startedAtRef.current || 0);
         const waitMs = Math.max(0, MIN_RECORD_MS - elapsed);
@@ -303,6 +357,9 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
       resolveStopRef.current(null);
       resolveStopRef.current = null;
     }
+    lastResultRef.current = null;
+    hitMaxRef.current = false;
+    settleOnstopWait(null);
     pendingStopRef.current = false;
     if (minHoldTimerRef.current) {
       clearTimeout(minHoldTimerRef.current);
@@ -322,7 +379,7 @@ export function useVoiceCapture({ maxMs = DEFAULT_MAX_MS } = {}) {
     chunksRef.current = [];
     cleanupStream();
     setIsRecording(false);
-  }, [cleanupStream]);
+  }, [cleanupStream, settleOnstopWait]);
 
   return {
     isRecording,

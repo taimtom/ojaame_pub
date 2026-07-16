@@ -19,6 +19,10 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
@@ -139,12 +143,23 @@ export default function EndOfDayReportPage() {
   const storeId = getStoreId(storeParam);
   const companyId = user?.company_id;
 
+  const today = useMemo(() => toIsoDate(new Date()), []);
+
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
   const [list, setList] = useState([]);
+  const [resetList, setResetList] = useState([]);
   const [preview, setPreview] = useState(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetContext, setResetContext] = useState(null);
+  const [resetEffectiveDate, setResetEffectiveDate] = useState(today);
+  const [resetCash, setResetCash] = useState('');
+  const [resetBankBalances, setResetBankBalances] = useState({});
+  const [resetReason, setResetReason] = useState('');
+  const [resetNotes, setResetNotes] = useState('');
+  const [expandedResetId, setExpandedResetId] = useState(null);
 
-  const today = useMemo(() => toIsoDate(new Date()), []);
   const periodTypeTouchedRef = useRef(false);
   const [periodType, setPeriodType] = useState('daily');
   const [periodValue, setPeriodValue] = useState(today);
@@ -183,6 +198,18 @@ export default function EndOfDayReportPage() {
       setList(Array.isArray(res.data) ? res.data : []);
     } catch {
       toast.error('Could not load end-of-period history.');
+    }
+  }, [storeId]);
+
+  const fetchResets = useCallback(async () => {
+    if (!storeId) return;
+    try {
+      const res = await axiosInstance.get(`/api/end-of-day/stores/${storeId}/balance-resets`, {
+        params: { limit: 50 },
+      });
+      setResetList(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      toast.error('Could not load balance restart history.');
     }
   }, [storeId]);
 
@@ -242,8 +269,90 @@ export default function EndOfDayReportPage() {
   }, [fetchList]);
 
   useEffect(() => {
+    fetchResets();
+  }, [fetchResets]);
+
+  useEffect(() => {
     fetchPreview();
   }, [fetchPreview]);
+
+  const openResetDialog = async () => {
+    if (!storeId) return;
+    setResetEffectiveDate(today);
+    setResetCash('');
+    setResetReason('');
+    setResetNotes('');
+    const nextBanks = {};
+    (accounts || []).forEach((a) => {
+      if (a?.is_active !== false) nextBanks[String(a.id)] = '';
+    });
+    setResetBankBalances(nextBanks);
+    setResetOpen(true);
+    try {
+      const { data } = await axiosInstance.get(
+        `/api/end-of-day/stores/${storeId}/balance-resets/context`,
+        { params: { as_of: today } }
+      );
+      setResetContext(data);
+    } catch {
+      setResetContext(null);
+    }
+  };
+
+  const closeResetDialog = () => {
+    if (resetSaving) return;
+    setResetOpen(false);
+  };
+
+  const resetNewTotal = useMemo(() => {
+    const cash = parseFloat(resetCash, 10);
+    let bank = 0;
+    Object.values(resetBankBalances).forEach((v) => {
+      const n = parseFloat(v, 10);
+      if (!Number.isNaN(n)) bank += n;
+    });
+    if (Number.isNaN(cash)) return null;
+    return cash + bank;
+  }, [resetCash, resetBankBalances]);
+
+  const handleSaveReset = async () => {
+    if (!storeId) return;
+    const cash = parseFloat(resetCash, 10);
+    if (Number.isNaN(cash) || cash < 0) {
+      toast.error('Enter a valid cash balance.');
+      return;
+    }
+    if (!resetReason.trim() || resetReason.trim().length < 3) {
+      toast.error('Enter a reason (at least 3 characters) for audit.');
+      return;
+    }
+    const bank_lines = Object.entries(resetBankBalances).map(([id, bal]) => {
+      const n = parseFloat(bal, 10);
+      return {
+        bank_account_id: Number(id),
+        balance: Number.isNaN(n) ? 0 : n,
+      };
+    });
+
+    setResetSaving(true);
+    try {
+      await axiosInstance.post(`/api/end-of-day/stores/${storeId}/balance-resets`, {
+        effective_date: resetEffectiveDate,
+        cash_balance: cash,
+        bank_lines,
+        reason: resetReason.trim(),
+        notes: resetNotes.trim() || null,
+      });
+      toast.success('Balances restarted. This is saved in the audit history.');
+      setResetOpen(false);
+      await Promise.all([fetchResets(), fetchPreview(), fetchList()]);
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : err.message || 'Restart failed.');
+    } finally {
+      setResetSaving(false);
+    }
+  };
 
   const addLine = () => {
     setLines((prev) => [
@@ -521,9 +630,27 @@ export default function EndOfDayReportPage() {
         <title>End of period report</title>
       </Helmet>
       <DashboardContent maxWidth="lg">
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-          <Iconify icon="solar:wallet-money-bold-duotone" width={32} />
-          <Typography variant="h4">End of period report</Typography>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          justifyContent="space-between"
+          spacing={1.5}
+          sx={{ mb: 3 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify icon="solar:wallet-money-bold-duotone" width={32} />
+            <Typography variant="h4">End of period report</Typography>
+          </Stack>
+          {canUpdateReports && (
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<Iconify icon="solar:refresh-circle-bold-duotone" />}
+              onClick={openResetDialog}
+            >
+              Restart balances
+            </Button>
+          )}
         </Stack>
 
         {loading ? (
@@ -656,8 +783,13 @@ export default function EndOfDayReportPage() {
                       </Typography>
                       <Stack spacing={0.5}>
                         <Typography variant="body2">
-                          Opening total (from previous period):{' '}
-                          <strong>{fCurrency(preview.opening_total)}</strong>
+                          Opening total
+                          {preview.opening_source === 'balance_reset'
+                            ? ' (from balance restart)'
+                            : preview.opening_source === 'previous_eod'
+                              ? ' (from previous period)'
+                              : ''}
+                          : <strong>{fCurrency(preview.opening_total)}</strong>
                         </Typography>
                         <Typography variant="body2">
                           Revenue (period): <strong>{fCurrency(preview.revenue_day)}</strong>
@@ -704,7 +836,14 @@ export default function EndOfDayReportPage() {
                         {preview.requires_initial_opening && (
                           <Alert severity="warning" sx={{ mt: 1 }}>
                             First end-of-period for this store: enter the opening total (cash + all
-                            banks at the start of the period).
+                            banks at the start of the period). Or use Restart balances if you want
+                            an audited reset going forward.
+                          </Alert>
+                        )}
+                        {preview.opening_source === 'balance_reset' && (
+                          <Alert severity="info" sx={{ mt: 1 }}>
+                            Opening comes from a saved balance restart. Later daily periods will
+                            chain from closings after this.
                           </Alert>
                         )}
                       </Stack>
@@ -835,6 +974,108 @@ export default function EndOfDayReportPage() {
 
             <Card sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
+                Balance restart audit
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Immutable record of cash + bank opening restarts (who, when, previous → new).
+              </Typography>
+              {resetList.length === 0 ? (
+                <Typography color="text.secondary">No balance restarts yet.</Typography>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Effective</TableCell>
+                      <TableCell>By</TableCell>
+                      <TableCell align="right">Previous</TableCell>
+                      <TableCell align="right">New</TableCell>
+                      <TableCell>Reason</TableCell>
+                      <TableCell align="right"> </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {resetList.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <Typography variant="body2">{row.effective_date}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.created_at
+                              ? new Date(row.created_at).toLocaleString()
+                              : ''}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {row.created_by_name || row.created_by_email || `User #${row.created_by}`}
+                          </Typography>
+                          {row.created_by_email && row.created_by_name && (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {row.created_by_email}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          {row.previous_total != null ? fCurrency(row.previous_total) : '—'}
+                        </TableCell>
+                        <TableCell align="right">{fCurrency(row.new_total)}</TableCell>
+                        <TableCell sx={{ maxWidth: 220 }}>
+                          <Typography variant="body2" noWrap title={row.reason}>
+                            {row.reason}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            onClick={() =>
+                              setExpandedResetId((id) => (id === row.id ? null : row.id))
+                            }
+                          >
+                            {expandedResetId === row.id ? 'Hide' : 'Details'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {expandedResetId != null &&
+                (() => {
+                  const row = resetList.find((r) => r.id === expandedResetId);
+                  if (!row) return null;
+                  return (
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'background.neutral', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Restart #{row.id} detail
+                      </Typography>
+                      <Stack spacing={0.5}>
+                        <Typography variant="body2">
+                          Previous cash: {row.previous_cash_balance != null ? fCurrency(row.previous_cash_balance) : '—'}
+                          {' · '}Previous banks:{' '}
+                          {row.previous_bank_total != null ? fCurrency(row.previous_bank_total) : '—'}
+                        </Typography>
+                        <Typography variant="body2">
+                          New cash: {fCurrency(row.new_cash_balance)} · New banks:{' '}
+                          {fCurrency(row.new_bank_total)}
+                        </Typography>
+                        {(row.bank_lines || []).map((ln) => (
+                          <Typography key={ln.bank_account_id} variant="caption" display="block">
+                            {ln.account_label || `Account ${ln.bank_account_id}`}:{' '}
+                            {fCurrency(ln.balance)}
+                          </Typography>
+                        ))}
+                        {row.notes && (
+                          <Typography variant="body2" color="text.secondary">
+                            Notes: {row.notes}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+                  );
+                })()}
+            </Card>
+
+            <Card sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
                 History
               </Typography>
               {sortedList.length === 0 ? (
@@ -901,6 +1142,111 @@ export default function EndOfDayReportPage() {
           </Stack>
         )}
       </DashboardContent>
+
+      <Dialog open={resetOpen} onClose={closeResetDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Restart cash &amp; bank balances</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Alert severity="warning">
+              This sets a new opening total for end-of-period from the effective date. Old sales and
+              products stay. The restart is saved permanently for audit (who, when, previous → new).
+            </Alert>
+
+            {resetContext?.has_prior_position && (
+              <Alert severity="info">
+                Last recorded closing before restart:{' '}
+                <strong>{fCurrency(resetContext.previous_total)}</strong>
+                {resetContext.previous_period_end
+                  ? ` (period ending ${resetContext.previous_period_end})`
+                  : ''}
+                . Cash {fCurrency(resetContext.previous_cash_balance)} · Banks{' '}
+                {fCurrency(resetContext.previous_bank_total)}.
+              </Alert>
+            )}
+
+            <TextField
+              type="date"
+              label="Effective date"
+              value={resetEffectiveDate}
+              onChange={(e) => setResetEffectiveDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              helperText="Next end-of-period starting on or after this date uses the new opening."
+            />
+
+            <TextField
+              label="New cash balance (₦)"
+              value={resetCash}
+              onChange={(e) => setResetCash(e.target.value)}
+              fullWidth
+              required
+            />
+
+            {(accounts || [])
+              .filter((a) => a?.is_active !== false)
+              .map((acct) => (
+                <TextField
+                  key={acct.id}
+                  label={`${acct.institution_name || ''} ${acct.account_name || `Account ${acct.id}`}`.trim()}
+                  value={resetBankBalances[String(acct.id)] ?? ''}
+                  onChange={(e) =>
+                    setResetBankBalances((prev) => ({
+                      ...prev,
+                      [String(acct.id)]: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                  helperText={acct.mask ? `****${acct.mask}` : 'Bank closing balance'}
+                />
+              ))}
+
+            {accounts?.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No bank accounts linked — cash only will be restarted.
+              </Typography>
+            )}
+
+            {resetNewTotal != null && (
+              <Typography variant="subtitle2">
+                New opening total: {fCurrency(resetNewTotal)}
+              </Typography>
+            )}
+
+            <TextField
+              label="Reason (required for audit)"
+              value={resetReason}
+              onChange={(e) => setResetReason(e.target.value)}
+              fullWidth
+              required
+              multiline
+              minRows={2}
+              placeholder="e.g. Store inactive for months; counted cash and banks to restart daily use"
+            />
+
+            <TextField
+              label="Notes (optional)"
+              value={resetNotes}
+              onChange={(e) => setResetNotes(e.target.value)}
+              fullWidth
+              multiline
+              minRows={2}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeResetDialog} disabled={resetSaving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleSaveReset}
+            disabled={resetSaving || !canUpdateReports}
+          >
+            {resetSaving ? 'Saving…' : 'Save restart'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmDelete.value}
