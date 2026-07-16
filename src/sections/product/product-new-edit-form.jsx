@@ -210,7 +210,9 @@ export function ProductNewEditForm({ currentProduct, storeId, storeSlug, mutateP
 
 
 
-  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
+  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId, {
+    published_only: true,
+  });
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { products } = useGetProducts(storeId);
 

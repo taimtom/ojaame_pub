@@ -1,5 +1,16 @@
 /** Maps nav permission keys / titles to Standard-only plan feature keys. */
 
+/**
+ * When false (default), Basic sees all Standard features and can add stores.
+ * Set VITE_PLAN_RESTRICTIONS_ENABLED=true to restore Basic vs Standard gating.
+ */
+const _FALSEY = new Set(['0', 'false', 'no', 'off', '']);
+
+export function planRestrictionsEnabled() {
+  const raw = import.meta.env.VITE_PLAN_RESTRICTIONS_ENABLED ?? 'false';
+  return !_FALSEY.has(String(raw).trim().toLowerCase());
+}
+
 export const NAV_PLAN_FEATURES = {
   'Service Log': 'service_log',
   'Usage dashboard': 'usage_dashboard',

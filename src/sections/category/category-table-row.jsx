@@ -19,9 +19,21 @@ import { Label } from 'src/components/label';
 // ----------------------------------------------------------------------
 
 export function RenderCellPublish({ params }) {
+  const value = params.row.publish;
+  const color =
+    (value === 'publish' && 'info') ||
+    (value === 'draft' && 'warning') ||
+    (value === 'deleted' && 'error') ||
+    'default';
+  const label =
+    (value === 'publish' && 'Published') ||
+    (value === 'draft' && 'Draft') ||
+    (value === 'deleted' && 'Deleted') ||
+    value;
+
   return (
-    <Label variant="soft" color={(params.row.publish === 'publish' && 'info') || 'default'}>
-      {params.row.publish}
+    <Label variant="soft" color={color}>
+      {label}
     </Label>
   );
 }

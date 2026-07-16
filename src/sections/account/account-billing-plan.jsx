@@ -22,6 +22,7 @@ import { fCurrency } from 'src/utils/format-number';
 import { fDate } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 import {
   useGetSubscriptionSummary,
   useGetSubscriptionPlans,
@@ -78,6 +79,7 @@ export function AccountBillingPlan() {
   const { summary, summaryLoading, summaryError, mutate } = useGetSubscriptionSummary();
   const { plans, storePrice } = useGetSubscriptionPlans();
   const { nextBillingDate, inTrial, trialDaysRemaining, mutateStatus } = useGetSubscriptionStatus();
+  const { planRestrictionsEnabled: restrictionsOn } = usePlanFeatures();
   const [adjusting, setAdjusting] = useState(null);
   const [changingPlan, setChangingPlan] = useState(false);
   const [pendingTier, setPendingTier] = useState(null);
@@ -281,6 +283,7 @@ export function AccountBillingPlan() {
                         ))}
                       </Stack>
                       {!selected && (
+                        restrictionsOn &&
                         plan.plan_tier === 'basic' &&
                         (summary.store_count ?? 0) > 1 &&
                         currentTier !== 'basic' ? (

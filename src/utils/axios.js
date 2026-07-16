@@ -164,6 +164,8 @@ export const endpoints = {
     edit: '/api/categories/edit',
     add: '/api/categories/add',
     addDefaults: '/api/categories/add-defaults', // Add default categories endpoint
+    delete: '/api/categories/delete',
+    publish: '/api/categories/publish',
   },
 
   store: {

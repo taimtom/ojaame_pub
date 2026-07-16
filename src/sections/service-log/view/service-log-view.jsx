@@ -7,41 +7,48 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
+import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
-import Autocomplete from '@mui/material/Autocomplete';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
 import DialogTitle from '@mui/material/DialogTitle';
+import Autocomplete from '@mui/material/Autocomplete';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
-import Grid from '@mui/material/Unstable_Grid2';
 
-import { fCurrency } from 'src/utils/format-number';
-import { DashboardContent } from 'src/layouts/dashboard';
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
-import { toast } from 'src/components/snackbar';
-import { Iconify } from 'src/components/iconify';
+import { useStaffDirectory } from 'src/hooks/use-staff-directory';
+
 import axiosInstance from 'src/utils/axios';
+import { fCurrency } from 'src/utils/format-number';
+
+import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetPaymentMethods } from 'src/actions/paymentmethod';
-import { useGetUsers } from 'src/actions/user';
-import { useAuthContext } from 'src/auth/hooks';
 import {
-  QuickDashboardPayments,
-  sumPaymentLines,
-} from 'src/sections/quick-dashboard/quick-dashboard-payments';
-import {
-  createServiceLog,
   billServiceLog,
+  createServiceLog,
   fetchServiceLogs,
   fetchServiceLogTodayStats,
   fetchServiceConsumableTemplates,
 } from 'src/actions/service-log';
-import { ServiceLogConsumables } from '../service-log-consumables';
+
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import { NonLoginStaffDialog } from 'src/components/staff/non-login-staff-dialog';
+import { CustomerQuickAddDialog } from 'src/components/customer/customer-quick-add-dialog';
+
+import { QuickDashboardPayments } from 'src/sections/quick-dashboard/quick-dashboard-payments';
+
+import { useAuthContext } from 'src/auth/hooks';
+
 import { ServiceLogExpenses } from '../service-log-expenses';
+import { ServiceLogServices } from '../service-log-services';
+import { ServiceLogConsumables } from '../service-log-consumables';
+import { ServiceLogDetailDialog } from '../service-log-detail-dialog';
 
 function getStoreIdFromStorage() {
   try {
@@ -75,19 +82,19 @@ export function ServiceLogView() {
   const [recentLogs, setRecentLogs] = useState([]);
   const [recentLoading, setRecentLoading] = useState(true);
 
-  const [serviceQuery, setServiceQuery] = useState('');
-  const [serviceResults, setServiceResults] = useState([]);
-  const [serviceSearching, setServiceSearching] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
+  const [selectedServices, setSelectedServices] = useState([
+    { service_id: null, service_name: '', unit_price: '' },
+  ]);
 
   const [customers, setCustomers] = useState([]);
   const [customerInput, setCustomerInput] = useState(null);
   const [customerName, setCustomerName] = useState('');
 
-  const [staffIds, setStaffIds] = useState([]);
+  const [staffKeys, setStaffKeys] = useState([]);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [durationHours, setDurationHours] = useState('');
   const [durationMinutes, setDurationMinutes] = useState('');
-  const [baseServicePrice, setBaseServicePrice] = useState('');
   const [servicePrice, setServicePrice] = useState('');
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
   const [notes, setNotes] = useState('');
@@ -107,8 +114,12 @@ export function ServiceLogView() {
   const [billing, setBilling] = useState(false);
   const [paymentManuallyEdited, setPaymentManuallyEdited] = useState(false);
 
+  const [detailLogId, setDetailLogId] = useState(null);
+  const [detailInitialLog, setDetailInitialLog] = useState(null);
+  const [detailOpenShare, setDetailOpenShare] = useState(false);
+
   const { paymentMethods, paymentMethodsLoading } = useGetPaymentMethods(storeId);
-  const { users, usersLoading } = useGetUsers();
+  const { options: staffOptions, loading: staffLoading, reloadEmployees } = useStaffDirectory();
 
   useEffect(() => {
     const sync = () => setStoreId(getStoreIdFromStorage());
@@ -123,10 +134,10 @@ export function ServiceLogView() {
   }, []);
 
   useEffect(() => {
-    if (user?.user_id && !staffIds.length) {
-      setStaffIds([String(user.user_id)]);
+    if (user?.user_id && !staffKeys.length) {
+      setStaffKeys([`user:${user.user_id}`]);
     }
-  }, [user, staffIds.length]);
+  }, [user, staffKeys.length]);
 
   const loadStats = useCallback(async () => {
     if (!storeId) {
@@ -184,59 +195,40 @@ export function ServiceLogView() {
   }, [storeId, customerName]);
 
   useEffect(() => {
-    if (!serviceQuery.trim() || !storeId) {
-      setServiceResults([]);
+    if (!storeId || !productDialogOpen) {
       return undefined;
     }
     let active = true;
     const timer = setTimeout(async () => {
-      setServiceSearching(true);
+      setProductSearching(true);
       try {
         const res = await axiosInstance.get('/api/quick-dashboard/search', {
-          params: { query: serviceQuery.trim(), store_id: storeId, limit: 20 },
+          params: {
+            query: productQuery.trim(),
+            store_id: storeId,
+            item_type: 'product',
+            limit: productQuery.trim() ? 20 : 5,
+          },
         });
-        const services = (res.data?.results || []).filter((r) => r.type === 'service');
-        if (active) setServiceResults(services);
+        const products = (res.data?.results || []).filter((r) => r.type === 'product');
+        if (active) setProductResults(products);
       } catch {
-        if (active) setServiceResults([]);
+        if (active) setProductResults([]);
       } finally {
-        if (active) setServiceSearching(false);
+        if (active) setProductSearching(false);
       }
-    }, 300);
+    }, productQuery.trim() ? 300 : 0);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [serviceQuery, storeId]);
+  }, [productQuery, storeId, productDialogOpen]);
 
-  useEffect(() => {
-    if (!selectedService) return;
-    const selectedBasePrice = Number(selectedService.price) || 0;
-    setBaseServicePrice(String(selectedBasePrice));
-    setPriceManuallyEdited(false);
-    setServicePrice(String(selectedBasePrice));
-    if (selectedService.duration) {
-      setDurationMinutes(String(selectedService.duration));
-      setDurationHours('');
-    }
-    if (!storeId) return;
-    (async () => {
-      try {
-        const templates = await fetchServiceConsumableTemplates(selectedService.id, storeId);
-        setConsumables(
-          (templates || []).map((t) => ({
-            product_id: t.product_id,
-            product_name: t.product_name,
-            quantity_used: t.default_quantity,
-            unit_price: Number(t.product_price) || 0,
-          }))
-        );
-      } catch {
-        // no templates
-      }
-    })();
-  }, [selectedService, storeId]);
-
+  const filledServices = (selectedServices || []).filter((row) => row.service_id);
+  const servicesTotal = filledServices.reduce(
+    (sum, row) => sum + (Number(row.unit_price) || 0),
+    0
+  );
   const productsTotal = (consumables || []).reduce(
     (sum, row) => sum + (Number(row.quantity_used) || 0) * (Number(row.unit_price) || 0),
     0
@@ -245,7 +237,7 @@ export function ServiceLogView() {
     (sum, row) => sum + (Number(row.amount) || 0),
     0
   );
-  const suggestedFinalPrice = (Number(baseServicePrice) || 0) + productsTotal + expensesTotal;
+  const suggestedFinalPrice = servicesTotal + productsTotal + expensesTotal;
 
   useEffect(() => {
     if (priceManuallyEdited) return;
@@ -266,41 +258,13 @@ export function ServiceLogView() {
     setPaymentLines([{ payment_method_id: methodId, amount: finalPrice }]);
   }, [servicePrice, billLater, paymentMethods, paymentLines, paymentManuallyEdited]);
 
-  useEffect(() => {
-    if (!productQuery.trim() || !storeId || !productDialogOpen) {
-      setProductResults([]);
-      return undefined;
-    }
-    let active = true;
-    const timer = setTimeout(async () => {
-      setProductSearching(true);
-      try {
-        const res = await axiosInstance.get('/api/quick-dashboard/search', {
-          params: { query: productQuery.trim(), store_id: storeId, limit: 20 },
-        });
-        const products = (res.data?.results || []).filter((r) => r.type === 'product');
-        if (active) setProductResults(products);
-      } catch {
-        if (active) setProductResults([]);
-      } finally {
-        if (active) setProductSearching(false);
-      }
-    }, 300);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [productQuery, storeId, productDialogOpen]);
-
   const resetForm = () => {
-    setSelectedService(null);
-    setServiceQuery('');
+    setSelectedServices([{ service_id: null, service_name: '', unit_price: '' }]);
     setCustomerInput(null);
     setCustomerName('');
-    setStaffIds(user?.user_id ? [String(user.user_id)] : []);
+    setStaffKeys(user?.user_id ? [`user:${user.user_id}`] : []);
     setDurationHours('');
     setDurationMinutes('');
-    setBaseServicePrice('');
     setServicePrice('');
     setPriceManuallyEdited(false);
     setNotes('');
@@ -333,8 +297,18 @@ export function ServiceLogView() {
       store_id: storeId,
       customer_id: customerInput?.id || null,
       customer_name: !customerInput?.id && customerName.trim() ? customerName.trim() : null,
-      service_id: selectedService.id,
-      performed_by_user_ids: staffIds.map((id) => Number(id)),
+      service_id: filledServices[0]?.service_id || null,
+      services: filledServices.map((s) => ({
+        service_id: s.service_id,
+        unit_price: Number(s.unit_price) || 0,
+        quantity: 1,
+      })),
+      performed_by_user_ids: staffOptions
+        .filter((o) => staffKeys.includes(o.key) && o.kind === 'user')
+        .map((o) => Number(o.userId || o.id)),
+      performed_by_employee_ids: staffOptions
+        .filter((o) => staffKeys.includes(o.key) && o.kind === 'employee')
+        .map((o) => Number(o.employeeId || o.id)),
       duration_minutes: buildDurationMinutes(),
       service_price: price,
       notes: notes.trim() || null,
@@ -343,6 +317,7 @@ export function ServiceLogView() {
         .map((c) => ({
           product_id: c.product_id,
           quantity_used: Number(c.quantity_used),
+          unit_price: Number(c.unit_price) || 0,
         })),
       expenses: expenses
         .filter((e) => Number(e.amount) > 0)
@@ -364,11 +339,11 @@ export function ServiceLogView() {
       toast.error('Select a store first.');
       return;
     }
-    if (!selectedService) {
-      toast.error('Select a service.');
+    if (!filledServices.length) {
+      toast.error('Select at least one service.');
       return;
     }
-    if (!staffIds.length) {
+    if (!staffKeys.length) {
       toast.error('Select at least one staff member who performed the service.');
       return;
     }
@@ -392,6 +367,18 @@ export function ServiceLogView() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openLogDetail = (log, share = false) => {
+    setDetailInitialLog(log);
+    setDetailLogId(log.id);
+    setDetailOpenShare(share);
+  };
+
+  const closeLogDetail = () => {
+    setDetailLogId(null);
+    setDetailInitialLog(null);
+    setDetailOpenShare(false);
   };
 
   const openBillDialog = (log) => {
@@ -428,6 +415,37 @@ export function ServiceLogView() {
       toast.error(error.message || 'Failed to bill service.');
     } finally {
       setBilling(false);
+    }
+  };
+
+  const handleServiceSelected = async (service) => {
+    setPriceManuallyEdited(false);
+    if (service?.duration && !durationMinutes && !durationHours) {
+      setDurationMinutes(String(service.duration));
+    }
+
+    // Merge templates into products — do not wipe existing products
+    if (!storeId || !service?.id) return;
+    try {
+      const templates = await fetchServiceConsumableTemplates(service.id, storeId);
+      if (templates?.length) {
+        setConsumables((prev) => {
+          const next = [...prev];
+          templates.forEach((t) => {
+            const idx = next.findIndex((c) => c.product_id === t.product_id);
+            if (idx >= 0) return;
+            next.push({
+              product_id: t.product_id,
+              product_name: t.product_name,
+              quantity_used: t.default_quantity,
+              unit_price: Number(t.product_price) || 0,
+            });
+          });
+          return next;
+        });
+      }
+    } catch {
+      // ignore template errors
     }
   };
 
@@ -476,56 +494,95 @@ export function ServiceLogView() {
             <CardContent>
               <Grid container spacing={2}>
                 <Grid xs={12} md={6}>
-                  <Autocomplete
-                    options={customers}
-                    getOptionLabel={(opt) => opt.name || ''}
-                    value={customerInput}
-                    onChange={(_, val) => {
-                      setCustomerInput(val);
-                      setCustomerName(val?.name || '');
-                    }}
-                    inputValue={customerName}
-                    onInputChange={(_, val) => setCustomerName(val)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Customer" placeholder="Search or leave blank for walk-in" />
-                    )}
-                  />
+                  <Stack spacing={1}>
+                    <Autocomplete
+                      options={customers}
+                      getOptionLabel={(opt) =>
+                        opt?.name
+                          ? `${opt.name}${opt.phone_number ? ` · ${opt.phone_number}` : ''}`
+                          : ''
+                      }
+                      value={customerInput}
+                      onChange={(_, val) => {
+                        setCustomerInput(val);
+                        setCustomerName(val?.name || '');
+                      }}
+                      inputValue={customerName}
+                      onInputChange={(_, val) => setCustomerName(val)}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Customer"
+                          placeholder="Search or leave blank for walk-in"
+                        />
+                      )}
+                    />
+                    <Button
+                      size="small"
+                      startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                      onClick={() => setCustomerDialogOpen(true)}
+                      sx={{ alignSelf: 'flex-start' }}
+                    >
+                      Add customer
+                    </Button>
+                  </Stack>
                 </Grid>
                 <Grid xs={12} md={6}>
-                  <Autocomplete
-                    multiple
-                    options={users || []}
-                    loading={usersLoading}
-                    value={(users || []).filter((u) => staffIds.includes(String(u.user_id)))}
-                    onChange={(_, values) => {
-                      setStaffIds(values.map((v) => String(v.user_id)));
-                    }}
-                    getOptionLabel={(opt) =>
-                      [opt.firstName, opt.lastName].filter(Boolean).join(' ') || opt.email
-                    }
-                    isOptionEqualToValue={(opt, val) => opt.user_id === val.user_id}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Performing staff"
-                        placeholder="Select one or more staff"
-                      />
-                    )}
-                  />
+                  <Stack spacing={1}>
+                    <Autocomplete
+                      multiple
+                      options={staffOptions}
+                      loading={staffLoading}
+                      value={staffOptions.filter((o) => staffKeys.includes(o.key))}
+                      onChange={(_, values) => {
+                        setStaffKeys(values.map((v) => v.key));
+                      }}
+                      getOptionLabel={(opt) =>
+                        opt.secondary ? `${opt.label} (${opt.secondary})` : opt.label
+                      }
+                      isOptionEqualToValue={(opt, val) => opt.key === val.key}
+                      renderOption={(props, opt) => (
+                        <li {...props} key={opt.key}>
+                          <Stack>
+                            <Typography variant="body2">{opt.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {opt.secondary}
+                            </Typography>
+                          </Stack>
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Performing staff"
+                          placeholder="Login or non-login staff"
+                        />
+                      )}
+                    />
+                    <Button
+                      size="small"
+                      startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                      onClick={() => setStaffDialogOpen(true)}
+                      sx={{ alignSelf: 'flex-start' }}
+                    >
+                      Add staff without login
+                    </Button>
+                  </Stack>
                 </Grid>
                 <Grid xs={12}>
-                  <Autocomplete
-                    options={serviceResults}
-                    getOptionLabel={(opt) => opt.name || ''}
-                    loading={serviceSearching}
-                    value={selectedService}
-                    onChange={(_, val) => setSelectedService(val)}
-                    inputValue={serviceQuery}
-                    onInputChange={(_, val) => setServiceQuery(val)}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Service" placeholder="Search services..." />
-                    )}
+                  <ServiceLogServices
+                    items={selectedServices}
+                    onChange={(next) => {
+                      setSelectedServices(next);
+                      setPriceManuallyEdited(false);
+                    }}
+                    onServiceSelected={handleServiceSelected}
+                    storeId={storeId}
+                    currencySymbol={currencySymbol}
                   />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Services total: <strong>{fCurrency(servicesTotal)}</strong>
+                  </Typography>
                 </Grid>
                 <Grid xs={6} md={3}>
                   <TextField
@@ -548,25 +605,6 @@ export function ServiceLogView() {
                   />
                 </Grid>
                 <Grid xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Base service price"
-                    type="number"
-                    value={baseServicePrice}
-                    onChange={(e) => {
-                      setBaseServicePrice(e.target.value);
-                      setPriceManuallyEdited(false);
-                    }}
-                    InputProps={{
-                      startAdornment: (
-                        <Typography sx={{ mr: 1, color: 'text.disabled' }}>
-                          {currencySymbol}
-                        </Typography>
-                      ),
-                    }}
-                  />
-                </Grid>
-                <Grid xs={12}>
                   <TextField
                     fullWidth
                     multiline
@@ -613,7 +651,7 @@ export function ServiceLogView() {
                 helperText={
                   priceManuallyEdited
                     ? 'Manual override enabled (editable)'
-                    : 'Auto = base service + products used + expenses'
+                    : 'Auto = services + products used + expenses'
                 }
                 InputProps={{
                   startAdornment: (
@@ -721,7 +759,10 @@ export function ServiceLogView() {
                         p: 1.5,
                         borderRadius: 1,
                         bgcolor: 'background.neutral',
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' },
                       }}
+                      onClick={() => openLogDetail(log)}
                     >
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                         <Box>
@@ -732,6 +773,11 @@ export function ServiceLogView() {
                             {log.performed_by_name || 'Staff'} · {formatDuration(log.duration_minutes)} ·{' '}
                             {fCurrency(log.service_price)}
                           </Typography>
+                          {(log.consumables?.length > 0 || log.expenses?.length > 0) && (
+                            <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
+                              {log.consumables?.length || 0} product(s) · {log.expenses?.length || 0} expense(s)
+                            </Typography>
+                          )}
                         </Box>
                         <Chip
                           size="small"
@@ -745,15 +791,25 @@ export function ServiceLogView() {
                           }
                         />
                       </Stack>
-                      {log.status === 'logged' && (
-                        <Button
-                          size="small"
-                          sx={{ mt: 1 }}
-                          onClick={() => openBillDialog(log)}
-                        >
-                          Bill now
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
+                        <Button size="small" onClick={() => openLogDetail(log)}>
+                          View breakdown
                         </Button>
-                      )}
+                        {log.status === 'logged' && (
+                          <Button size="small" onClick={() => openBillDialog(log)}>
+                            Bill now
+                          </Button>
+                        )}
+                        {(log.status === 'billed' || log.status === 'logged') && (
+                          <Button
+                            size="small"
+                            startIcon={<Iconify icon="solar:share-bold" width={16} />}
+                            onClick={() => openLogDetail(log, true)}
+                          >
+                            Share
+                          </Button>
+                        )}
+                      </Stack>
                       {log.status === 'billed' && log.balance_due > 0.02 && (
                         <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
                           Owes {fCurrency(log.balance_due)}
@@ -775,12 +831,22 @@ export function ServiceLogView() {
             autoFocus
             fullWidth
             label="Search products"
+            placeholder="Type to filter, or pick from suggestions"
             value={productQuery}
             onChange={(e) => setProductQuery(e.target.value)}
             sx={{ mt: 1, mb: 2 }}
           />
+          {!productQuery.trim() && (
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              Top products
+            </Typography>
+          )}
           {productSearching ? (
             <CircularProgress size={24} />
+          ) : !productResults.length ? (
+            <Typography variant="body2" color="text.disabled">
+              No products found.
+            </Typography>
           ) : (
             <Stack spacing={1}>
               {productResults.map((p) => (
@@ -788,11 +854,14 @@ export function ServiceLogView() {
                   key={p.id}
                   variant="outlined"
                   fullWidth
-                  sx={{ justifyContent: 'flex-start' }}
+                  sx={{ justifyContent: 'space-between' }}
                   onClick={() => addProductToConsumables(p)}
                 >
-                  {p.name}
-                  {p.stock != null ? ` · stock: ${p.stock}` : ''}
+                  <span>
+                    {p.name}
+                    {p.stock != null ? ` · stock: ${p.stock}` : ''}
+                  </span>
+                  <span>{fCurrency(p.price || 0)}</span>
                 </Button>
               ))}
             </Stack>
@@ -830,6 +899,43 @@ export function ServiceLogView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <CustomerQuickAddDialog
+        open={customerDialogOpen}
+        storeId={storeId}
+        onClose={() => setCustomerDialogOpen(false)}
+        onCreated={(option) => {
+          setCustomers((prev) => {
+            const exists = prev.some((c) => c.id === option.id);
+            return exists ? prev : [option, ...prev];
+          });
+          setCustomerInput(option);
+          setCustomerName(option.name || '');
+        }}
+      />
+
+      <NonLoginStaffDialog
+        open={staffDialogOpen}
+        companyId={user?.company_id}
+        onClose={() => setStaffDialogOpen(false)}
+        onCreated={(emp) => {
+          reloadEmployees().then(() => {
+            setStaffKeys((prev) => {
+              const key = `employee:${emp.id}`;
+              return prev.includes(key) ? prev : [...prev, key];
+            });
+          });
+        }}
+      />
+
+      <ServiceLogDetailDialog
+        open={Boolean(detailLogId)}
+        logId={detailLogId}
+        storeId={storeId}
+        initialLog={detailInitialLog}
+        openShareOnLoad={detailOpenShare}
+        onClose={closeLogDetail}
+      />
     </DashboardContent>
   );
 }

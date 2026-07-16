@@ -79,7 +79,9 @@ export function ProductQuickAddForm({
   const advanceOnboarding = useAdvanceOnboarding();
   const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
   const { currencySymbol } = useCurrencyFormat();
-  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
+  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId, {
+    published_only: true,
+  });
 
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, quantity: defaultQuantity }));
   const [submitting, setSubmitting] = useState(false);

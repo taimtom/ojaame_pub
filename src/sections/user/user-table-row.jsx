@@ -38,6 +38,7 @@ export function UserTableRow({
   const quickEdit = useBoolean();
 
   const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
+  const isNonLogin = Boolean(row.isNonLogin);
 
   const isOwner = row.role === 'merchant' || row.role === 'owner';
   const isDeleted = row.status === 'deleted';
@@ -59,9 +60,15 @@ export function UserTableRow({
           <Stack spacing={2} direction="row" alignItems="center">
             <Avatar alt={fullName} src={row.photoURL || ''} />
             <Stack sx={{ typography: 'body2', flex: '1 1 auto', alignItems: 'flex-start' }}>
-              <Link color="inherit" onClick={onEditRow} sx={{ cursor: 'pointer' }}>
-                {fullName}
-              </Link>
+              {isNonLogin ? (
+                <Box component="span" sx={{ typography: 'subtitle2' }}>
+                  {fullName || 'Staff'}
+                </Box>
+              ) : (
+                <Link color="inherit" onClick={onEditRow} sx={{ cursor: 'pointer' }}>
+                  {fullName}
+                </Link>
+              )}
               <Box component="span" sx={{ color: 'text.disabled' }}>
                 {row.email}
               </Box>
@@ -74,7 +81,9 @@ export function UserTableRow({
         <TableCell sx={{ whiteSpace: 'nowrap' }}>
           {row.store_names && row.store_names.length > 0
             ? row.store_names.join(', ')
-            : 'N/A'}
+            : isNonLogin
+              ? '—'
+              : 'N/A'}
         </TableCell>
 
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.role}</TableCell>
@@ -87,23 +96,26 @@ export function UserTableRow({
               (row.status === 'pending' && 'warning') ||
               (row.status === 'banned' && 'error') ||
               (row.status === 'deleted' && 'default') ||
+              (row.status === 'no_login' && 'info') ||
               'default'
             }
           >
-            {row.status}
+            {row.status === 'no_login' ? 'No login' : row.status}
           </Label>
         </TableCell>
 
         <TableCell>
           <Stack direction="row" alignItems="center">
-            <Tooltip title="Quick Edit" placement="top" arrow>
-              <IconButton
-                color={quickEdit.value ? 'inherit' : 'default'}
-                onClick={quickEdit.onTrue}
-              >
-                <Iconify icon="solar:pen-bold" />
-              </IconButton>
-            </Tooltip>
+            {!isNonLogin && (
+              <Tooltip title="Quick Edit" placement="top" arrow>
+                <IconButton
+                  color={quickEdit.value ? 'inherit' : 'default'}
+                  onClick={quickEdit.onTrue}
+                >
+                  <Iconify icon="solar:pen-bold" />
+                </IconButton>
+              </Tooltip>
+            )}
             <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
               <Iconify icon="eva:more-vertical-fill" />
             </IconButton>
@@ -111,7 +123,9 @@ export function UserTableRow({
         </TableCell>
       </TableRow>
 
-      <UserQuickEditForm currentUser={row} open={quickEdit.value} onClose={quickEdit.onFalse} />
+      {!isNonLogin && (
+        <UserQuickEditForm currentUser={row} open={quickEdit.value} onClose={quickEdit.onFalse} />
+      )}
 
       <CustomPopover
         open={popover.open}
@@ -133,17 +147,19 @@ export function UserTableRow({
             </MenuItem>
           )}
 
-          <MenuItem
-            onClick={() => {
-              onEditRow();
-              popover.onClose();
-            }}
-          >
-            <Iconify icon="solar:pen-bold" />
-            Edit
-          </MenuItem>
+          {!isNonLogin && (
+            <MenuItem
+              onClick={() => {
+                onEditRow();
+                popover.onClose();
+              }}
+            >
+              <Iconify icon="solar:pen-bold" />
+              Edit
+            </MenuItem>
+          )}
 
-          {row.status === 'pending' && (
+          {!isNonLogin && row.status === 'pending' && (
             <MenuItem
               onClick={() => {
                 onResendInvite();
@@ -161,7 +177,11 @@ export function UserTableRow({
         open={confirm.value}
         onClose={confirm.onFalse}
         title="Delete"
-        content="Are you sure you want to delete this user? Their account will be deactivated and their email will be freed for future use."
+        content={
+          isNonLogin
+            ? 'Remove this non-login staff member? They will no longer appear for Service Log or payroll.'
+            : 'Are you sure you want to delete this user? Their account will be deactivated and their email will be freed for future use.'
+        }
         action={
           <Button
             variant="contained"

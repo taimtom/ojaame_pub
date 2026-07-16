@@ -126,3 +126,29 @@ export async function addDefaultCategories(storeId) {
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
+// deleteCategory - Soft-deletes a category (sets publish=deleted).
+export async function deleteCategory(categoryId) {
+  try {
+    const url = `${endpoints.categories.delete}/${categoryId}`;
+    const response = await axiosInstance.delete(url);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+// updateCategoryPublish - Sets publish/draft on a category.
+export async function updateCategoryPublish(categoryId, publish) {
+  try {
+    const url = `${endpoints.categories.publish}/${categoryId}`;
+    const response = await axiosInstance.patch(url, { publish });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating category publish status:', error);
+    throw error;
+  }
+}

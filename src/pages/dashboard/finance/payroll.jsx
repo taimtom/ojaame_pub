@@ -40,8 +40,10 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
 import { useGetStores } from 'src/actions/store';
 import { useGetRoles } from 'src/actions/role';
+import { useStaffDirectory } from 'src/hooks/use-staff-directory';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import ListSubheader from '@mui/material/ListSubheader';
 
 const emptyForm = {
   name: '',
@@ -76,9 +78,13 @@ export default function PayrollPage() {
   const companyId = user?.company_id;
   const { stores } = useGetStores();
   const { roles } = useGetRoles();
+  const {
+    linkableLoginUsers,
+    nonLoginOptions,
+    reloadEmployees,
+  } = useStaffDirectory();
 
   const [employees, setEmployees] = useState([]);
-  const [linkableUsers, setLinkableUsers] = useState([]);
   const [run, setRun] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -112,24 +118,12 @@ export default function PayrollPage() {
       params: { company_id: companyId },
     });
     setEmployees(data || []);
-  }, [companyId]);
-
-  const loadLinkable = useCallback(async () => {
-    if (!companyId) return;
-    try {
-      const { data } = await axiosInstance.get(endpoints.payroll.linkableUsers, {
-        params: { company_id: companyId },
-      });
-      setLinkableUsers(data || []);
-    } catch {
-      setLinkableUsers([]);
-    }
-  }, [companyId]);
+    await reloadEmployees();
+  }, [companyId, reloadEmployees]);
 
   useEffect(() => {
     loadEmployees().catch(() => toast.error('Could not load staff'));
-    loadLinkable();
-  }, [loadEmployees, loadLinkable]);
+  }, [loadEmployees]);
 
   const salaryPayload = () => ({
     monthly_gross: effectiveGross,
@@ -141,8 +135,13 @@ export default function PayrollPage() {
 
   const addStaff = async () => {
     setSeatError(null);
-    if (effectiveGross <= 0) {
+    // Non-login attendants can be added with ₦0; login/link staff need a salary for PAYE
+    if (staffKind !== 'non_user' && effectiveGross <= 0) {
       toast.error(showAdvanced ? 'Enter at least one salary component' : 'Enter a monthly gross greater than 0');
+      return;
+    }
+    if (staffKind === 'non_user' && effectiveGross < 0) {
+      toast.error('Monthly gross cannot be negative');
       return;
     }
 
@@ -160,9 +159,15 @@ export default function PayrollPage() {
         return;
       }
     }
-    if (staffKind === 'link_user' && !form.user_id) {
-      toast.error('Select a team user to link');
-      return;
+    if (staffKind === 'link_user') {
+      if (String(form.user_id).startsWith('nl:')) {
+        toast.info('That non-login staff member is already in the staff table below.');
+        return;
+      }
+      if (!form.user_id) {
+        toast.error('Select a team user to link');
+        return;
+      }
     }
 
     try {
@@ -191,7 +196,6 @@ export default function PayrollPage() {
       setForm(emptyForm);
       setShowAdvanced(false);
       loadEmployees();
-      loadLinkable();
     } catch (err) {
       if (err?._httpStatus === 402) {
         setSeatError(apiErrorMessage(err));
@@ -208,7 +212,6 @@ export default function PayrollPage() {
       await axiosInstance.delete(`${endpoints.payroll.employees}/${employeeId}`);
       toast.success('Staff removed from payroll');
       loadEmployees();
-      loadLinkable();
     } catch {
       toast.error('Failed to remove staff');
     }
@@ -230,7 +233,6 @@ export default function PayrollPage() {
       await axiosInstance.post(endpoints.payroll.convertStaff(emp.id), { target: 'non_user' });
       toast.success('Converted to non-user staff — login deactivated and seat released');
       loadEmployees();
-      loadLinkable();
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
@@ -259,7 +261,6 @@ export default function PayrollPage() {
       toast.success('Converted to user staff');
       setConvertTarget(null);
       loadEmployees();
-      loadLinkable();
     } catch (err) {
       if (err?._httpStatus === 402) {
         setSeatError(apiErrorMessage(err));
@@ -326,9 +327,9 @@ export default function PayrollPage() {
         <Stack spacing={3}>
           <Typography variant="h4">Payroll / PAYE</Typography>
           <Alert severity="info">
-            Select staff from your directory — user staff have login and use a seat; non-user staff are
-            payroll-only. Converting user → non-user deactivates login and frees the seat. Converting
-            non-user → user needs an available seat.
+            Select staff from your directory — login staff use a seat; non-login staff do not.
+            Non-login staff appear in the staff table and under Select staff → Non-login.
+            Use User List → Add staff without login, or the Non-user tab here.
           </Alert>
 
           {seatError && (
@@ -360,8 +361,8 @@ export default function PayrollPage() {
                   value={staffKind}
                   onChange={(_, v) => v && setStaffKind(v)}
                 >
-                  <ToggleButton value="non_user">Non-user</ToggleButton>
-                  <ToggleButton value="link_user">Link team user</ToggleButton>
+                  <ToggleButton value="non_user">Non-user (no login)</ToggleButton>
+                  <ToggleButton value="link_user">Select staff</ToggleButton>
                   <ToggleButton value="user">Invite user</ToggleButton>
                 </ToggleButtonGroup>
               </Stack>
@@ -449,19 +450,37 @@ export default function PayrollPage() {
                 )}
 
                 {staffKind === 'link_user' && (
-                  <FormControl sx={{ minWidth: 260 }}>
-                    <InputLabel>Team user</InputLabel>
+                  <FormControl sx={{ minWidth: 320 }}>
+                    <InputLabel>Staff</InputLabel>
                     <Select
-                      label="Team user"
+                      label="Staff"
                       value={form.user_id}
                       onChange={(e) => setForm({ ...form, user_id: e.target.value })}
                     >
                       <MenuItem value="" disabled>
-                        Select user
+                        Select staff
                       </MenuItem>
-                      {linkableUsers.map((u) => (
-                        <MenuItem key={u.user_id} value={String(u.user_id)}>
-                          {u.name} · {u.email}
+                      <ListSubheader>Login users (add to payroll)</ListSubheader>
+                      {linkableLoginUsers.length === 0 && (
+                        <MenuItem disabled value="__no_login_users">
+                          No unlinked login users
+                        </MenuItem>
+                      )}
+                      {linkableLoginUsers.map((u) => (
+                        <MenuItem key={u.key} value={String(u.userId)}>
+                          {u.label}
+                          {u.email ? ` · ${u.email}` : ''}
+                        </MenuItem>
+                      ))}
+                      <ListSubheader>Non-login staff (already in table)</ListSubheader>
+                      {nonLoginOptions.length === 0 && (
+                        <MenuItem disabled value="__no_non_login">
+                          No non-login staff yet — use Non-user tab
+                        </MenuItem>
+                      )}
+                      {nonLoginOptions.map((s) => (
+                        <MenuItem key={s.key} value={`nl:${s.employeeId}`}>
+                          {s.label} · no login / no seat
                         </MenuItem>
                       ))}
                     </Select>
@@ -528,6 +547,9 @@ export default function PayrollPage() {
           </Card>
 
           <Card>
+              <Typography variant="subtitle1" sx={{ p: 2, pb: 0 }}>
+                Staff directory (login + non-login)
+              </Typography>
             <Table size="small">
               <TableHead>
                 <TableRow>

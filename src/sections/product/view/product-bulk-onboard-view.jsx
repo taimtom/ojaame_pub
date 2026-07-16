@@ -133,7 +133,9 @@ export function ProductBulkOnboardView({ storeSlug, storeId }) {
 
   // Pre-load 10 empty rows on mount
   const [rows, setRows] = useState(() => Array.from({ length: 10 }, createEmptyRow));
-  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId);
+  const { categories, categoriesLoading, mutateCategories } = useGetCategories(storeId, {
+    published_only: true,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [csvExpanded, setCsvExpanded] = useState(false);

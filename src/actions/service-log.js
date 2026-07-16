@@ -27,6 +27,13 @@ export async function cancelServiceLog(logId, storeId) {
   return res.data;
 }
 
+export async function fetchServiceLog(logId, storeId) {
+  const res = await axiosInstance.get(`/api/service-logs/${logId}`, {
+    params: { store_id: storeId },
+  });
+  return res.data;
+}
+
 export async function fetchServiceLogs(params) {
   const res = await axiosInstance.get('/api/service-logs/', { params });
   return res.data;

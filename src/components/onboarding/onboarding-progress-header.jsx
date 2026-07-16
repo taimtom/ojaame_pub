@@ -44,11 +44,16 @@ export function OnboardingProgressHeader({ progress, subtitle }) {
     getViewingOnboardingStep(pathname, searchParams, progress) || currentKey;
   const activeIndex = getOnboardingStepIndex(viewingKey);
 
-  const salesStep = progress?.steps?.sales;
-  const salesLabel =
-    salesStep && viewingKey === 'sales'
-      ? `Record sales (${salesStep.count || 0}/${salesStep.target || 5})`
-      : null;
+  const stepCountLabel = (stepKey, baseLabel) => {
+    const step = progress?.steps?.[stepKey];
+    if (!step || typeof step.count !== 'number') {
+      return baseLabel;
+    }
+    if (stepKey === 'sales') {
+      return `${baseLabel} (${step.count || 0}/${step.target || 5})`;
+    }
+    return `${baseLabel} (${step.count || 0})`;
+  };
 
   const currentStepState = currentKey ? progress?.steps?.[currentKey] : null;
   const canSkipCurrentStep = Boolean(
@@ -121,10 +126,8 @@ export function OnboardingProgressHeader({ progress, subtitle }) {
           {ONBOARDING_STEPS.map((step, idx) => {
             const done = progress?.steps?.[step.key]?.done;
             const isReachable = idx <= furthestIndex;
-            const label =
-              step.key === 'sales' && salesLabel && viewingKey === 'sales'
-                ? salesLabel
-                : step.label;
+            const showCount = step.key === 'products' || step.key === 'customers' || step.key === 'sales';
+            const label = showCount ? stepCountLabel(step.key, step.label) : step.label;
 
             return (
               <Step key={step.key} completed={done}>
