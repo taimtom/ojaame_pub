@@ -237,7 +237,7 @@ export function ServiceLogView() {
     (sum, row) => sum + (Number(row.amount) || 0),
     0
   );
-  const suggestedFinalPrice = servicesTotal + productsTotal + expensesTotal;
+  const suggestedFinalPrice = servicesTotal + productsTotal;
 
   useEffect(() => {
     if (priceManuallyEdited) return;
@@ -635,6 +635,7 @@ export function ServiceLogView() {
 
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 Expenses total: <strong>{fCurrency(expensesTotal)}</strong>
+                {' '}(internal cost — not added to customer invoice)
               </Typography>
 
               <Divider sx={{ my: 2 }} />
@@ -651,7 +652,7 @@ export function ServiceLogView() {
                 helperText={
                   priceManuallyEdited
                     ? 'Manual override enabled (editable)'
-                    : 'Auto = services + products used + expenses'
+                    : 'Auto = services + products used (expenses are internal costs only)'
                 }
                 InputProps={{
                   startAdornment: (

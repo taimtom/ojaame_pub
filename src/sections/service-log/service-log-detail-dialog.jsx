@@ -299,14 +299,6 @@ export function ServiceLogDetailDialog({
                 </Stack>
                 <Stack direction="row" spacing={4}>
                   <Typography variant="body2" color="text.secondary">
-                    Expenses
-                  </Typography>
-                  <Typography variant="body2" sx={{ minWidth: 100, textAlign: 'right' }}>
-                    {fCurrency(breakdown.expensesTotal)}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={4}>
-                  <Typography variant="body2" color="text.secondary">
                     Subtotal
                   </Typography>
                   <Typography variant="subtitle2" sx={{ minWidth: 100, textAlign: 'right' }}>
@@ -316,9 +308,14 @@ export function ServiceLogDetailDialog({
                 <Stack direction="row" spacing={4}>
                   <Typography variant="subtitle1">Total</Typography>
                   <Typography variant="subtitle1" sx={{ minWidth: 100, textAlign: 'right' }}>
-                    {fCurrency(log.service_price)}
+                    {fCurrency(computedSubtotal)}
                   </Typography>
                 </Stack>
+                {breakdown.expensesTotal > 0 && (
+                  <Typography variant="caption" color="text.disabled" sx={{ pt: 0.5 }}>
+                    Internal expenses {fCurrency(breakdown.expensesTotal)} (not billed to customer)
+                  </Typography>
+                )}
                 {log.amount_paid > 0 && (
                   <Stack direction="row" spacing={4}>
                     <Typography variant="body2" color="text.secondary">

@@ -71,7 +71,8 @@ export function resolveServiceLogBreakdown(log) {
 }
 
 /**
- * Build receipt line items from a service log (services + products used + expenses).
+ * Build customer receipt line items from a service log (services + products used).
+ * Expenses are internal cost tracking and are omitted from customer invoices/receipts.
  */
 export function buildServiceLogReceiptItems(log) {
   if (!log) return [];
@@ -125,20 +126,6 @@ export function buildServiceLogReceiptItems(log) {
     });
   });
 
-  (log.expenses || []).forEach((row) => {
-    const amount = Number(row.amount) || 0;
-    if (amount <= 0) return;
-    const label = row.description?.trim() || row.category || 'Expense';
-    items.push({
-      description: label,
-      product_name: `Expense · ${label}`,
-      quantity: 1,
-      price: amount,
-      total: amount,
-      line_type: 'expense',
-    });
-  });
-
   return items;
 }
 
@@ -149,7 +136,8 @@ export function normalizeReceiptFromServiceLog(log, storeContext = {}) {
   if (!log) return null;
 
   const items = buildServiceLogReceiptItems(log);
-  const { servicePrice } = resolveServiceLogBreakdown(log);
+  const { baseServicePrice, productsTotal } = resolveServiceLogBreakdown(log);
+  const billableTotal = baseServicePrice + productsTotal;
 
   const saleLike = {
     id: log.sale_id || log.id,
@@ -158,7 +146,7 @@ export function normalizeReceiptFromServiceLog(log, storeContext = {}) {
     status: log.sale_status || (log.status === 'billed' ? 'paid' : log.status || 'logged'),
     create_date: log.created_at,
     due_date: log.created_at,
-    total_amount: servicePrice,
+    total_amount: billableTotal,
     taxes: 0,
     discount: 0,
     shipping: 0,
