@@ -27,6 +27,8 @@ const AiAgentPage = lazy(() => import('src/pages/dashboard/ai-agent'));
 const ServiceLogPage = lazy(() => import('src/pages/dashboard/service-log'));
 const FrontDeskPage = lazy(() => import('src/pages/dashboard/front-desk'));
 const FrontDeskSetupPage = lazy(() => import('src/pages/dashboard/front-desk-setup'));
+const FrontDeskCalendarPage = lazy(() => import('src/pages/dashboard/front-desk-calendar'));
+const FrontDeskHousekeepingPage = lazy(() => import('src/pages/dashboard/front-desk-housekeeping'));
 const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
 const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
@@ -234,22 +236,29 @@ export const dashboardRoutes = [
         element: (
           <HotelLodgingGuard>
             <PermissionGuard anyOf={['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create']}>
-              <FrontDeskPage />
+              <Outlet />
             </PermissionGuard>
           </HotelLodgingGuard>
         ),
+        children: [
+          { index: true, element: <FrontDeskPage /> },
+          { path: 'calendar', element: <FrontDeskCalendarPage /> },
+          { path: 'housekeeping', element: <FrontDeskHousekeepingPage /> },
+          {
+            path: 'setup',
+            element: (
+              <PermissionGuard anyOf={['rooms.manage']}>
+                <FrontDeskSetupPage />
+              </PermissionGuard>
+            ),
+          },
+        ],
       },
-      {
-        path: 'front-desk/setup',
-        element: (
-          <HotelLodgingGuard>
-            <PermissionGuard anyOf={['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create']}>
-              <FrontDeskSetupPage />
-            </PermissionGuard>
-          </HotelLodgingGuard>
-        ),
-      },
-      { path: 'quick-restock', element: <QuickRestockPage /> },
+      { path: 'quick-restock', element: (
+        <PermissionGuard anyOf={['products.update', 'inventory.update', 'inventory.manage']}>
+          <QuickRestockPage />
+        </PermissionGuard>
+      ) },
       {
         path: 'usage-dashboard',
         element: withPlanFeature(
@@ -278,15 +287,64 @@ export const dashboardRoutes = [
             { index: true, element: <ProductListPage /> },
             { path: 'list', element: <ProductListPage /> },
             { path: 'history', element: <ProductHistoryListPage /> },
-            { path: 'restock-history', element: <ProductRestockHistoryPage /> },
+            {
+              path: 'restock-history',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update', 'inventory.manage']}>
+                  <ProductRestockHistoryPage />
+                </PermissionGuard>
+              ),
+            },
             { path: ':id', element: <ProductDetailsPage /> },
             { path: ':id/movement', element: <ProductHistoryMovementPage /> },
-            { path: 'new', element: <ProductCreatePage /> },
-            { path: 'bulk-add', element: <ProductBulkAddPage /> },
-            { path: ':id/edit', element: <ProductEditPage /> },
-            { path: ':id/addqty', element: <ProductAddQuantityPage /> },
-            { path: ':id/adjust', element: <ProductAdjustStockPage /> },
-            { path: ':id/change-price', element: <ProductChangePricePage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['products.create']}>
+                  <ProductCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'bulk-add',
+              element: (
+                <PermissionGuard anyOf={['products.create']}>
+                  <ProductBulkAddPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['products.update']}>
+                  <ProductEditPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/addqty',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update']}>
+                  <ProductAddQuantityPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/adjust',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update']}>
+                  <ProductAdjustStockPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/change-price',
+              element: (
+                <PermissionGuard anyOf={['products.update']}>
+                  <ProductChangePricePage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
         {

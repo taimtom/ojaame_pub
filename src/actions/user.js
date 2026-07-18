@@ -49,6 +49,13 @@ export const editUserDetails = async (userId, userData) => {
   const url = `${endpoints.user.edit}/${userId}`;
   const formData = new FormData();
   Object.entries(userData).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    // Skip read-only / non-API fields the form may carry
+    if (key === 'companyName') return;
+    if (Array.isArray(value)) {
+      formData.append(key, value.join(','));
+      return;
+    }
     formData.append(key, value);
   });
   const response = await axiosInstance.put(url, formData, {

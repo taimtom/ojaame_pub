@@ -24,6 +24,7 @@ export function ProductDetailsToolbar({
   liveLink,
   publishOptions,
   onChangePublish,
+  canUpdate = true,
   sx,
   ...other
 }) {
@@ -50,7 +51,7 @@ export function ProductDetailsToolbar({
           </Tooltip>
         )}
 
-        {addQtyLink && (
+        {canUpdate && addQtyLink && (
           <Button
             component={RouterLink}
             href={addQtyLink}
@@ -61,7 +62,7 @@ export function ProductDetailsToolbar({
           </Button>
         )}
 
-        {adjustLink && (
+        {canUpdate && adjustLink && (
           <Button
             component={RouterLink}
             href={adjustLink}
@@ -73,7 +74,7 @@ export function ProductDetailsToolbar({
           </Button>
         )}
 
-        {changePriceLink && (
+        {canUpdate && changePriceLink && (
           <Button
             component={RouterLink}
             href={changePriceLink}
@@ -85,23 +86,27 @@ export function ProductDetailsToolbar({
           </Button>
         )}
 
-        <Tooltip title="Edit">
-          <IconButton component={RouterLink} href={editLink}>
-            <Iconify icon="solar:pen-bold" />
-          </IconButton>
-        </Tooltip>
+        {canUpdate && editLink && (
+          <Tooltip title="Edit">
+            <IconButton component={RouterLink} href={editLink}>
+              <Iconify icon="solar:pen-bold" />
+            </IconButton>
+          </Tooltip>
+        )}
 
-        <LoadingButton
-          color="inherit"
-          variant="contained"
-          loading={!publish}
-          loadingIndicator="Loading…"
-          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
-          onClick={popover.onOpen}
-          sx={{ textTransform: 'capitalize' }}
-        >
-          {publish}
-        </LoadingButton>
+        {canUpdate && (
+          <LoadingButton
+            color="inherit"
+            variant="contained"
+            loading={!publish}
+            loadingIndicator="Loading…"
+            endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
+            onClick={popover.onOpen}
+            sx={{ textTransform: 'capitalize' }}
+          >
+            {publish}
+          </LoadingButton>
+        )}
       </Stack>
 
       <CustomPopover

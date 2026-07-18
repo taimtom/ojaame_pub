@@ -61,7 +61,13 @@ export const NAV_PERMISSIONS = {
     // Inventory items
     Category: ['categories.read'],
     'Product Management': ['products.read'],
+    'Add Product': ['products.create'],
+    'Product Report': ['products.read'],
+    'Product History': ['products.read'],
+    'Restock History': ['products.update', 'inventory.update', 'inventory.manage'],
     'Service Management': ['services.read'],
+    'Add Service': ['services.create'],
+    'Service Report': ['services.read'],
     'Digital Product': ['digital_products.read', 'products.read', 'services.read'],
     
     // Accounting items

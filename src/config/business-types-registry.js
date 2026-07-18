@@ -983,7 +983,8 @@ const BUSINESS_TYPE_CONFIGS = {
           customer: 'Guest',
           sale: 'Folio',
           invoice: 'Folio / Invoice',
-          service: 'Room / Stay',
+          // Services = spa, laundry, etc. Rooms live under Front Desk → Setup.
+          service: 'Service',
           product: 'Amenity / Product',
           pos: 'Front Desk / POS',
           salePlural: 'Folios',
@@ -995,6 +996,7 @@ const BUSINESS_TYPE_CONFIGS = {
           ...DEFAULT_CONFIG.navigation,
           frontDesk: 'Front Desk',
           serviceLog: 'Service Log',
+          serviceManagement: 'Other Services',
           salesAndOrdersSection: 'Front Desk & Sales',
           customer: 'Guests',
         },

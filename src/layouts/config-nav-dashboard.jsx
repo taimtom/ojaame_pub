@@ -312,12 +312,28 @@ export const useNavData = () => {
         icon: ICONS.product,
         permissionKey: 'Product Management',
         children: [
-          { title: `Add ${t('product')}`, path: callIfFunction(paths.dashboard.product.new, currentStore) },
+          {
+            title: `Add ${t('product')}`,
+            path: callIfFunction(paths.dashboard.product.new, currentStore),
+            permissionKey: 'Add Product',
+          },
           // Temporarily hidden from nav while refining UX; route still works at .../product/bulk-add
           // { title: `Bulk add ${t('product')}`, path: callIfFunction(paths.dashboard.product.bulkAdd, currentStore) },
-          { title: `${t('product')} Report`, path: callIfFunction(paths.dashboard.product.root, currentStore) },
-          { title: `${t('product')} History`, path: callIfFunction(paths.dashboard.product.history, currentStore) },
-          { title: 'Restock History', path: callIfFunction(paths.dashboard.product.restockHistory, currentStore) },
+          {
+            title: `${t('product')} Report`,
+            path: callIfFunction(paths.dashboard.product.root, currentStore),
+            permissionKey: 'Product Report',
+          },
+          {
+            title: `${t('product')} History`,
+            path: callIfFunction(paths.dashboard.product.history, currentStore),
+            permissionKey: 'Product History',
+          },
+          {
+            title: 'Restock History',
+            path: callIfFunction(paths.dashboard.product.restockHistory, currentStore),
+            permissionKey: 'Restock History',
+          },
         ],
       },
       {
@@ -326,8 +342,16 @@ export const useNavData = () => {
         icon: ICONS.service,
         permissionKey: 'Service Management',
         children: [
-          { title: `Add ${t('service')}`, path: callIfFunction(paths.dashboard.service.new, currentStore) },
-          { title: `${t('service')} Report`, path: callIfFunction(paths.dashboard.service.root, currentStore) },
+          {
+            title: `Add ${t('service')}`,
+            path: callIfFunction(paths.dashboard.service.new, currentStore),
+            permissionKey: 'Add Service',
+          },
+          {
+            title: `${t('service')} Report`,
+            path: callIfFunction(paths.dashboard.service.root, currentStore),
+            permissionKey: 'Service Report',
+          },
         ],
       },
       {

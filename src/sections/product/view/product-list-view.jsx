@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -19,6 +19,7 @@ import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSetState } from 'src/hooks/use-set-state';
+import { usePermissions } from 'src/hooks/use-permissions';
 
 import { paramCase } from 'src/utils/change-case';
 
@@ -89,6 +90,12 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
   const confirmRows = useBoolean();
   const { t } = useBusinessType();
   const productTerm = t('product');
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = hasPermission('products.create');
+  const canUpdateProduct = hasPermission('products.update');
+  const canDeleteProduct = hasPermission('products.delete');
+  const canAdjustStock =
+    hasPermission('products.update') || hasPermission('inventory.update');
 
 
   const filters = useSetState({ publish: [], stock: [] });
@@ -193,7 +200,8 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [filters.state, selectedRowIds]
   );
 
-  const columns = [
+  const columns = useMemo(
+    () => [
     { field: 'category', headerName: 'Category', filterable: false },
     {
       field: 'name',
@@ -229,7 +237,7 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       field: 'price',
       headerName: 'Price',
       width: 140,
-      editable: true,
+      editable: canUpdateProduct,
       renderCell: (params) => <RenderCellPrice params={params} />,
     },
     {
@@ -237,7 +245,7 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       headerName: 'Publish',
       width: 130,
       type: 'singleSelect',
-      editable: true,
+      editable: canUpdateProduct,
       valueOptions: PUBLISH_OPTIONS,
       renderCell: (params) => <RenderCellPublish params={params} />,
     },
@@ -251,50 +259,82 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      getActions: (params) => [
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:eye-bold" />}
-          label="View"
-          onClick={() => handleViewRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:pen-bold" />}
-          label="Edit"
-          onClick={() => handleEditRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:add-square-bold" />}
-          label="add qty"
-          onClick={() => handleAddQtyRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:danger-triangle-bold" />}
-          label="Record Loss"
-          onClick={() => handleAdjustRow(params.row.id)}
-          sx={{ color: 'error.main' }}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:tag-price-bold" />}
-          label="Change Price"
-          onClick={() => handleChangePriceRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:trash-bin-trash-bold" />}
-          label="Delete"
-          onClick={() => {
-            handleDeleteRow(params.row.id);
-          }}
-          sx={{ color: 'error.main' }}
-        />,
-      ],
+      getActions: (params) => {
+        const actions = [
+          <GridActionsCellItem
+            showInMenu
+            icon={<Iconify icon="solar:eye-bold" />}
+            label="View"
+            onClick={() => handleViewRow(params.row.id)}
+          />,
+        ];
+        if (canUpdateProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:pen-bold" />}
+              label="Edit"
+              onClick={() => handleEditRow(params.row.id)}
+            />
+          );
+        }
+        if (canAdjustStock) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:add-square-bold" />}
+              label="add qty"
+              onClick={() => handleAddQtyRow(params.row.id)}
+            />,
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:danger-triangle-bold" />}
+              label="Record Loss"
+              onClick={() => handleAdjustRow(params.row.id)}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+        if (canUpdateProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:tag-price-bold" />}
+              label="Change Price"
+              onClick={() => handleChangePriceRow(params.row.id)}
+            />
+          );
+        }
+        if (canDeleteProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              label="Delete"
+              onClick={() => {
+                handleDeleteRow(params.row.id);
+              }}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+        return actions;
+      },
     },
-  ];
+  ],
+    [
+      productTerm,
+      canUpdateProduct,
+      canAdjustStock,
+      canDeleteProduct,
+      handleViewRow,
+      handleEditRow,
+      handleAddQtyRow,
+      handleAdjustRow,
+      handleChangePriceRow,
+      handleDeleteRow,
+    ]
+  );
 
   const getTogglableColumns = () =>
     columns
@@ -312,13 +352,15 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
             { name: 'List' },
           ]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
-            >
-              New {productTerm}
-            </Button>
+            canCreateProduct ? (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
+              >
+                New {productTerm}
+              </Button>
+            ) : null
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

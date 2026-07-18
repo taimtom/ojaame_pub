@@ -16,6 +16,7 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useTabs } from 'src/hooks/use-tabs';
+import { usePermissions } from 'src/hooks/use-permissions';
 
 import { fCurrency } from 'src/utils/format-number';
 import { effectiveSaleLineQuantity } from 'src/utils/sale-line-quantity';
@@ -167,6 +168,9 @@ function StockOverviewChart({ purchaseRows, saleRows, outboundLabel = 'Units Sol
 export function ProductDetailsView({ product, error, loading, storeSlug, storeNameSlug, storeId }) {
   const tabs = useTabs('description');
   const theme = useTheme();
+  const { hasPermission } = usePermissions();
+  const canUpdateProduct =
+    hasPermission('products.update') || hasPermission('inventory.update');
 
   const [publish, setPublish] = useState('');
 
@@ -294,6 +298,7 @@ export function ProductDetailsView({ product, error, loading, storeSlug, storeNa
         publish={publish}
         onChangePublish={handleChangePublish}
         publishOptions={PRODUCT_PUBLISH_OPTIONS}
+        canUpdate={canUpdateProduct}
       />
 
       {/* Product overview: image + stock info panel */}

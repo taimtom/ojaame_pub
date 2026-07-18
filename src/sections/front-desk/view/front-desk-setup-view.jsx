@@ -22,9 +22,6 @@ import TableContainer from '@mui/material/TableContainer';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
-
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
 
 import { fCurrency } from 'src/utils/format-number';
@@ -41,6 +38,8 @@ import {
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+
+import { FrontDeskNav } from '../front-desk-nav';
 
 function getStoreIdFromStorage() {
   try {
@@ -227,15 +226,9 @@ export function FrontDeskSetupView() {
             Room types (rates) and physical rooms
           </Typography>
         </Box>
-        <Button
-          component={RouterLink}
-          href={paths.dashboard.frontDesk}
-          variant="outlined"
-          startIcon={<Iconify icon="solar:home-2-bold-duotone" />}
-        >
-          Back to Front Desk
-        </Button>
       </Stack>
+
+      <FrontDeskNav />
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>

@@ -34,6 +34,32 @@ export async function fetchRoomBlockedDates(roomId, storeId, params = {}) {
   return res.data;
 }
 
+export async function fetchRoomHistory(roomId, storeId, params = {}) {
+  const res = await axiosInstance.get(`/api/rooms/${roomId}/history`, {
+    params: { store_id: storeId, ...params },
+  });
+  return res.data;
+}
+
+export async function fetchRoomAvailability(storeId, params = {}) {
+  const res = await axiosInstance.get('/api/rooms/availability', {
+    params: { store_id: storeId, ...params },
+  });
+  return res.data;
+}
+
+export async function fetchHousekeepingBoard(storeId) {
+  const res = await axiosInstance.get('/api/rooms/housekeeping', {
+    params: { store_id: storeId },
+  });
+  return res.data;
+}
+
+export async function applyRoomHousekeeping(roomId, payload) {
+  const res = await axiosInstance.post(`/api/rooms/${roomId}/housekeeping`, payload);
+  return res.data;
+}
+
 export async function createRoom(payload) {
   const res = await axiosInstance.post('/api/rooms/', payload);
   return res.data;
@@ -102,4 +128,22 @@ export async function earlyCheckoutRoomBooking(bookingId, payload) {
     payload
   );
   return res.data;
+}
+
+export async function fetchBookingFolio(bookingId, storeId) {
+  const res = await axiosInstance.get(`/api/room-bookings/${bookingId}/folio`, {
+    params: { store_id: storeId },
+  });
+  return res.data;
+}
+
+export async function addBookingFolioItem(bookingId, payload) {
+  const res = await axiosInstance.post(`/api/room-bookings/${bookingId}/folio`, payload);
+  return res.data;
+}
+
+export async function deleteBookingFolioItem(bookingId, itemId, storeId) {
+  await axiosInstance.delete(`/api/room-bookings/${bookingId}/folio/${itemId}`, {
+    params: { store_id: storeId },
+  });
 }

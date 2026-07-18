@@ -17,6 +17,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Autocomplete from '@mui/material/Autocomplete';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
@@ -24,6 +25,7 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useCurrencyFormat } from 'src/hooks/use-currency-format';
+import { usePermissions } from 'src/hooks/use-permissions';
 
 import axiosInstance from 'src/utils/axios';
 import { fCurrency } from 'src/utils/format-number';
@@ -38,13 +40,19 @@ import {
   markRoomAvailable,
   checkInRoomBooking,
   checkOutRoomBooking,
+  fetchBookingFolio,
+  addBookingFolioItem,
+  fetchRoomHistory,
   fetchRoomBlockedDates,
   addRoomBookingDeposit,
+  deleteBookingFolioItem,
   earlyCheckoutRoomBooking,
 } from 'src/actions/rooms';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+
+import { FrontDeskNav } from '../front-desk-nav';
 
 // ----------------------------------------------------------------------
 
@@ -84,7 +92,17 @@ function nightsBetween(checkIn, checkOut) {
 
 function bookingBalance(booking) {
   if (!booking) return 0;
-  return Math.max(0, Number(booking.total_amount || 0) - Number(booking.deposit_amount || 0));
+  const grand =
+    booking.grand_total != null
+      ? Number(booking.grand_total)
+      : Number(booking.total_amount || 0) + Number(booking.folio_total || 0);
+  return Math.max(0, grand - Number(booking.deposit_amount || 0));
+}
+
+function bookingGrand(booking) {
+  if (!booking) return 0;
+  if (booking.grand_total != null) return Number(booking.grand_total);
+  return Number(booking.total_amount || 0) + Number(booking.folio_total || 0);
 }
 
 function firstOpenNight(blockedSet, fromDayjs = dayjs()) {
@@ -124,6 +142,9 @@ export function FrontDeskView() {
   const storeId = getStoreIdFromStorage();
   const { currencySymbol } = useCurrencyFormat();
   const { paymentMethods } = useGetPaymentMethods(storeId);
+  const { hasPermission } = usePermissions();
+  // Cancel booking / end stay early / deposit refunds — not cashiers
+  const canManageBookings = hasPermission('rooms.manage');
 
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +155,10 @@ export function FrontDeskView() {
   const [moveOpen, setMoveOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [earlyOpen, setEarlyOpen] = useState(false);
+  const [folioOpen, setFolioOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const [customers, setCustomers] = useState([]);
@@ -153,6 +178,15 @@ export function FrontDeskView() {
   const [earlyOutDate, setEarlyOutDate] = useState(toISODate(dayjs()));
   const [refundAmount, setRefundAmount] = useState('');
   const [depositTargetBooking, setDepositTargetBooking] = useState(null);
+  const [folioData, setFolioData] = useState(null);
+  const [folioType, setFolioType] = useState('custom');
+  const [folioQty, setFolioQty] = useState('1');
+  const [folioPrice, setFolioPrice] = useState('');
+  const [folioDesc, setFolioDesc] = useState('');
+  const [folioProduct, setFolioProduct] = useState(null);
+  const [folioService, setFolioService] = useState(null);
+  const [catalogItems, setCatalogItems] = useState([]);
+  const [catalogQuery, setCatalogQuery] = useState('');
 
   const loadBoard = useCallback(async () => {
     if (!storeId) {
@@ -216,7 +250,8 @@ export function FrontDeskView() {
   const earlyStayTotal = useMemo(() => {
     const booking = selectedRoom?.current_booking;
     if (!booking) return 0;
-    return Number(booking.rate_per_night || 0) * earlyNights;
+    const roomPart = Number(booking.rate_per_night || 0) * earlyNights;
+    return roomPart + Number(booking.folio_total || 0);
   }, [selectedRoom, earlyNights]);
 
   const earlyBalance = useMemo(() => {
@@ -232,6 +267,132 @@ export function FrontDeskView() {
   }, [selectedRoom, earlyStayTotal]);
 
   const refundNum = Number(refundAmount) || 0;
+
+  const openFolio = async (room) => {
+    const booking = room.current_booking;
+    if (!booking) return;
+    setSelectedRoom(room);
+    setFolioType('custom');
+    setFolioQty('1');
+    setFolioPrice('');
+    setFolioDesc('');
+    setFolioProduct(null);
+    setFolioService(null);
+    setCatalogQuery('');
+    setCatalogItems([]);
+    setFolioOpen(true);
+    try {
+      const data = await fetchBookingFolio(booking.id, storeId);
+      setFolioData(data);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load folio.');
+      setFolioData(null);
+    }
+  };
+
+  const searchCatalog = async (query, itemType) => {
+    setCatalogQuery(query);
+    if (!query || query.length < 1) {
+      setCatalogItems([]);
+      return;
+    }
+    try {
+      const res = await axiosInstance.get('/api/quick-dashboard/search', {
+        params: {
+          query,
+          store_id: storeId,
+          item_type: itemType === 'product' ? 'product' : 'service',
+          limit: 20,
+        },
+      });
+      const list = Array.isArray(res.data?.results)
+        ? res.data.results
+        : Array.isArray(res.data?.items)
+          ? res.data.items
+          : Array.isArray(res.data)
+            ? res.data
+            : [];
+      setCatalogItems(
+        list.filter((i) =>
+          itemType === 'product'
+            ? i.type === 'product' || i.item_type === 'product' || !i.type
+            : i.type === 'service' || i.item_type === 'service' || !i.type
+        )
+      );
+    } catch {
+      setCatalogItems([]);
+    }
+  };
+
+  const handleAddFolio = async () => {
+    const booking = selectedRoom?.current_booking;
+    if (!booking) return;
+    const qty = Number(folioQty) || 1;
+    const payload = {
+      store_id: storeId,
+      item_type: folioType,
+      quantity: qty,
+    };
+    if (folioType === 'product') {
+      if (!folioProduct?.id) {
+        toast.error('Select a product.');
+        return;
+      }
+      payload.product_id = folioProduct.id;
+      if (folioPrice !== '') payload.unit_price = Number(folioPrice);
+    } else if (folioType === 'service') {
+      if (!folioService?.id) {
+        toast.error('Select a service.');
+        return;
+      }
+      payload.service_id = folioService.id;
+      if (folioPrice !== '') payload.unit_price = Number(folioPrice);
+    } else {
+      if (!folioDesc.trim()) {
+        toast.error('Enter a description.');
+        return;
+      }
+      if (!(Number(folioPrice) >= 0) || folioPrice === '') {
+        toast.error('Enter a unit price.');
+        return;
+      }
+      payload.description = folioDesc.trim();
+      payload.unit_price = Number(folioPrice);
+    }
+    setBusy(true);
+    try {
+      await addBookingFolioItem(booking.id, payload);
+      toast.success('Charge added to folio.');
+      const data = await fetchBookingFolio(booking.id, storeId);
+      setFolioData(data);
+      setFolioDesc('');
+      setFolioPrice('');
+      setFolioProduct(null);
+      setFolioService(null);
+      await loadBoard();
+    } catch (err) {
+      toast.error(err.message || 'Could not add charge.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveFolio = async (itemId) => {
+    const booking = selectedRoom?.current_booking;
+    if (!booking) return;
+    setBusy(true);
+    try {
+      await deleteBookingFolioItem(booking.id, itemId, storeId);
+      toast.success('Charge removed.');
+      const data = await fetchBookingFolio(booking.id, storeId);
+      setFolioData(data);
+      await loadBoard();
+    } catch (err) {
+      toast.error(err.message || 'Could not remove charge.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const loadBlockedDates = async (room) => {
     if (!room || !storeId) {
@@ -379,15 +540,19 @@ export function FrontDeskView() {
   const handleCheckout = async () => {
     const booking = selectedRoom?.current_booking;
     if (!booking) return;
+    const balance = bookingBalance(booking);
+    if (balance > 0.01 && !paymentMethodId) {
+      toast.error('Select a payment method and collect the balance before checkout.');
+      return;
+    }
     setBusy(true);
     try {
-      const balance = bookingBalance(booking);
       await checkOutRoomBooking(booking.id, {
         store_id: storeId,
         status: 'paid',
         mark_room_dirty: true,
         payments:
-          balance > 0.01 && paymentMethodId
+          balance > 0.01
             ? [{ payment_method_id: Number(paymentMethodId), amount: balance }]
             : [],
       });
@@ -427,6 +592,10 @@ export function FrontDeskView() {
   };
 
   const handleCancel = async (room) => {
+    if (!canManageBookings) {
+      toast.error('Only a store manager, accountant, or merchant can cancel bookings.');
+      return;
+    }
     const booking = room.next_booking || room.current_booking;
     if (!booking || booking.status === 'checked_in') {
       toast.error('Cancel is only for held/confirmed bookings. Use End stay early for in-house guests.');
@@ -488,6 +657,10 @@ export function FrontDeskView() {
   };
 
   const openEarlyCheckout = (room) => {
+    if (!canManageBookings) {
+      toast.error('Only a store manager, accountant, or merchant can end a stay early or issue a refund.');
+      return;
+    }
     setSelectedRoom(room);
     const today = dayjs();
     const minOut = dayjs(room.current_booking?.check_in_date).add(1, 'day');
@@ -501,6 +674,10 @@ export function FrontDeskView() {
   };
 
   const handleEarlyCheckout = async () => {
+    if (!canManageBookings) {
+      toast.error('Only a store manager, accountant, or merchant can end a stay early or issue a refund.');
+      return;
+    }
     const booking = selectedRoom?.current_booking;
     if (!booking) return;
     if (refundNum > earlyExcess + 0.01) {
@@ -509,6 +686,10 @@ export function FrontDeskView() {
     }
     if (refundNum < 0) {
       toast.error('Refund amount cannot be negative.');
+      return;
+    }
+    if (earlyBalance > 0.01 && !paymentMethodId) {
+      toast.error('Select a payment method and collect the balance before ending the stay.');
       return;
     }
     setBusy(true);
@@ -520,7 +701,7 @@ export function FrontDeskView() {
         mark_room_dirty: true,
         refund_amount: refundNum > 0.01 ? refundNum : null,
         payments:
-          earlyBalance > 0.01 && paymentMethodId
+          earlyBalance > 0.01
             ? [{ payment_method_id: Number(paymentMethodId), amount: earlyBalance }]
             : [],
       });
@@ -548,6 +729,21 @@ export function FrontDeskView() {
       toast.error(err.message || 'Could not mark available.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openHistory = async (room) => {
+    setSelectedRoom(room);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryData(null);
+    try {
+      const data = await fetchRoomHistory(room.id, storeId, { limit: 50 });
+      setHistoryData(data);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load room history.');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -600,14 +796,6 @@ export function FrontDeskView() {
         </Box>
         <Stack direction="row" spacing={1}>
           <Button
-            component={RouterLink}
-            href={paths.dashboard.frontDeskSetup}
-            variant="outlined"
-            startIcon={<Iconify icon="solar:settings-bold-duotone" />}
-          >
-            Rooms setup
-          </Button>
-          <Button
             variant="contained"
             startIcon={<Iconify icon="solar:refresh-bold" />}
             onClick={loadBoard}
@@ -617,6 +805,8 @@ export function FrontDeskView() {
           </Button>
         </Stack>
       </Stack>
+
+      <FrontDeskNav />
 
       {loading && !board ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -634,10 +824,17 @@ export function FrontDeskView() {
 
           {!board?.rooms?.length ? (
             <Alert severity="info" sx={{ mb: 2 }}>
-              No rooms yet.{' '}
-              <Button component={RouterLink} href={paths.dashboard.frontDeskSetup} size="small">
-                Add room types & rooms
-              </Button>
+              No rooms yet.
+              {canManageBookings ? (
+                <>
+                  {' '}
+                  <Button component={RouterLink} href={paths.dashboard.frontDeskSetup} size="small">
+                    Add room types & rooms
+                  </Button>
+                </>
+              ) : (
+                ' Ask a store manager to add room types and rooms.'
+              )}
             </Alert>
           ) : (
             <Grid container spacing={2}>
@@ -682,7 +879,10 @@ export function FrontDeskView() {
                               {booking.check_in_date} → {booking.check_out_date} ({booking.nights}n)
                             </Typography>
                             <Typography variant="caption" color="text.secondary" display="block">
-                              {fCurrency(booking.total_amount)}
+                              {fCurrency(bookingGrand(booking))}
+                              {Number(booking.folio_total || 0) > 0
+                                ? ` (room ${fCurrency(booking.total_amount)} + charges ${fCurrency(booking.folio_total)})`
+                                : ''}
                               {booking.deposit_amount > 0
                                 ? ` · deposit ${fCurrency(booking.deposit_amount)}`
                                 : ''}
@@ -694,6 +894,15 @@ export function FrontDeskView() {
                         )}
 
                         <Stack spacing={1} sx={{ mt: 2 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={() => openHistory(room)}
+                            disabled={busy}
+                          >
+                            Room history
+                          </Button>
                           {canBookRoom(room) && (
                             <Button
                               size="small"
@@ -726,21 +935,32 @@ export function FrontDeskView() {
                               <Button
                                 size="small"
                                 variant="soft"
+                                color="secondary"
+                                onClick={() => openFolio(room)}
+                                disabled={busy}
+                              >
+                                Room charges
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="soft"
                                 color="warning"
                                 onClick={() => openCheckout(room)}
                                 disabled={busy}
                               >
                                 Check out
                               </Button>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="error"
-                                onClick={() => openEarlyCheckout(room)}
-                                disabled={busy}
-                              >
-                                End stay early
-                              </Button>
+                              {canManageBookings && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() => openEarlyCheckout(room)}
+                                  disabled={busy}
+                                >
+                                  End stay early
+                                </Button>
+                              )}
                               <Button size="small" variant="outlined" onClick={() => openMove(room)} disabled={busy}>
                                 Move room
                               </Button>
@@ -771,7 +991,8 @@ export function FrontDeskView() {
                             </Button>
                           )}
 
-                          {room.next_booking &&
+                          {canManageBookings &&
+                            room.next_booking &&
                             ['held', 'confirmed'].includes(room.next_booking.status) && (
                               <Button size="small" color="inherit" onClick={() => handleCancel(room)} disabled={busy}>
                                 Cancel booking
@@ -903,7 +1124,15 @@ export function FrontDeskView() {
                 Guest: <strong>{selectedRoom.current_booking.customer_name}</strong>
               </Typography>
               <Typography variant="body2">
-                Stay total: {fCurrency(selectedRoom.current_booking.total_amount)}
+                Stay (room): {fCurrency(selectedRoom.current_booking.total_amount)}
+              </Typography>
+              {Number(selectedRoom.current_booking.folio_total || 0) > 0 && (
+                <Typography variant="body2">
+                  Folio charges: {fCurrency(selectedRoom.current_booking.folio_total)}
+                </Typography>
+              )}
+              <Typography variant="body2">
+                Grand total: {fCurrency(bookingGrand(selectedRoom.current_booking))}
               </Typography>
               <Typography variant="body2">
                 Deposit paid: {fCurrency(selectedRoom.current_booking.deposit_amount || 0)}
@@ -912,18 +1141,26 @@ export function FrontDeskView() {
                 Balance due: {fCurrency(bookingBalance(selectedRoom.current_booking))}
               </Typography>
               {bookingBalance(selectedRoom.current_booking) > 0.01 && (
-                <TextField
-                  select
-                  label="Payment method"
-                  value={paymentMethodId}
-                  onChange={(e) => setPaymentMethodId(e.target.value)}
-                >
-                  {(paymentMethods || []).map((pm) => (
-                    <MenuItem key={pm.id} value={String(pm.id)}>
-                      {pm.issuer || pm.method_type || `Method #${pm.id}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <>
+                  <Alert severity="warning">
+                    Collect the full balance due before checkout. You can also use Balance deposit on
+                    the room card first.
+                  </Alert>
+                  <TextField
+                    select
+                    required
+                    label="Payment method"
+                    value={paymentMethodId}
+                    onChange={(e) => setPaymentMethodId(e.target.value)}
+                    helperText={`Will collect ${fCurrency(bookingBalance(selectedRoom.current_booking))}`}
+                  >
+                    {(paymentMethods || []).map((pm) => (
+                      <MenuItem key={pm.id} value={String(pm.id)}>
+                        {pm.issuer || pm.method_type || `Method #${pm.id}`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </>
               )}
               <Alert severity="info">Room will be marked dirty after checkout.</Alert>
             </Stack>
@@ -931,8 +1168,18 @@ export function FrontDeskView() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCheckoutOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="warning" onClick={handleCheckout} disabled={busy}>
-            Confirm checkout
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleCheckout}
+            disabled={
+              busy ||
+              (bookingBalance(selectedRoom?.current_booking) > 0.01 && !paymentMethodId)
+            }
+          >
+            {bookingBalance(selectedRoom?.current_booking) > 0.01
+              ? 'Pay balance & check out'
+              : 'Confirm checkout'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1013,25 +1260,36 @@ export function FrontDeskView() {
                 slotProps={{ textField: { fullWidth: true } }}
               />
               <Typography variant="body2">
-                Billed nights: {earlyNights} · New total {fCurrency(earlyStayTotal)}
+                Billed nights: {earlyNights} · Room {fCurrency(Number(selectedRoom.current_booking.rate_per_night || 0) * earlyNights)}
+                {Number(selectedRoom.current_booking.folio_total || 0) > 0
+                  ? ` + charges ${fCurrency(selectedRoom.current_booking.folio_total)}`
+                  : ''}{' '}
+                = {fCurrency(earlyStayTotal)}
               </Typography>
               <Typography variant="body2">
                 Deposit paid: {fCurrency(selectedRoom.current_booking.deposit_amount || 0)}
               </Typography>
               <Typography variant="subtitle2">Balance due: {fCurrency(earlyBalance)}</Typography>
               {earlyBalance > 0.01 && (
-                <TextField
-                  select
-                  label="Payment method"
-                  value={paymentMethodId}
-                  onChange={(e) => setPaymentMethodId(e.target.value)}
-                >
-                  {(paymentMethods || []).map((pm) => (
-                    <MenuItem key={pm.id} value={String(pm.id)}>
-                      {pm.issuer || pm.method_type || `Method #${pm.id}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <>
+                  <Alert severity="warning">
+                    Collect the full balance due before ending the stay.
+                  </Alert>
+                  <TextField
+                    select
+                    required
+                    label="Payment method"
+                    value={paymentMethodId}
+                    onChange={(e) => setPaymentMethodId(e.target.value)}
+                    helperText={`Will collect ${fCurrency(earlyBalance)}`}
+                  >
+                    {(paymentMethods || []).map((pm) => (
+                      <MenuItem key={pm.id} value={String(pm.id)}>
+                        {pm.issuer || pm.method_type || `Method #${pm.id}`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </>
               )}
               {earlyExcess > 0.01 && (
                 <>
@@ -1062,8 +1320,274 @@ export function FrontDeskView() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEarlyOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleEarlyCheckout} disabled={busy}>
-            {busy ? <CircularProgress size={18} /> : 'End stay & check out'}
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleEarlyCheckout}
+            disabled={busy || (earlyBalance > 0.01 && !paymentMethodId)}
+          >
+            {busy ? (
+              <CircularProgress size={18} />
+            ) : earlyBalance > 0.01 ? (
+              'Pay balance & end stay'
+            ) : (
+              'End stay & check out'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Room history */}
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>
+          Room history · {historyData?.room_code || selectedRoom?.code}
+          {historyData?.room_type_name ? ` · ${historyData.room_type_name}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          {historyLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : !historyData?.stays?.length ? (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              No stays recorded for this room yet.
+            </Alert>
+          ) : (
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {historyData.total_stays} stay(s)
+              </Typography>
+              {historyData.stays.map((stay) => (
+                <Box
+                  key={stay.booking_id}
+                  sx={{ p: 2, borderRadius: 1, bgcolor: 'background.neutral' }}
+                >
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    justifyContent="space-between"
+                    spacing={1}
+                    sx={{ mb: 1 }}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1">
+                        {stay.customer_name || 'Guest'} · {stay.booking_number}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {stay.check_in_date} → {stay.check_out_date} · {stay.nights} night(s) ·{' '}
+                        {fCurrency(stay.rate_per_night)}/night
+                      </Typography>
+                    </Box>
+                    <Chip
+                      size="small"
+                      label={stay.status}
+                      sx={{ textTransform: 'capitalize', alignSelf: 'flex-start' }}
+                    />
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Room {fCurrency(stay.room_total)}
+                    {stay.folio_total > 0 ? ` + charges ${fCurrency(stay.folio_total)}` : ''}
+                    {` = ${fCurrency(stay.grand_total)}`}
+                    {` · deposit ${fCurrency(stay.deposit_amount)}`}
+                    {stay.balance_due > 0.01 ? ` · due ${fCurrency(stay.balance_due)}` : ''}
+                  </Typography>
+
+                  {stay.purchases?.length > 0 && (
+                    <>
+                      <Divider sx={{ my: 1.5 }} />
+                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                        Purchases / charges
+                      </Typography>
+                      <Stack spacing={0.75}>
+                        {stay.purchases.map((p, idx) => (
+                          <Stack
+                            key={`${stay.booking_id}-p-${idx}`}
+                            direction="row"
+                            justifyContent="space-between"
+                          >
+                            <Typography variant="body2">
+                              {p.description}{' '}
+                              <Typography component="span" variant="caption" color="text.secondary">
+                                ({p.item_type} · {p.quantity} × {fCurrency(p.unit_price)}
+                                {p.invoice_number ? ` · ${p.invoice_number}` : ''})
+                              </Typography>
+                            </Typography>
+                            <Typography variant="body2">{fCurrency(p.amount)}</Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </>
+                  )}
+
+                  {stay.payments?.length > 0 && (
+                    <>
+                      <Divider sx={{ my: 1.5 }} />
+                      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                        Payments (deposit & checkout)
+                      </Typography>
+                      <Stack spacing={0.75}>
+                        {stay.payments.map((pay, idx) => (
+                          <Stack
+                            key={`${stay.booking_id}-pay-${idx}`}
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="flex-start"
+                          >
+                            <Box>
+                              <Typography variant="body2">
+                                {fCurrency(pay.amount)} ·{' '}
+                                {pay.kind === 'deposit'
+                                  ? 'Deposit'
+                                  : pay.kind === 'deposit_topup'
+                                    ? 'Deposit top-up'
+                                    : pay.kind === 'folio'
+                                      ? 'Folio charge'
+                                      : pay.kind === 'checkout'
+                                        ? 'Checkout'
+                                        : pay.kind}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {[
+                                  pay.paid_at
+                                    ? dayjs(pay.paid_at).format('DD MMM YYYY, h:mm a')
+                                    : null,
+                                  pay.invoice_number,
+                                  pay.payment_method,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Room folio charges */}
+      <Dialog open={folioOpen} onClose={() => setFolioOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Room charges · {selectedRoom?.code}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {folioData && (
+              <Alert severity="info">
+                Room {fCurrency(folioData.room_total)} + charges {fCurrency(folioData.folio_total)} −
+                deposit {fCurrency(folioData.deposit_amount)} = due {fCurrency(folioData.balance_due)}
+              </Alert>
+            )}
+            {(folioData?.items || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No charges yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1}>
+                {folioData.items.map((item) => (
+                  <Stack
+                    key={item.id}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    sx={{ p: 1, bgcolor: 'background.neutral', borderRadius: 1 }}
+                  >
+                    <Box>
+                      <Typography variant="subtitle2">{item.description}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.item_type} · {item.quantity} × {fCurrency(item.unit_price)}
+                        {item.invoice_number ? ` · ${item.invoice_number}` : ''}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="subtitle2">{fCurrency(item.amount)}</Typography>
+                      <Button size="small" color="inherit" onClick={() => handleRemoveFolio(item.id)} disabled={busy}>
+                        Remove
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
+            <TextField
+              select
+              label="Charge type"
+              value={folioType}
+              onChange={(e) => {
+                setFolioType(e.target.value);
+                setFolioProduct(null);
+                setFolioService(null);
+                setCatalogItems([]);
+              }}
+            >
+              <MenuItem value="product">Product (stock out)</MenuItem>
+              <MenuItem value="service">Service</MenuItem>
+              <MenuItem value="custom">Custom</MenuItem>
+            </TextField>
+
+            {folioType === 'product' && (
+              <Autocomplete
+                options={catalogItems}
+                getOptionLabel={(o) => o.name || o.label || ''}
+                value={folioProduct}
+                onInputChange={(_, v) => searchCatalog(v, 'product')}
+                onChange={(_, v) => {
+                  setFolioProduct(v);
+                  if (v?.price != null) setFolioPrice(String(v.price));
+                }}
+                renderInput={(params) => <TextField {...params} label="Search product" />}
+              />
+            )}
+            {folioType === 'service' && (
+              <Autocomplete
+                options={catalogItems}
+                getOptionLabel={(o) => o.name || o.label || ''}
+                value={folioService}
+                onInputChange={(_, v) => searchCatalog(v, 'service')}
+                onChange={(_, v) => {
+                  setFolioService(v);
+                  const p = v?.price_sale ?? v?.price;
+                  if (p != null) setFolioPrice(String(p));
+                }}
+                renderInput={(params) => <TextField {...params} label="Search service" />}
+              />
+            )}
+            {folioType === 'custom' && (
+              <TextField
+                label="Description"
+                value={folioDesc}
+                onChange={(e) => setFolioDesc(e.target.value)}
+              />
+            )}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                type="number"
+                label="Qty"
+                value={folioQty}
+                onChange={(e) => setFolioQty(e.target.value)}
+                sx={{ width: 100 }}
+              />
+              <TextField
+                fullWidth
+                type="number"
+                label={`Unit price (${currencySymbol})`}
+                value={folioPrice}
+                onChange={(e) => setFolioPrice(e.target.value)}
+                helperText={folioType !== 'custom' ? 'Optional — defaults to catalog price' : undefined}
+              />
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFolioOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={handleAddFolio} disabled={busy}>
+            Add charge
           </Button>
         </DialogActions>
       </Dialog>

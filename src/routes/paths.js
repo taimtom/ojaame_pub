@@ -114,6 +114,8 @@ export const paths = {
     serviceLog: `${ROOTS.DASHBOARD}/service-log`,
     frontDesk: `${ROOTS.DASHBOARD}/front-desk`,
     frontDeskSetup: `${ROOTS.DASHBOARD}/front-desk/setup`,
+    frontDeskCalendar: `${ROOTS.DASHBOARD}/front-desk/calendar`,
+    frontDeskHousekeeping: `${ROOTS.DASHBOARD}/front-desk/housekeeping`,
     quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
     usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,
     mail: `${ROOTS.DASHBOARD}/mail`,
