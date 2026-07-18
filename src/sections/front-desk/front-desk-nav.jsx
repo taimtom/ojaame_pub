@@ -35,8 +35,10 @@ function resolveTab(pathname) {
 export function FrontDeskNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { hasPermission } = usePermissions();
-  const canManageRooms = hasPermission('rooms.manage');
+  const { hasPermission, isFullAccessRole } = usePermissions();
+  // Room types / physical rooms — manager+ (and merchant/owner full access)
+  const canManageRooms =
+    isFullAccessRole || hasPermission('rooms.manage') || hasPermission('rooms.delete');
 
   const tabs = useMemo(
     () => ALL_TABS.filter((tab) => !tab.requireManage || canManageRooms),

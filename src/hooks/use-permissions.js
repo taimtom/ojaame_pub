@@ -12,6 +12,15 @@ import { useUser } from 'src/actions/user';
 
 import { useAuthContext } from 'src/auth/hooks';
 
+const FULL_ACCESS_ROLES = new Set(['merchant', 'owner', 'administrator', 'admin']);
+
+function normalizeRoleName(role) {
+  if (!role) return '';
+  if (typeof role === 'string') return role.trim().toLowerCase();
+  if (typeof role === 'object' && role.name) return String(role.name).trim().toLowerCase();
+  return '';
+}
+
 /**
  * Hook to access and check user permissions
  * @returns {Object} Permission utilities and user permission data
@@ -19,6 +28,13 @@ import { useAuthContext } from 'src/auth/hooks';
 export function usePermissions() {
   const { user: authUser } = useAuthContext();
   const { user: apiUser, isLoading } = useUser();
+
+  const roleName = useMemo(
+    () => normalizeRoleName(apiUser?.role || authUser?.role),
+    [apiUser, authUser]
+  );
+
+  const isFullAccessRole = FULL_ACCESS_ROLES.has(roleName);
 
   // Get permissions from API user (preferred) or auth context
   const userPermissions = useMemo(() => {
@@ -43,8 +59,11 @@ export function usePermissions() {
    * @returns {boolean} True if user has the permission
    */
   const checkPermission = useMemo(
-    () => (permission) => hasPermission(userPermissions, permission),
-    [userPermissions]
+    () => (permission) => {
+      if (isFullAccessRole) return true;
+      return hasPermission(userPermissions, permission);
+    },
+    [userPermissions, isFullAccessRole]
   );
 
   /**
@@ -53,8 +72,11 @@ export function usePermissions() {
    * @returns {boolean} True if user has at least one of the required permissions
    */
   const checkAnyPermission = useMemo(
-    () => (requiredPermissions) => hasAnyPermission(userPermissions, requiredPermissions),
-    [userPermissions]
+    () => (requiredPermissions) => {
+      if (isFullAccessRole) return true;
+      return hasAnyPermission(userPermissions, requiredPermissions);
+    },
+    [userPermissions, isFullAccessRole]
   );
 
   /**
@@ -63,8 +85,11 @@ export function usePermissions() {
    * @returns {boolean} True if user has all required permissions
    */
   const checkAllPermissions = useMemo(
-    () => (requiredPermissions) => hasAllPermissions(userPermissions, requiredPermissions),
-    [userPermissions]
+    () => (requiredPermissions) => {
+      if (isFullAccessRole) return true;
+      return hasAllPermissions(userPermissions, requiredPermissions);
+    },
+    [userPermissions, isFullAccessRole]
   );
 
   /**
@@ -73,13 +98,18 @@ export function usePermissions() {
    * @returns {boolean} True if user has any permission in the category
    */
   const checkCategoryPermission = useMemo(
-    () => (category) => hasCategoryPermission(userPermissions, category),
-    [userPermissions]
+    () => (category) => {
+      if (isFullAccessRole) return true;
+      return hasCategoryPermission(userPermissions, category);
+    },
+    [userPermissions, isFullAccessRole]
   );
 
   return {
     userPermissions,
     roleId,
+    roleName,
+    isFullAccessRole,
     isLoading,
     hasPermission: checkPermission,
     hasAnyPermission: checkAnyPermission,

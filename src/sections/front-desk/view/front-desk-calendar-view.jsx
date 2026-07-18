@@ -91,8 +91,9 @@ export function FrontDeskCalendarView() {
   const storeId = getStoreIdFromStorage();
   const { currencySymbol } = useCurrencyFormat();
   const { paymentMethods } = useGetPaymentMethods(storeId);
-  const { hasPermission } = usePermissions();
-  const canManageBookings = hasPermission('rooms.manage');
+  const { hasPermission, isFullAccessRole } = usePermissions();
+  const canManageBookings =
+    isFullAccessRole || hasPermission('rooms.manage') || hasPermission('rooms.delete');
 
   const [fromDate, setFromDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [data, setData] = useState(null);

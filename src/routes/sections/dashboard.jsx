@@ -247,7 +247,7 @@ export const dashboardRoutes = [
           {
             path: 'setup',
             element: (
-              <PermissionGuard anyOf={['rooms.manage']}>
+              <PermissionGuard anyOf={['rooms.manage', 'rooms.delete']}>
                 <FrontDeskSetupPage />
               </PermissionGuard>
             ),

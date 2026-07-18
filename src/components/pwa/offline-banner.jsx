@@ -7,6 +7,8 @@ import { usePathname } from 'src/routes/hooks';
 
 import { useNetworkStatus } from 'src/hooks/use-network-status';
 
+import { toast, isNetworkAdvisoryMessage } from 'src/components/snackbar';
+
 import { NETWORK_QUALITY } from 'src/utils/network-quality';
 
 // ----------------------------------------------------------------------
@@ -158,6 +160,41 @@ export function OfflineBanner() {
       setDismissedQuality('');
     }
   }, [quality, dismissedQuality]);
+
+  // Kill any top-right network toasts while connection is degraded (banner is enough).
+  useEffect(() => {
+    if (quality === NETWORK_QUALITY.GOOD) return undefined;
+
+    const dismissNetworkToasts = () => {
+      const root = document.querySelector('[data-sonner-toaster]');
+      if (!root) return;
+
+      root.querySelectorAll('[data-sonner-toast]').forEach((el) => {
+        const text = el.textContent || '';
+        if (!isNetworkAdvisoryMessage(text)) return;
+
+        const id = el.getAttribute('data-sonner-toast');
+        if (id) {
+          toast.dismiss(id);
+          return;
+        }
+        el.querySelector('[data-close-button]')?.click();
+      });
+    };
+
+    dismissNetworkToasts();
+    const root = document.querySelector('[data-sonner-toaster]');
+    const observer =
+      root &&
+      new MutationObserver(() => {
+        dismissNetworkToasts();
+      });
+    if (root && observer) {
+      observer.observe(root, { childList: true, subtree: true });
+    }
+
+    return () => observer?.disconnect();
+  }, [quality]);
 
   if (!showOnAuth && !showInApp) return null;
 

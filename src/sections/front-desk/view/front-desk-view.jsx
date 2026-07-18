@@ -142,9 +142,10 @@ export function FrontDeskView() {
   const storeId = getStoreIdFromStorage();
   const { currencySymbol } = useCurrencyFormat();
   const { paymentMethods } = useGetPaymentMethods(storeId);
-  const { hasPermission } = usePermissions();
-  // Cancel booking / end stay early / deposit refunds — not cashiers
-  const canManageBookings = hasPermission('rooms.manage');
+  const { hasPermission, isFullAccessRole } = usePermissions();
+  // Cancel booking / end stay early / deposit refunds / room setup — not cashiers
+  const canManageBookings =
+    isFullAccessRole || hasPermission('rooms.manage') || hasPermission('rooms.delete');
 
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -833,7 +834,7 @@ export function FrontDeskView() {
                   </Button>
                 </>
               ) : (
-                ' Ask a store manager to add room types and rooms.'
+                ' Ask a store manager or merchant to add room types and rooms.'
               )}
             </Alert>
           ) : (
