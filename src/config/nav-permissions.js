@@ -51,6 +51,7 @@ export const NAV_PERMISSIONS = {
     'Service Log': [],
     'Usage dashboard': ['inventory.read', 'inventory.update', 'inventory.manage'],
     'Help & Support': [],
+    'Front Desk': ['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create'],
     'Quick Restock': ['inventory.update', 'inventory.manage', 'products.update'],
     
     // Sales & Orders items

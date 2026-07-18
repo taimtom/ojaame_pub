@@ -112,6 +112,8 @@ export const paths = {
     aiAgent: `${ROOTS.DASHBOARD}/ai-agent`,
     subscriptionInactive: `${ROOTS.DASHBOARD}/subscription-inactive`,
     serviceLog: `${ROOTS.DASHBOARD}/service-log`,
+    frontDesk: `${ROOTS.DASHBOARD}/front-desk`,
+    frontDeskSetup: `${ROOTS.DASHBOARD}/front-desk/setup`,
     quickRestock: `${ROOTS.DASHBOARD}/quick-restock`,
     usageDashboard: `${ROOTS.DASHBOARD}/usage-dashboard`,
     mail: `${ROOTS.DASHBOARD}/mail`,

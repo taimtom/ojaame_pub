@@ -25,7 +25,8 @@ const PLAN_TIERS = [
     features: [
       'Full POS, inventory & customer management',
       'Essential reports & receipt printing',
-      'Up to 3 team members per store (₦1,000/seat for seats 2–3)',
+      '2 seats included per store',
+      'Up to 3 team members per store (₦1,000/seat beyond the 2 included)',
       'Roles & per-user permissions',
       'First store included free',
       '₦3,000/month per additional store',
@@ -40,7 +41,9 @@ const PLAN_TIERS = [
     description: 'For growing businesses that need more capacity.',
     features: [
       'Everything in Basic',
-      'Unlimited team size',
+      '2 stores included',
+      '2 seats included per store',
+      'Unlimited team size beyond included seats',
       'Custom roles',
       'Advanced & company reports',
       'Integrations, store website & digital products',
@@ -56,7 +59,8 @@ const PLAN_TIERS = [
     description: 'Tailored pricing for larger operations.',
     features: [
       'Custom base subscription',
-      'Custom per-seat pricing',
+      '2 seats included per store',
+      'Custom per-seat pricing beyond included seats',
       'First store included free',
       '₦3,000/month per additional store',
       'Managed by Ojaame team',
@@ -68,24 +72,24 @@ const PLAN_TIERS = [
 const EXAMPLES = [
   {
     name: 'Example A — Basic',
-    details: '1 store, 1 seat',
+    details: '1 store, 2 seats',
     basic: '₦3,000/month',
     standard: '₦10,000/month',
-    formula: 'Base only — no extra stores or seats',
+    formula: 'Base only — 2 included seats, no extras',
   },
   {
     name: 'Example B — Basic',
-    details: '2 stores, 2 seats in first store, 1 seat in second',
-    basic: '₦7,000/month',
-    standard: '₦15,000/month',
-    formula: 'Base + 1 extra store (₦3,000) + 1 extra seat',
+    details: '2 stores, 2 seats each',
+    basic: '₦6,000/month',
+    standard: '₦10,000/month',
+    formula: 'Basic: base + 1 extra store. Standard: both stores included',
   },
   {
     name: 'Example C — Basic',
     details: '1 store, 4 seats',
-    basic: '₦6,000/month',
-    standard: '₦16,000/month',
-    formula: 'Base + 3 extra seats',
+    basic: '₦5,000/month',
+    standard: '₦14,000/month',
+    formula: 'Base + 2 extra seats (seats 3 and 4)',
   },
 ];
 
@@ -166,7 +170,7 @@ export function HomePricing() {
 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   {plan.tier !== 'enterprise'
-                    ? `+ ${plan.seatPrice}/seat/month beyond included seat`
+                    ? `+ ${plan.seatPrice}/seat/month beyond 2 included seats per store`
                     : 'Contact us for custom rates'}
                 </Typography>
 
@@ -231,8 +235,9 @@ export function HomePricing() {
             How billing works
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Every plan includes one free seat per store. Additional stores cost ₦3,000/month each
-            (first store is free). Extra staff seats are billed per store at your plan&apos;s seat rate.
+            Every plan includes two seats per store. Additional stores cost ₦3,000/month each
+            (first store is free on Basic; Standard includes two stores). Extra staff seats are
+            billed per store at your plan&apos;s seat rate.
           </Typography>
 
           <Stack spacing={2.5}>

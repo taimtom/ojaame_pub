@@ -1,16 +1,28 @@
 import axios from 'axios';
 
-import { CONFIG } from 'src/config-global';
 import { getAuthToken } from 'src/utils/auth-storage';
+import {
+  recordRequestLatency,
+  isAxiosNetworkFailure,
+  getAxiosNetworkErrorMessage,
+} from 'src/utils/network-quality';
+
+import { CONFIG } from 'src/config-global';
 
 // ----------------------------------------------------------------------
 
-const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
+const DEFAULT_TIMEOUT_MS = 30000;
+
+const axiosInstance = axios.create({
+  baseURL: CONFIG.site.serverUrl,
+  timeout: DEFAULT_TIMEOUT_MS,
+});
 
 // Attach the auth token from storage to every request. Storage is async
 // (Capacitor Preferences on native, sessionStorage on web), so this interceptor
 // reads it fresh each time instead of relying on axios.defaults being set in time.
 axiosInstance.interceptors.request.use(async (config) => {
+  config.metadata = { ...(config.metadata || {}), startTime: Date.now() };
   try {
     const token = await getAuthToken();
     if (token) {
@@ -23,12 +35,51 @@ axiosInstance.interceptors.request.use(async (config) => {
   return config;
 });
 
+function attachLatency(config) {
+  const start = config?.metadata?.startTime;
+  if (start) {
+    recordRequestLatency(Date.now() - start);
+  }
+}
+
+function formatDetail(detail) {
+  if (detail == null) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => (typeof item === 'string' ? item : item?.msg || JSON.stringify(item)))
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (typeof detail === 'object' && detail.message) return String(detail.message);
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return 'Request failed';
+  }
+}
+
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    attachLatency(response.config);
+    return response;
+  },
   (error) => {
-    const data = (error.response && error.response.data) || 'Something went wrong!';
+    attachLatency(error.config);
+
+    if (isAxiosNetworkFailure(error)) {
+      const message = getAxiosNetworkErrorMessage(error);
+      const err = new Error(message);
+      err.isNetworkError = true;
+      err.code = error.code;
+      err._httpStatus = undefined;
+      err.data = { detail: message, _network: true };
+      return Promise.reject(err);
+    }
+
+    const data = error.response?.data;
     const httpStatus = error.response?.status;
-    const detail = error.response?.data?.detail;
+    const detail = data?.detail;
 
     // Subscription deactivation: owner → redirect to billing settings
     if (httpStatus === 402 && detail === 'subscription_deactivated_owner') {
@@ -39,8 +90,13 @@ axiosInstance.interceptors.response.use(
       window.location.href = '/app/subscription-inactive';
     }
 
-    // Attach the HTTP status so catch blocks can branch on it
-    const err = new Error(data?.detail || data?.message || 'Request failed');
+    const message =
+      formatDetail(detail) ||
+      data?.message ||
+      (typeof data === 'string' ? data : null) ||
+      'Request failed';
+
+    const err = new Error(message);
     err.data = data && typeof data === 'object' ? { ...data, _httpStatus: httpStatus } : data;
     err._httpStatus = httpStatus;
     return Promise.reject(err);
@@ -400,6 +456,19 @@ export const endpoints = {
   support: {
     tickets: '/api/support/tickets',
     ticketComments: (id) => `/api/support/tickets/${id}/comments`,
+  },
+  rooms: {
+    types: '/api/rooms/types',
+    list: '/api/rooms/',
+    board: '/api/rooms/board',
+    markAvailable: (id) => `/api/rooms/${id}/mark-available`,
+  },
+  roomBookings: {
+    list: '/api/room-bookings/',
+    checkIn: (id) => `/api/room-bookings/${id}/check-in`,
+    checkOut: (id) => `/api/room-bookings/${id}/check-out`,
+    move: (id) => `/api/room-bookings/${id}/move`,
+    cancel: (id) => `/api/room-bookings/${id}/cancel`,
   },
   transfer: {
     create: '/api/transfers/',

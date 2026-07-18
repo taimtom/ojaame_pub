@@ -3,19 +3,20 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 import { paths } from 'src/routes/paths';
 
-import { paramCase } from 'src/utils/change-case';
-
 import { usePermissions } from 'src/hooks/use-permissions';
 import { useBusinessType } from 'src/hooks/use-business-type';
-
-import { isItemVisible, isSectionVisible } from 'src/config/nav-permissions';
-import { isNavItemAllowedByPlan } from 'src/config/plan-features';
 import { usePlanFeatures } from 'src/hooks/use-plan-features';
-import { CONFIG } from 'src/config-global';
+
 import axiosInstance from 'src/utils/axios';
+import { paramCase } from 'src/utils/change-case';
+import { isHotelLodgingBusiness } from 'src/utils/hotel-lodging';
+
+import { CONFIG } from 'src/config-global';
+import { useCompany } from 'src/actions/company';
+import { isNavItemAllowedByPlan } from 'src/config/plan-features';
+import { isItemVisible, isSectionVisible } from 'src/config/nav-permissions';
 
 // import { Label } from 'src/components/label';
-import { Iconify } from 'src/components/iconify';
 import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
@@ -74,6 +75,8 @@ export const useNavData = () => {
   const { getNavLabel, t } = useBusinessType();
   const { userPermissions } = usePermissions();
   const { hasPlanFeature } = usePlanFeatures();
+  const { company } = useCompany({ skip: false });
+  const showFrontDesk = isHotelLodgingBusiness(company);
 
   // 1. Hydrate currentStore from URL or localStorage.
   // A valid storeParam must end with a numeric ID (e.g. "my-store-42").
@@ -202,6 +205,10 @@ export const useNavData = () => {
           return null;
         }
 
+        if (item.requiresHotelLodging && !showFrontDesk) {
+          return null;
+        }
+
         // If item has children, filter them recursively
         if (item.children && Array.isArray(item.children)) {
           const filteredChildren = filterNavItems(item.children);
@@ -234,6 +241,13 @@ export const useNavData = () => {
       { title: getNavLabel('quickDashboard'), path: paths.dashboard.quickDashboard, icon: ICONS.ecommerce },
       { title: 'AI Assistant', path: paths.dashboard.aiAgent, icon: ICONS.chat },
       { title: getNavLabel('serviceLog'), path: paths.dashboard.serviceLog, icon: ICONS.booking, permissionKey: 'Service Log' },
+      {
+        title: getNavLabel('frontDesk'),
+        path: paths.dashboard.frontDesk,
+        icon: ICONS.tour,
+        permissionKey: 'Front Desk',
+        requiresHotelLodging: true,
+      },
       { title: getNavLabel('quickRestock'), path: paths.dashboard.quickRestock, icon: ICONS.product },
       {
         title: 'Customer Report',

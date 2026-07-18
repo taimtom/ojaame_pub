@@ -18,9 +18,17 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useNetworkStatus } from 'src/hooks/use-network-status';
+
+import { getGoogleClientId, getGoogleAuthRedirectUrl } from 'src/utils/google-auth-env';
+import {
+  NETWORK_QUALITY,
+  isAxiosNetworkFailure,
+  getAxiosNetworkErrorMessage,
+  getConnectionQualityMessage,
+} from 'src/utils/network-quality';
 
 import { toast } from 'src/components/snackbar';
-import { getGoogleAuthRedirectUrl, getGoogleClientId } from 'src/utils/google-auth-env';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
@@ -39,11 +47,41 @@ export const SignInSchema = zod.object({
     .min(6, { message: 'Password must be at least 6 characters!' }),
 });
 
+function resolveSignInError(error) {
+  if (isAxiosNetworkFailure(error) || error?.isNetworkError || error?.data?._network) {
+    return error?.message || getAxiosNetworkErrorMessage(error);
+  }
+
+  const response = error?.response;
+  if (response?.data?.detail) {
+    return typeof response.data.detail === 'string'
+      ? response.data.detail
+      : JSON.stringify(response.data.detail);
+  }
+
+  if (error?.detail) {
+    return typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+  }
+
+  if (error?.data?.detail) {
+    return typeof error.data.detail === 'string'
+      ? error.data.detail
+      : JSON.stringify(error.data.detail);
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'An error occurred while signing in.';
+}
+
 export function JwtSignInView() {
   const router = useRouter();
   const { checkUserSession } = useAuthContext();
   const [errorMsg, setErrorMsg] = useState('');
   const password = useBoolean();
+  const { quality, isOnline, message: connectionMessage } = useNetworkStatus();
 
   const defaultValues = {
     email: '',
@@ -62,37 +100,20 @@ export function JwtSignInView() {
 
   // Email/Password form submission handler.
   const onSubmit = handleSubmit(async (data) => {
+    if (!isOnline || quality === NETWORK_QUALITY.OFFLINE) {
+      const offlineMsg = getConnectionQualityMessage(NETWORK_QUALITY.OFFLINE);
+      setErrorMsg(offlineMsg);
+      toast.error(offlineMsg);
+      return;
+    }
+
     try {
       await signInWithPassword({ email: data.email, password: data.password });
       await checkUserSession();
       router.refresh();
     } catch (error) {
       console.error(error);
-
-      let errorMessage = '';
-
-      // Case 1: Axios error with response.data.detail
-      const response = error?.response;
-      if (response?.data?.detail) {
-        errorMessage =
-          typeof response.data.detail === 'string'
-            ? response.data.detail
-            : JSON.stringify(response.data.detail);
-      }
-      // Case 2: Interceptor already returned plain data object: { detail: '...' }
-      else if (error?.detail) {
-        errorMessage =
-          typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-      }
-      // Case 3: Standard Error instance
-      else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      // Fallback: generic message
-      else {
-        errorMessage = 'An error occurred while signing in.';
-      }
-
+      const errorMessage = resolveSignInError(error);
       setErrorMsg(errorMessage);
       toast.error(errorMessage);
     }
@@ -100,6 +121,13 @@ export function JwtSignInView() {
 
   // Handler for the Google sign-in button.
   const handleGoogleSignIn = () => {
+    if (!isOnline || quality === NETWORK_QUALITY.OFFLINE) {
+      const offlineMsg = getConnectionQualityMessage(NETWORK_QUALITY.OFFLINE);
+      setErrorMsg(offlineMsg);
+      toast.error(offlineMsg);
+      return;
+    }
+
     const clientId = getGoogleClientId();
     const redirectUrl = getGoogleAuthRedirectUrl();
     if (!clientId || !redirectUrl) {
@@ -224,6 +252,14 @@ export function JwtSignInView() {
     <>
       {renderHead}
 
+      {connectionMessage && (
+        <Alert
+          severity={quality === NETWORK_QUALITY.SLOW ? 'info' : 'warning'}
+          sx={{ mb: 3 }}
+        >
+          {connectionMessage}
+        </Alert>
+      )}
 
       {!!errorMsg && (
         <Alert severity="error" sx={{ mb: 3 }}>

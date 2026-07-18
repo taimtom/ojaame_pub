@@ -61,6 +61,7 @@ const DEFAULT_CONFIG = {
     usageDashboard: 'Usage dashboard',
     quickDashboard: 'Quick Dashboard',
     serviceLog: 'Service Log',
+    frontDesk: 'Front Desk',
     quickRestock: 'Quick Restock',
     salesAndOrdersSection: 'Sales & Orders',
     inventorySection: 'Inventory',
@@ -961,6 +962,45 @@ const BUSINESS_TYPE_CONFIGS = {
       inventorySection: 'Cargo Management',
     },
   },
+
+  // ---- Hotels / Lodging (Front Desk) ----
+  ...Object.fromEntries(
+    [
+      ['Hotels', 'Hotel'],
+      ['Hotels', 'Lodge'],
+      ['Hotels', 'Guest house'],
+      ['Hotels', 'Boutique hotel'],
+      ['Resorts', 'Resort'],
+      ['Resorts', 'Beach resort'],
+      ['Resorts', 'Spa resort'],
+      ['Resorts', 'Holiday resort'],
+    ].map(([sub, exact]) => [
+      createKey('Tourism & Hospitality', sub, exact),
+      {
+        features: { frontDesk: true },
+        terminology: {
+          ...DEFAULT_CONFIG.terminology,
+          customer: 'Guest',
+          sale: 'Folio',
+          invoice: 'Folio / Invoice',
+          service: 'Room / Stay',
+          product: 'Amenity / Product',
+          pos: 'Front Desk / POS',
+          salePlural: 'Folios',
+          invoicePlural: 'Folios',
+          todaySalesTitle: "Today's Folios",
+        },
+        fields: DEFAULT_CONFIG.fields,
+        navigation: {
+          ...DEFAULT_CONFIG.navigation,
+          frontDesk: 'Front Desk',
+          serviceLog: 'Service Log',
+          salesAndOrdersSection: 'Front Desk & Sales',
+          customer: 'Guests',
+        },
+      },
+    ])
+  ),
 };
 
 // Function to get business type configuration

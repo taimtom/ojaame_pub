@@ -5,11 +5,12 @@ import { CONFIG } from 'src/config-global';
 import { DashboardLayout } from 'src/layouts/dashboard';
 
 import { LoadingScreen } from 'src/components/loading-screen';
-
-import { AuthGuard, PermissionGuard } from 'src/auth/guard';
-import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
 import { PlanFeatureGuard } from 'src/components/plan/plan-feature-guard';
+
 import { SubscriptionInactiveStaffView } from 'src/sections/error';
+
+import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
+import { AuthGuard, PermissionGuard, HotelLodgingGuard } from 'src/auth/guard';
 
 function withPlanFeature(feature, title, element) {
   return <PlanFeatureGuard feature={feature} title={title}>{element}</PlanFeatureGuard>;
@@ -24,6 +25,8 @@ const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashbo
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
 const AiAgentPage = lazy(() => import('src/pages/dashboard/ai-agent'));
 const ServiceLogPage = lazy(() => import('src/pages/dashboard/service-log'));
+const FrontDeskPage = lazy(() => import('src/pages/dashboard/front-desk'));
+const FrontDeskSetupPage = lazy(() => import('src/pages/dashboard/front-desk-setup'));
 const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
 const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
@@ -226,6 +229,26 @@ export const dashboardRoutes = [
       { path: 'ai-agent', element: <AiAgentPage /> },
       { path: 'subscription-inactive', element: <SubscriptionInactiveStaffView /> },
       { path: 'service-log', element: withPlanFeature('service_log', 'Service Log', <ServiceLogPage />) },
+      {
+        path: 'front-desk',
+        element: (
+          <HotelLodgingGuard>
+            <PermissionGuard anyOf={['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create']}>
+              <FrontDeskPage />
+            </PermissionGuard>
+          </HotelLodgingGuard>
+        ),
+      },
+      {
+        path: 'front-desk/setup',
+        element: (
+          <HotelLodgingGuard>
+            <PermissionGuard anyOf={['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create']}>
+              <FrontDeskSetupPage />
+            </PermissionGuard>
+          </HotelLodgingGuard>
+        ),
+      },
       { path: 'quick-restock', element: <QuickRestockPage /> },
       {
         path: 'usage-dashboard',
