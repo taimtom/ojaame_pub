@@ -798,6 +798,17 @@ export default function EndOfDayReportPage() {
                           Expenses (period): <strong>{fCurrency(preview.expenses_day)}</strong>
                         </Typography>
                         <Typography variant="body2">
+                          Restock (period): <strong>{fCurrency(preview.restock_day || 0)}</strong>
+                        </Typography>
+                        <Typography variant="body2">
+                          Loan collected (period):{' '}
+                          <strong>{fCurrency(preview.loan_collected_day || 0)}</strong>
+                        </Typography>
+                        <Typography variant="body2">
+                          Loan repayment (period):{' '}
+                          <strong>{fCurrency(preview.loan_repayment_day || 0)}</strong>
+                        </Typography>
+                        <Typography variant="body2">
                           Net operations: <strong>{fCurrency(preview.net_operations)}</strong>
                         </Typography>
                         <Typography variant="body2">
