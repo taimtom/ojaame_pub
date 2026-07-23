@@ -52,6 +52,14 @@ function getStoreIdFromStorage() {
   return null;
 }
 
+function todayIsoDate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function normalizeQuickSearchProduct(item) {
   if (!item || item.type !== 'product') return item;
   const isPack = Boolean(item.is_pack ?? item.isPack);
@@ -84,6 +92,7 @@ export function QuickRestockView() {
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [qtyDrafts, setQtyDrafts] = useState({});
   const [supplierValue, setSupplierValue] = useState({ supplier_id: null, supplier: null });
+  const [restockDate, setRestockDate] = useState(() => todayIsoDate());
 
   const debounceRef = useRef(null);
 
@@ -310,11 +319,16 @@ export function QuickRestockView() {
       toast.error('Please select or enter supplier name and phone number.');
       return;
     }
+    if (!restockDate) {
+      toast.error('Please select a restock date.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const payload = {
         store_id: storeId,
+        restock_date: restockDate,
         items: restockCart.map((r) => ({
           product_id: r.productId,
           quantity: Number(r.qty),
@@ -329,12 +343,13 @@ export function QuickRestockView() {
       setQuery('');
       setSearchResults([]);
       setSupplierValue({ supplier_id: null, supplier: null });
+      setRestockDate(todayIsoDate());
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Failed to submit restock.');
     } finally {
       setSubmitting(false);
     }
-  }, [storeId, restockCart, clearCart, supplierValue]);
+  }, [storeId, restockCart, clearCart, supplierValue, restockDate]);
 
   // ── Derived totals ──────────────────────────────────────────────────────────
 
@@ -655,6 +670,14 @@ export function QuickRestockView() {
                     <Divider sx={{ my: 2 }} />
 
                     <Stack spacing={2} sx={{ mb: 2 }}>
+                      <TextField
+                        label="Restock date"
+                        type="date"
+                        value={restockDate}
+                        onChange={(e) => setRestockDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                      />
                       <SupplierSelect value={supplierValue} onChange={setSupplierValue} />
                     </Stack>
 
