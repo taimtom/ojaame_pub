@@ -199,6 +199,18 @@ export async function bulkRestockProducts(payload) {
   }
 }
 
+export async function updateRestockBatchDate(batchId, restockDate) {
+  const response = await axiosInstance.patch(
+    `${endpoints.product.restockBatches}/${batchId}`,
+    { restock_date: restockDate }
+  );
+  return response.data;
+}
+
+export async function deleteRestockBatch(batchId) {
+  await axiosInstance.delete(`${endpoints.product.restockBatches}/${batchId}`);
+}
+
 export async function bulkOnboardProducts(payload) {
   try {
     const response = await axiosInstance.post(endpoints.product.bulkOnboard, payload);
@@ -364,7 +376,7 @@ export function useGetRestockBatches(storeId, queryParams = {}) {
     ? [endpoints.product.restockBatches, { params: { store_id: storeId, ...queryParams } }]
     : null;
 
-  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(() => {
     const paged = normalizePaginatedResponse(data);
@@ -375,14 +387,15 @@ export function useGetRestockBatches(storeId, queryParams = {}) {
       restockBatchesError: error,
       restockBatchesValidating: isValidating,
       restockBatchesEmpty: !isLoading && paged.items.length === 0,
+      mutateRestockBatches: mutate,
     };
-  }, [data, error, isLoading, isValidating]);
+  }, [data, error, isLoading, isValidating, mutate]);
 }
 
 export function useGetRestockBatch(batchId) {
   const key = batchId ? `${endpoints.product.restockBatches}/${batchId}` : null;
 
-  const { data, isLoading, error, isValidating } = useSWR(key, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating, mutate } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
     () => ({
@@ -390,7 +403,8 @@ export function useGetRestockBatch(batchId) {
       restockBatchLoading: isLoading,
       restockBatchError: error,
       restockBatchValidating: isValidating,
+      mutateRestockBatch: mutate,
     }),
-    [data, error, isLoading, isValidating]
+    [data, error, isLoading, isValidating, mutate]
   );
 }
