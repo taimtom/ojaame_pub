@@ -1,0 +1,21 @@
+Name,Category,Qty,Cost Price,Selling Price,Taxes,Is Pack,Qty per Pack,Cost per Pack,Variable price,Min price,Max price,Input only
+Aqua Spring Water 500ml,Beverages,24,45,65,0,no,,,no,,,no
+Citrus Fizz Soda 330ml,Beverages,36,55,85,0,no,,,no,,,no
+Roasted Ground Coffee 250g,Grocery,12,1200,1650,0,no,,,no,,,no
+Whole Milk 1L,Dairy,18,380,520,0,no,,,no,,,no
+Greek Yogurt Plain 400g,Dairy,20,450,620,0,no,,,no,,,no
+Brown Basmati Rice 2kg,Grocery,8,2800,3600,0,no,,,no,,,no
+Penne Pasta 500g,Grocery,30,320,480,0,no,,,no,,,no
+Tomato Paste Tin 400g,Grocery,40,180,260,0,no,,,no,,,no
+Sunflower Cooking Oil 1L,Grocery,15,950,1280,0,no,,,no,,,no
+Kitchen Towel 6-Pack,Household,10,650,920,0,yes,6,3800,5200,no,,,no
+AA Alkaline Batteries 8-Pack,Household,14,900,1350,0,yes,8,7200,10800,no,,,no
+Mixed Nuts Snack Pack 150g,Snacks,25,280,420,0,no,,,no,,,no
+Dark Chocolate Bar 100g,Snacks,50,150,220,0,no,,,yes,200,280,no
+Fresh Gala Apples kg,Produce,40,350,480,0,no,,,yes,400,600,no
+Banana Bunch (approx 1kg),Produce,22,280,380,0,no,,,no,,,no
+Iceberg Lettuce Each,Produce,16,120,180,0,no,,,no,,,no
+Frozen Peas 1kg,Frozen,12,480,650,0,no,,,no,,,no
+Vanilla Ice Cream 1L,Frozen,9,720,980,0,no,,,no,,,no
+Flour Sack 25kg (Bakery),Bakery supplies,4,8500,0,0,no,,,no,,,yes
+Sugar Granulated 50kg (Bakery),Bakery supplies,2,12000,0,0,no,,,no,,,yes

@@ -13,10 +13,12 @@ import { RouterLink } from 'src/routes/components';
 
 import { paramCase } from 'src/utils/change-case';
 
+import { useAuthContext } from 'src/auth/hooks';
 import { Image } from 'src/components/image';
 
 export function StoreItem({ store }) {
   const navigate = useNavigate();
+  const { user } = useAuthContext();
 
   if (!store) {
     return null;
@@ -26,8 +28,12 @@ export function StoreItem({ store }) {
   const storeParam = `${paramCase(storeName)}-${id}`;
   const linkTo = `${paths.dashboard.root}/${storeParam}`;
 
+  const saveWorkspace = () => {
+    localStorage.setItem('activeWorkspace', JSON.stringify({ ...store, user_id: user?.user_id }));
+  };
+
   const handleNavigation = () => {
-    localStorage.setItem('activeWorkspace', JSON.stringify(store));
+    saveWorkspace();
     navigate(linkTo);
   };
 
@@ -90,7 +96,7 @@ export function StoreItem({ store }) {
         color="inherit"
         variant="subtitle2"
         noWrap
-        onClick={() => localStorage.setItem('activeWorkspace', JSON.stringify(store))}
+        onClick={saveWorkspace}
         sx={{ cursor: 'pointer' }}
       >
         {storeName}

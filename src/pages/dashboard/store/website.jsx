@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 
@@ -9,8 +11,10 @@ import { useForm } from 'react-hook-form';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useParams } from 'src/routes/hooks';
 import { paths } from 'src/routes/paths';
+import { getStoreSiteUrl } from 'src/utils/store-site-url';
 import axiosInstance from 'src/utils/axios';
 import { useBoolean } from 'src/hooks/use-boolean';
+import { Iconify } from 'src/components/iconify';
 import { StoreWebsiteSettingsView } from 'src/sections/store-website/store-website-settings-view';
 import { toast } from 'src/components/snackbar';
 
@@ -18,8 +22,9 @@ export default function StoreWebsiteSettingsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const loading = useBoolean(true);
+  const [website, setWebsite] = useState(null);
+  const [previewVersion, setPreviewVersion] = useState(0);
 
-  // Redirect if no store ID is provided
   useEffect(() => {
     if (!id) {
       toast.error('Store ID is required');
@@ -35,6 +40,8 @@ export default function StoreWebsiteSettingsPage() {
       seo_title: '',
       seo_description: '',
       seo_keywords: '',
+      content_config: {},
+      theme_config: {},
     },
   });
 
@@ -45,13 +52,27 @@ export default function StoreWebsiteSettingsPage() {
       try {
         const res = await axiosInstance.get(`/api/stores/details/${id}`);
         const store = res.data;
+        const websiteData = {
+          storeName: store.storeName,
+          slug: store.slug || '',
+          template_id: store.template_id || '',
+          has_public_site: store.has_public_site || false,
+          seo_title: store.seo_title || '',
+          seo_description: store.seo_description || '',
+          seo_keywords: store.seo_keywords || [],
+          theme_config: store.theme_config || {},
+          content_config: store.content_config || {},
+        };
+        setWebsite(websiteData);
         reset({
-          has_public_site: store.has_public_site,
+          has_public_site: store.has_public_site || false,
           slug: store.slug || '',
           template_id: store.template_id || '',
           seo_title: store.seo_title || '',
           seo_description: store.seo_description || '',
           seo_keywords: (store.seo_keywords || []).join(', '),
+          content_config: store.content_config || {},
+          theme_config: store.theme_config || {},
         });
       } catch (error) {
         console.error('Failed to load store website settings', error);
@@ -77,13 +98,20 @@ export default function StoreWebsiteSettingsPage() {
         seo_keywords: data.seo_keywords
           ? data.seo_keywords.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
+        content_config: data.content_config || {},
+        theme_config: data.theme_config || {},
       };
 
       const res = await axiosInstance.put(`/api/store-website/${id}`, payload);
+      const updated = res.data;
+      setWebsite((prev) => ({ ...prev, ...updated }));
       toast.success('Website settings saved');
+      setPreviewVersion((v) => v + 1);
       reset({
         ...data,
-        slug: res.data.slug || data.slug,
+        slug: updated.slug || data.slug,
+        content_config: updated.content_config || data.content_config,
+        theme_config: updated.theme_config || data.theme_config,
       });
     } catch (error) {
       console.error('Failed to save website settings', error);
@@ -93,17 +121,34 @@ export default function StoreWebsiteSettingsPage() {
   });
 
   if (!id) {
-    return null; // Will redirect via useEffect
+    return null;
   }
 
   return (
     <DashboardContent maxWidth="xl">
       <Container maxWidth="xl">
-        <Typography variant="h4" sx={{ mb: 3 }}>
-          Store website
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+          <Typography variant="h4">Store website</Typography>
+          {website?.slug && website?.has_public_site && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Iconify icon="eva:external-link-fill" />}
+              href={getStoreSiteUrl(website.slug)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Public Site
+            </Button>
+          )}
+        </Box>
         {!loading.value && (
-          <StoreWebsiteSettingsView methods={methods} onSubmit={onSubmit} website={{}} />
+          <StoreWebsiteSettingsView
+            methods={methods}
+            onSubmit={onSubmit}
+            website={website || {}}
+            previewVersion={previewVersion}
+          />
         )}
       </Container>
     </DashboardContent>

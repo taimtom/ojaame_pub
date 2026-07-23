@@ -1,16 +1,16 @@
 import { z as zod } from 'zod';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isValidPhoneNumber } from 'react-phone-number-input/input';
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
-// import MenuItem from '@mui/material/MenuItem';
+import MenuItem from '@mui/material/MenuItem';
 import Grid from '@mui/material/Unstable_Grid2';
-// import InputLabel from '@mui/material/InputLabel';
-// import Typography from '@mui/material/Typography';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 // import FormControl from '@mui/material/FormControl';
 // import FormControlLabel from '@mui/material/FormControlLabel';
@@ -24,6 +24,9 @@ import { paramCase } from 'src/utils/change-case';
 import { useGetRoles } from 'src/actions/role';
 import { useGetStores } from 'src/actions/store';
 import { addCustomer, editCustomer } from 'src/actions/customer';
+import { useOnboardingProgress } from 'src/actions/onboarding';
+import { useAdvanceOnboarding, useOnboardingMode } from 'src/hooks/use-onboarding-mode';
+import { useBusinessType } from 'src/hooks/use-business-type';
 
 // import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -44,12 +47,20 @@ export const NewCustomerSchema = zod.object({
   // Not required
   primary: zod.boolean(),
   address_type: zod.string(),
+  customer_type: zod.enum(['retail', 'dealer', 'sub_dealer']).optional(),
+  credit_limit: zod.coerce.number().min(0).optional().nullable(),
+  payment_terms_days: zod.coerce.number().int().min(1).optional().nullable(),
 });
 
 // ----------------------------------------------------------------------
 
 export function CustomerNewEditForm({ currentUser }) {
   const router = useRouter();
+  const { t } = useBusinessType();
+  const onboarding = useOnboardingMode();
+  const advanceOnboarding = useAdvanceOnboarding();
+  const { mutateProgress } = useOnboardingProgress({ skip: !onboarding });
+  const [addedCount, setAddedCount] = useState(0);
 
   const { roles, rolesLoading } = useGetRoles();
   const { stores, storesLoading } = useGetStores();
@@ -66,6 +77,9 @@ export function CustomerNewEditForm({ currentUser }) {
       primary: currentUser ? Boolean(currentUser.primary) : true,
       phone_number: currentUser?.phone_number || '',
       address_type: currentUser?.address_type || '',
+      customer_type: currentUser?.customer_type || 'retail',
+      credit_limit: currentUser?.credit_limit ?? '',
+      payment_terms_days: currentUser?.payment_terms_days ?? '',
     }),
     [currentUser]
   );
@@ -99,18 +113,34 @@ export function CustomerNewEditForm({ currentUser }) {
           const activeWorkspace = JSON.parse(activeWorkspaceJson);
           // Ensure the store_id is attached to the data.
           data.store_id = activeWorkspace.id;
+          if (data.credit_limit === '' || data.credit_limit === undefined) {
+            data.credit_limit = null;
+          }
+          if (data.payment_terms_days === '' || data.payment_terms_days === undefined) {
+            data.payment_terms_days = null;
+          }
           // Create a store slug e.g. "mystore-1"
           const storeSlug = `${paramCase(activeWorkspace.storeName)}-${activeWorkspace.id}`;
           // Proceed with add or edit operations.
           if (currentUser && currentUser.id) {
             await editCustomer(currentUser.id, data);
             toast.success('Customer updated successfully!');
+            if (onboarding) {
+              await advanceOnboarding();
+            } else {
+              router.push(paths.dashboard.customer.root(storeSlug));
+            }
           } else {
             await addCustomer(data);
             toast.success('Customer added successfully!');
+            if (onboarding) {
+              setAddedCount((prev) => prev + 1);
+              await mutateProgress();
+              reset(defaultValues);
+            } else {
+              router.push(paths.dashboard.customer.root(storeSlug));
+            }
           }
-          // Navigate to the customer list page with the store slug.
-          router.push(paths.dashboard.customer.root(storeSlug));
         } catch (parseError) {
           console.error("Error parsing activeWorkspace:", parseError);
           toast.error("Failed to retrieve store information");
@@ -203,13 +233,64 @@ export function CustomerNewEditForm({ currentUser }) {
 
             <Field.CountrySelect name="country" label="Country" placeholder="Choose a country" />
 
+            <Box
+              rowGap={3}
+              columnGap={2}
+              display="grid"
+              gridTemplateColumns={{
+                xs: 'repeat(1, 1fr)',
+                sm: 'repeat(3, 1fr)',
+              }}
+            >
+              <Field.Select name="customer_type" label={`${t('customer')} type`}>
+                <MenuItem value="retail">Retail</MenuItem>
+                <MenuItem value="dealer">Dealer</MenuItem>
+                <MenuItem value="sub_dealer">Sub-dealer</MenuItem>
+              </Field.Select>
+              <Field.Text
+                name="credit_limit"
+                label="Credit limit"
+                type="number"
+                placeholder="No limit"
+              />
+              <Field.Text
+                name="payment_terms_days"
+                label="Payment terms (days)"
+                type="number"
+                placeholder="e.g. 30"
+              />
+            </Box>
+
             <Field.Checkbox name="primary" label="Use this address as default." />
           </Stack>
 
-            <Stack alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
-                {!currentUser ? 'Create Customer' : 'Save changes'}
-              </LoadingButton>
+            <Stack alignItems="flex-end" spacing={2} sx={{ mt: 3 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: '100%' }}>
+                <LoadingButton
+                  type="submit"
+                  variant="contained"
+                  loading={isSubmitting}
+                  sx={{ flex: 1 }}
+                >
+                  {!currentUser ? 'Create Customer' : 'Save changes'}
+                </LoadingButton>
+                {onboarding && !currentUser && addedCount > 0 && (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    disabled={isSubmitting}
+                    onClick={() => advanceOnboarding()}
+                    sx={{ flex: 1 }}
+                  >
+                    Next
+                  </Button>
+                )}
+              </Stack>
+              {onboarding && !currentUser && addedCount > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {addedCount} customer{addedCount === 1 ? '' : 's'} added this session
+                </Typography>
+              )}
             </Stack>
           </Card>
         </Grid>

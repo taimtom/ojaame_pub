@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -19,6 +19,7 @@ import { useParams, useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSetState } from 'src/hooks/use-set-state';
+import { usePermissions } from 'src/hooks/use-permissions';
 
 import { paramCase } from 'src/utils/change-case';
 
@@ -89,11 +90,28 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
   const confirmRows = useBoolean();
   const { t } = useBusinessType();
   const productTerm = t('product');
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = hasPermission('products.create');
+  const canUpdateProduct = hasPermission('products.update');
+  const canDeleteProduct = hasPermission('products.delete');
+  const canAdjustStock =
+    hasPermission('products.update') || hasPermission('inventory.update');
 
-
-  const { products, productsLoading } = useGetProducts(numericStoreId);
 
   const filters = useSetState({ publish: [], stock: [] });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [sortModel, setSortModel] = useState([{ field: 'createdAt', sort: 'desc' }]);
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] });
+  const quickSearch = (filterModel.quickFilterValues || []).join(' ').trim();
+  const { products, productsLoading, productsPagination } = useGetProducts(numericStoreId, {
+    skip: paginationModel.page * paginationModel.pageSize,
+    limit: paginationModel.pageSize,
+    q: quickSearch || undefined,
+    publish: filters?.state?.publish?.[0],
+    inventory_type: filters?.state?.stock?.[0],
+    sort_by: sortModel[0]?.field || 'createdAt',
+    sort_dir: sortModel[0]?.sort || 'desc',
+  });
 
   const [tableData, setTableData] = useState([]);
 
@@ -104,14 +122,12 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
   const [columnVisibilityModel, setColumnVisibilityModel] = useState(HIDE_COLUMNS);
 
   useEffect(() => {
-    if (products.length) {
-      setTableData(products);
-    }
+    setTableData(products || []);
   }, [products]);
 
   const canReset = filters.state.publish.length > 0 || filters.state.stock.length > 0;
 
-  const dataFiltered = applyFilter({ inputData: tableData, filters: filters.state });
+  const dataFiltered = tableData;
 
   const handleDeleteRow = useCallback(
     (id) => {
@@ -146,6 +162,20 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
+  const handleAdjustRow = useCallback(
+    (id) => {
+      router.push(paths.dashboard.product.adjust(storeSlug, id));
+    },
+    [router, storeSlug]
+  );
+
+  const handleChangePriceRow = useCallback(
+    (id) => {
+      router.push(paths.dashboard.product.changePrice(storeSlug, id));
+    },
+    [router, storeSlug]
+  );
+
   const handleViewRow = useCallback(
     (id) => {
       router.push(paths.dashboard.product.details(storeSlug, id));
@@ -153,12 +183,6 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [router, storeSlug]
   );
 
-  const handleDetailRow = useCallback(
-    (id) => {
-      router.push(paths.dashboard.product.movement(storeSlug, id));
-    },
-    [router, storeSlug]
-  );
 
 
   const CustomToolbarCallback = useCallback(
@@ -176,7 +200,8 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
     [filters.state, selectedRowIds]
   );
 
-  const columns = [
+  const columns = useMemo(
+    () => [
     { field: 'category', headerName: 'Category', filterable: false },
     {
       field: 'name',
@@ -212,7 +237,7 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       field: 'price',
       headerName: 'Price',
       width: 140,
-      editable: true,
+      editable: canUpdateProduct,
       renderCell: (params) => <RenderCellPrice params={params} />,
     },
     {
@@ -220,7 +245,7 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       headerName: 'Publish',
       width: 130,
       type: 'singleSelect',
-      editable: true,
+      editable: canUpdateProduct,
       valueOptions: PUBLISH_OPTIONS,
       renderCell: (params) => <RenderCellPublish params={params} />,
     },
@@ -234,43 +259,82 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
-      getActions: (params) => [
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:eye-bold" />}
-          label="View"
-          onClick={() => handleViewRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:pen-bold" />}
-          label="Edit"
-          onClick={() => handleEditRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:add-square-bold" />}
-          label="add qty"
-          onClick={() => handleAddQtyRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:eye-bold" />}
-          label="Stock Movement"
-          onClick={() => handleDetailRow(params.row.id)}
-        />,
-        <GridActionsCellItem
-          showInMenu
-          icon={<Iconify icon="solar:trash-bin-trash-bold" />}
-          label="Delete"
-          onClick={() => {
-            handleDeleteRow(params.row.id);
-          }}
-          sx={{ color: 'error.main' }}
-        />,
-      ],
+      getActions: (params) => {
+        const actions = [
+          <GridActionsCellItem
+            showInMenu
+            icon={<Iconify icon="solar:eye-bold" />}
+            label="View"
+            onClick={() => handleViewRow(params.row.id)}
+          />,
+        ];
+        if (canUpdateProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:pen-bold" />}
+              label="Edit"
+              onClick={() => handleEditRow(params.row.id)}
+            />
+          );
+        }
+        if (canAdjustStock) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:add-square-bold" />}
+              label="add qty"
+              onClick={() => handleAddQtyRow(params.row.id)}
+            />,
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:danger-triangle-bold" />}
+              label="Record Loss"
+              onClick={() => handleAdjustRow(params.row.id)}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+        if (canUpdateProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:tag-price-bold" />}
+              label="Change Price"
+              onClick={() => handleChangePriceRow(params.row.id)}
+            />
+          );
+        }
+        if (canDeleteProduct) {
+          actions.push(
+            <GridActionsCellItem
+              showInMenu
+              icon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              label="Delete"
+              onClick={() => {
+                handleDeleteRow(params.row.id);
+              }}
+              sx={{ color: 'error.main' }}
+            />
+          );
+        }
+        return actions;
+      },
     },
-  ];
+  ],
+    [
+      productTerm,
+      canUpdateProduct,
+      canAdjustStock,
+      canDeleteProduct,
+      handleViewRow,
+      handleEditRow,
+      handleAddQtyRow,
+      handleAdjustRow,
+      handleChangePriceRow,
+      handleDeleteRow,
+    ]
+  );
 
   const getTogglableColumns = () =>
     columns
@@ -288,13 +352,15 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
             { name: 'List' },
           ]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
-            >
-              New {productTerm}
-            </Button>
+            canCreateProduct ? (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={() => router.push(paths.dashboard.product.new(storeSlug))}
+              >
+                New {productTerm}
+              </Button>
+            ) : null
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -313,8 +379,18 @@ export function ProductListView({ storeSlug: propStoreSlug }) {
             rows={dataFiltered}
             columns={columns}
             loading={productsLoading}
+            paginationMode="server"
+            sortingMode="server"
+            filterMode="server"
+            rowCount={productsPagination?.total || 0}
             getRowHeight={() => 'auto'}
             pageSizeOptions={[5, 10, 25]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            filterModel={filterModel}
+            onFilterModelChange={setFilterModel}
             initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
             onRowSelectionModelChange={(newSelectionModel) => setSelectedRowIds(newSelectionModel)}
             columnVisibilityModel={columnVisibilityModel}

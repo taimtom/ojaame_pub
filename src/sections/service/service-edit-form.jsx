@@ -24,31 +24,39 @@ import { useCurrencyFormat } from 'src/hooks/use-currency-format';
 
 import { toast } from 'src/components/snackbar';
 import { Form, Field, schemaHelper } from 'src/components/hook-form';
+import { ServiceConsumableTemplates } from './service-consumable-templates';
 
 // ----------------------------------------------------------------------
 
-export const NewServiceSchema = zod.object({
-  name: zod.string().min(1, { message: 'Name is required!' }),
-  description: schemaHelper.editor1().optional(), // Make description optional
-  price: zod.number().min(1, { message: 'Price should not be $0.00' }),
-  price_sale: zod.number().optional(),
-  // sub_description: zod.string().optional(),
-  taxes: zod.number().optional(),
-  publish: zod.string().optional(),
-
-  // saleLabel: zod
-  //   .object({
-  //     enabled: zod.boolean(),
-  //     content: zod.string(),
-  //   })
-  //   .optional(),
-  // newLabel: zod
-  //   .object({
-  //     enabled: zod.boolean(),
-  //     content: zod.string(),
-  //   })
-  //   .optional(),
-});
+export const NewServiceSchema = zod
+  .object({
+    name: zod.string().min(1, { message: 'Name is required!' }),
+    description: schemaHelper.editor1().optional(), // Make description optional
+    price: zod.number().min(1, { message: 'Price should not be $0.00' }),
+    price_sale: zod.number().optional(),
+    // sub_description: zod.string().optional(),
+    taxes: zod.number().optional(),
+    publish: zod.string().optional(),
+    allow_variable_price: zod.boolean().optional(),
+    variable_price_min: zod.number().nullable().optional(),
+    variable_price_max: zod.number().nullable().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.allow_variable_price) return true;
+      const min = data.variable_price_min;
+      const max = data.variable_price_max;
+      if (min == null || max == null) return false;
+      if (min < 0 || max < 0) return false;
+      if (min > max) return false;
+      return true;
+    },
+    {
+      message:
+        'When variable pricing is enabled, set both min and max, and min must not exceed max.',
+      path: ['variable_price_max'],
+    }
+  );
 
 // ----------------------------------------------------------------------
 
@@ -70,9 +78,12 @@ export function ServiceEditForm({ currentService, storeId, storeSlug  }) {
       description: currentService?.description || '',
       // subDescription: currentService?.sub_description || '',
       price: currentService?.price || 0,
-      priceSale: currentService?.price_sale || 0,
+      price_sale: currentService?.price_sale ?? undefined,
       taxes: currentService?.taxes || 0,
       publish: currentService?.publish || 'draft',
+      allow_variable_price: currentService?.allow_variable_price || false,
+      variable_price_min: currentService?.variable_price_min ?? null,
+      variable_price_max: currentService?.variable_price_max ?? null,
       // newLabel: currentService?.newLabel || { enabled: false, content: '' },
       // saleLabel: currentService?.saleLabel || { enabled: false, content: '' },
     }),
@@ -112,6 +123,11 @@ export function ServiceEditForm({ currentService, storeId, storeSlug  }) {
   const onSubmit = handleSubmit(async (data) => {
     try {
       data.publish = isPublish ? 'publish' : 'draft';
+      if (!data.allow_variable_price) {
+        data.allow_variable_price = false;
+        data.variable_price_min = null;
+        data.variable_price_max = null;
+      }
         let response;
             if (currentService) {
               response = await editService(currentService.id, data);
@@ -236,6 +252,58 @@ export function ServiceEditForm({ currentService, storeId, storeSlug  }) {
             ),
           }}
         />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={values.allow_variable_price || false}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setValue('allow_variable_price', enabled);
+                if (!enabled) {
+                  setValue('variable_price_min', null);
+                  setValue('variable_price_max', null);
+                }
+              }}
+            />
+          }
+          label="Allow variable pricing"
+        />
+        {values.allow_variable_price && (
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <Field.Text
+              name="variable_price_min"
+              label="Min variable price"
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>
+                      {currencySymbol}
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Field.Text
+              name="variable_price_max"
+              label="Max variable price"
+              placeholder="0.00"
+              type="number"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ color: 'text.disabled' }}>
+                      {currencySymbol}
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
+        )}
         {isFieldVisible('service', 'duration') && (
           <Field.Text
             name="duration"
@@ -330,6 +398,13 @@ export function ServiceEditForm({ currentService, storeId, storeSlug  }) {
         {renderDetails}
 
         {renderPricing}
+
+        {currentService && (
+          <ServiceConsumableTemplates
+            serviceId={currentService.id}
+            storeId={storeId || Number(localStorage.getItem('store_id')) || null}
+          />
+        )}
 
         {renderActions}
       </Stack>

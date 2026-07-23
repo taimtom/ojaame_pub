@@ -27,14 +27,13 @@ import { addCategory, editCategory } from 'src/actions/category';
 // 'src/_mock';
 
 import { toast } from 'src/components/snackbar';
-import { Form, Field, schemaHelper } from 'src/components/hook-form';
+import { Form, Field } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
 
 export const NewCategorySchema = zod.object({
   name: zod.string().min(1, { message: 'Name is required!' }),
   publish: zod.string().optional(),
-  description: schemaHelper.editor({ message: { required_error: 'Description is required!' } }),
 });
 
 // ----------------------------------------------------------------------
@@ -50,7 +49,6 @@ export function CategoryNewEditForm({ currentCategory, storeId, storeSlug  }) {
     () => ({
       name: currentCategory?.name || '',
       publish: currentCategory?.publish || 'draft',
-      description: currentCategory?.description || '',
     }),
     [currentCategory]
   );
@@ -62,13 +60,10 @@ export function CategoryNewEditForm({ currentCategory, storeId, storeSlug  }) {
 
   const {
     reset,
-    watch,
     setValue,
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
-
-  const values = watch();
 
   useEffect(() => {
     if (currentCategory) {
@@ -123,14 +118,12 @@ export function CategoryNewEditForm({ currentCategory, storeId, storeSlug  }) {
 
   const renderDetails = (
     <Card>
-      <CardHeader title="Details" subheader="Title, short description" sx={{ mb: 3 }} />
+      <CardHeader title="Details" sx={{ mb: 3 }} />
 
       <Divider />
 
       <Stack spacing={3} sx={{ p: 3 }}>
         <Field.Text name="name" label="Category name" />
-
-        <Field.Text name="description" label="Sub description" multiline rows={4} />
       </Stack>
     </Card>
   );

@@ -5,3 +5,7 @@ export * from './role-based';
 export * from './guest-guard';
 
 export * from './role-based-guard';
+
+export * from './permission-guard';
+
+export * from './hotel-lodging-guard';

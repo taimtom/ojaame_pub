@@ -81,12 +81,24 @@ export function useBusinessType() {
     [activeConfig]
   );
 
+  const tp = useMemo(
+    () => (key) => activeConfig.terminology?.[`${key}Plural`] ?? `${activeConfig.terminology?.[key] || key}s`,
+    [activeConfig]
+  );
+
+  const tPhrase = useMemo(
+    () => (key) => activeConfig.terminology?.[key] ?? DEFAULT_CONFIG.terminology[key] ?? key,
+    [activeConfig]
+  );
+
   return {
     config: activeConfig,
     company,
     isLoading,
     hasBusinessType,
     t,
+    tp,
+    tPhrase,
     getLabel,
     isFieldVisible,
     getNavLabel,

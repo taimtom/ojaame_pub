@@ -25,7 +25,7 @@ import { paramCase } from 'src/utils/change-case';
 
 import { PRODUCT_STOCK_OPTIONS } from 'src/_mock';
 
-import { useGetCategories, addDefaultCategories } from 'src/actions/category';
+import { useGetCategories, addDefaultCategories, deleteCategory, updateCategoryPublish } from 'src/actions/category';
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
@@ -120,23 +120,59 @@ export function CategoryListView({storeSlug: propStoreSlug }) {
   const dataFiltered = applyFilter({ inputData: tableData, filters: filters.state });
 
   const handleDeleteRow = useCallback(
-    (id) => {
-      const deleteRow = tableData.filter((row) => row.id !== id);
-
-      toast.success('Delete success!');
-
-      setTableData(deleteRow);
+    async (id) => {
+      try {
+        await deleteCategory(id);
+        toast.success('Category deleted');
+        if (mutateCategories) {
+          await mutateCategories();
+        } else {
+          setTableData((prev) => prev.filter((row) => row.id !== id));
+        }
+      } catch (error) {
+        toast.error(error?.data?.detail || error?.message || 'Failed to delete category');
+      }
     },
-    [tableData]
+    [mutateCategories]
   );
 
-  const handleDeleteRows = useCallback(() => {
-    const deleteRows = tableData.filter((row) => !selectedRowIds.includes(row.id));
+  const handleDeleteRows = useCallback(async () => {
+    try {
+      await Promise.all(selectedRowIds.map((id) => deleteCategory(id)));
+      toast.success('Categories deleted');
+      if (mutateCategories) {
+        await mutateCategories();
+      } else {
+        setTableData((prev) => prev.filter((row) => !selectedRowIds.includes(row.id)));
+      }
+    } catch (error) {
+      toast.error(error?.data?.detail || error?.message || 'Failed to delete categories');
+    }
+  }, [selectedRowIds, mutateCategories]);
 
-    toast.success('Delete success!');
-
-    setTableData(deleteRows);
-  }, [selectedRowIds, tableData]);
+  const handlePublishChange = useCallback(
+    async (newRow, oldRow) => {
+      if (newRow.publish === oldRow.publish) {
+        return oldRow;
+      }
+      if (newRow.publish !== 'publish' && newRow.publish !== 'draft') {
+        toast.error('Publish status must be published or draft');
+        return oldRow;
+      }
+      try {
+        await updateCategoryPublish(newRow.id, newRow.publish);
+        toast.success(newRow.publish === 'draft' ? 'Category set to draft' : 'Category published');
+        if (mutateCategories) {
+          await mutateCategories();
+        }
+        return newRow;
+      } catch (error) {
+        toast.error(error?.data?.detail || error?.message || 'Failed to update publish status');
+        return oldRow;
+      }
+    },
+    [mutateCategories]
+  );
 
   const handleEditRow = useCallback(
     (id) => {
@@ -297,6 +333,10 @@ export function CategoryListView({storeSlug: propStoreSlug }) {
             onRowSelectionModelChange={(newSelectionModel) => setSelectedRowIds(newSelectionModel)}
             columnVisibilityModel={columnVisibilityModel}
             onColumnVisibilityModelChange={(newModel) => setColumnVisibilityModel(newModel)}
+            processRowUpdate={handlePublishChange}
+            onProcessRowUpdateError={(error) => {
+              toast.error(error?.message || 'Failed to update category');
+            }}
             slots={{
               toolbar: CustomToolbarCallback,
               noRowsOverlay: () => <EmptyContent />,

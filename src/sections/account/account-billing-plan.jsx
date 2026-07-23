@@ -1,212 +1,523 @@
 import { useState, useCallback } from 'react';
+import { toast } from 'src/components/snackbar';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Paper from '@mui/material/Paper';
+import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
-import Grid from '@mui/material/Unstable_Grid2';
+import Tooltip from '@mui/material/Tooltip';
+import Skeleton from '@mui/material/Skeleton';
+import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import CircularProgress from '@mui/material/CircularProgress';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
-import { PlanFreeIcon, PlanStarterIcon, PlanPremiumIcon } from 'src/assets/icons';
-
-import { Label } from 'src/components/label';
+import { fCurrency } from 'src/utils/format-number';
+import { fDate } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
-
-import { AddressListDialog } from '../address';
-import { PaymentCardListDialog } from '../payment/payment-card-list-dialog';
+import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
+import {
+  useGetSubscriptionSummary,
+  useGetSubscriptionPlans,
+  adjustSeats,
+  changePlan,
+} from 'src/actions/subscription';
 
 // ----------------------------------------------------------------------
 
-export function AccountBillingPlan({ cardList, addressBook, plans }) {
-  const openAddress = useBoolean();
+function BillingRow({ label, value, secondary }) {
+  return (
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.75 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        {secondary && (
+          <Typography variant="caption" color="text.disabled">
+            {secondary}
+          </Typography>
+        )}
+        <Typography variant="subtitle2">{value}</Typography>
+      </Stack>
+    </Stack>
+  );
+}
 
-  const openCards = useBoolean();
+function tierLabel(tier) {
+  if (!tier) return 'Basic';
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
 
-  const primaryAddress = addressBook.filter((address) => address.primary)[0];
+const PLAN_HIGHLIGHTS = {
+  basic: [
+    'Full POS, inventory & customers',
+    'Essential reports',
+    '2 seats included per store',
+    'Up to 3 team members per store',
+    'Roles & per-user permissions',
+  ],
+  standard: [
+    'Everything in Basic',
+    '2 stores included',
+    '2 seats included per store',
+    'Unlimited team size beyond included seats',
+    'Custom roles',
+    'Advanced & company reports',
+    'Integrations, store website & more',
+  ],
+};
 
-  const primaryCard = cardList.filter((card) => card.primary)[0];
+// ----------------------------------------------------------------------
 
-  const [selectedPlan, setSelectedPlan] = useState('');
+export function AccountBillingPlan() {
+  const { summary, summaryLoading, summaryError, mutate } = useGetSubscriptionSummary();
+  const { plans, storePrice } = useGetSubscriptionPlans();
+  const { nextBillingDate, inTrial, trialDaysRemaining, mutateStatus } = useGetSubscriptionStatus();
+  const { planRestrictionsEnabled: restrictionsOn } = usePlanFeatures();
+  const [adjusting, setAdjusting] = useState(null);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
 
-  const [selectedAddress, setSelectedAddress] = useState(primaryAddress);
+  const billingDate = summary?.next_billing_date || nextBillingDate;
+  const daysUntilBilling = billingDate
+    ? Math.max(0, Math.ceil((new Date(billingDate) - new Date()) / (1000 * 60 * 60 * 24)))
+    : null;
 
-  const [selectedCard, setSelectedCard] = useState(primaryCard);
+  const seatPrice = summary?.seat_price ?? 1000;
+  const currentTier = summary?.plan_tier ?? 'basic';
+  const isEnterprise = currentTier === 'enterprise';
+  const maxSeatsPerStore = summary?.max_seats_per_store ?? null;
+  const freeStores = summary?.free_stores ?? (currentTier === 'standard' ? 2 : 1);
+  const includedSeatsPerStore = summary?.included_seats_per_store ?? 2;
 
-  const handleSelectPlan = useCallback(
-    (newValue) => {
-      const currentPlan = plans.filter((plan) => plan.primary)[0].subscription;
-      if (currentPlan !== newValue) {
-        setSelectedPlan(newValue);
+  const handleSeatChange = useCallback(
+    async (delta, scope, storeId) => {
+      const key = `${scope}-${storeId ?? 'biz'}-${delta}`;
+      setAdjusting(key);
+      try {
+        await adjustSeats({ delta, scope, store_id: storeId });
+        await mutate();
+        toast.success(delta > 0 ? 'Seat added.' : 'Seat removed.');
+      } catch (err) {
+        toast.error(err?.data?.detail || err?.detail || err?.message || 'Failed to adjust seat.');
+      } finally {
+        setAdjusting(null);
       }
     },
-    [plans]
+    [mutate]
   );
 
-  const handleSelectAddress = useCallback((newValue) => {
-    setSelectedAddress(newValue);
-  }, []);
+  const estimateTotalForTier = useCallback(
+    (planTier) => {
+      const plan = plans.find((p) => p.plan_tier === planTier);
+      if (!plan || !summary) return null;
+      const tierFreeStores = plan.free_stores ?? (planTier === 'standard' ? 2 : 1);
+      const estimatedStoreFees =
+        Math.max(0, (summary.store_count ?? 0) - tierFreeStores) * (storePrice ?? 3000);
 
-  const handleSelectCard = useCallback((newValue) => {
-    setSelectedCard(newValue);
-  }, []);
+      let extraSeatFees = 0;
+      const included = plan.included_seats_per_store ?? includedSeatsPerStore ?? 2;
+      extraSeatFees =
+        summary.store_breakdown?.reduce(
+          (sum, store) =>
+            sum + Math.max((store.paid_seats ?? included) - included, 0) * (plan.seat_price ?? 0),
+          0
+        ) ?? 0;
+      return (plan.base_fee ?? 0) + estimatedStoreFees + extraSeatFees;
+    },
+    [plans, summary, storePrice, includedSeatsPerStore]
+  );
 
-  const renderPlans = plans.map((plan) => (
-    <Grid xs={12} md={4} key={plan.subscription}>
-      <Paper
-        variant="outlined"
-        onClick={() => handleSelectPlan(plan.subscription)}
-        sx={{
-          p: 2.5,
-          cursor: 'pointer',
-          position: 'relative',
-          ...(plan.primary && { opacity: 0.48, cursor: 'default' }),
-          ...(plan.subscription === selectedPlan && {
-            boxShadow: (theme) => `0 0 0 2px ${theme.vars.palette.text.primary}`,
-          }),
-        }}
-      >
-        {plan.primary && (
-          <Label
-            color="info"
-            startIcon={<Iconify icon="eva:star-fill" />}
-            sx={{ position: 'absolute', top: 8, right: 8 }}
-          >
-            Current
-          </Label>
-        )}
+  const handleConfirmPlanChange = useCallback(async () => {
+    if (!pendingTier) return;
+    setChangingPlan(true);
+    try {
+      await changePlan({ plan_tier: pendingTier });
+      await Promise.all([mutate(), mutateStatus?.()]);
+      toast.success(`Plan updated to ${tierLabel(pendingTier)}.`);
+      setPendingTier(null);
+    } catch (err) {
+      toast.error(err?.data?.detail || err?.detail || err?.message || 'Failed to change plan.');
+    } finally {
+      setChangingPlan(false);
+    }
+  }, [pendingTier, mutate, mutateStatus]);
 
-        {plan.subscription === 'basic' && <PlanFreeIcon />}
-        {plan.subscription === 'starter' && <PlanStarterIcon />}
-        {plan.subscription === 'premium' && <PlanPremiumIcon />}
+  const isUnpaid = summary?.status === 'unpaid';
+  const isAttention = summary?.paystack_status === 'attention';
 
-        <Box
-          sx={{
-            typography: 'subtitle2',
-            mt: 2,
-            mb: 0.5,
-            textTransform: 'capitalize',
-          }}
-        >
-          {plan.subscription}
-        </Box>
-
-        <Stack direction="row" alignItems="center" sx={{ typography: 'h4' }}>
-          {plan.price || 'Free'}
-
-          {!!plan.price && (
-            <Box component="span" sx={{ typography: 'body2', color: 'text.disabled', ml: 0.5 }}>
-              /mo
-            </Box>
-          )}
+  if (summaryLoading) {
+    return (
+      <Card>
+        <CardHeader title="Subscription & Billing" />
+        <Stack spacing={1.5} sx={{ p: 3 }}>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} height={28} />
+          ))}
         </Stack>
-      </Paper>
-    </Grid>
-  ));
+      </Card>
+    );
+  }
+
+  if (summaryError || !summary) {
+    return (
+      <Card>
+        <CardHeader title="Subscription & Billing" />
+        <Stack alignItems="center" spacing={1.5} sx={{ p: 4 }}>
+          <Iconify icon="solar:bill-list-bold" width={48} sx={{ color: 'text.disabled' }} />
+          <Typography variant="body2" color="text.secondary">
+            Could not load billing information.
+          </Typography>
+        </Stack>
+      </Card>
+    );
+  }
+
+  const statusColor =
+    summary.status === 'active'
+      ? 'success'
+      : summary.status === 'unpaid'
+        ? 'warning'
+        : 'error';
+
+  const pendingTotal = pendingTier ? estimateTotalForTier(pendingTier) : null;
 
   return (
     <>
       <Card>
-        <CardHeader title="Plan" />
+        <CardHeader
+          title="Subscription & Billing"
+          action={
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip
+                size="small"
+                label={tierLabel(currentTier)}
+                color="primary"
+                variant="soft"
+              />
+              <Chip
+                size="small"
+                label={summary.status}
+                color={statusColor}
+                variant="soft"
+                sx={{ textTransform: 'capitalize' }}
+              />
+            </Stack>
+          }
+        />
 
-        <Grid container spacing={2} sx={{ p: 3 }}>
-          {renderPlans}
-        </Grid>
+        {inTrial && (
+          <Alert severity="info" sx={{ mx: 2, mb: 0, borderRadius: 1 }}>
+            <strong>Free trial.</strong> Your first billing date is{' '}
+            {billingDate ? fDate(billingDate) : '—'} ({trialDaysRemaining} day
+            {trialDaysRemaining !== 1 ? 's' : ''} left). You can use the app without paying
+            until then.
+          </Alert>
+        )}
 
-        <Stack spacing={2} sx={{ p: 3, pt: 0, typography: 'body2' }}>
-          <Grid container spacing={{ xs: 0.5, md: 2 }}>
-            <Grid xs={12} md={4} sx={{ color: 'text.secondary' }}>
-              Plan
-            </Grid>
-            <Grid xs={12} md={8} sx={{ typography: 'subtitle2', textTransform: 'capitalize' }}>
-              {selectedPlan || '-'}
-            </Grid>
-          </Grid>
+        {isAttention && (
+          <Alert severity="warning" sx={{ mx: 2, mb: 0, borderRadius: 1 }}>
+            Last payment failed. Paystack will automatically retry on your next billing date.
+            You can also update your payment method below.
+          </Alert>
+        )}
 
-          <Grid container spacing={{ xs: 0.5, md: 2 }}>
-            <Grid xs={12} md={4} sx={{ color: 'text.secondary' }}>
-              Billing name
-            </Grid>
-            <Grid xs={12} md={8}>
-              <Button
-                onClick={openAddress.onTrue}
-                endIcon={<Iconify width={16} icon="eva:arrow-ios-downward-fill" />}
-                sx={{ typography: 'subtitle2', p: 0, borderRadius: 0 }}
-              >
-                {selectedAddress?.name}
-              </Button>
-            </Grid>
-          </Grid>
+        {isUnpaid && !isAttention && (
+          <Alert severity="warning" sx={{ mx: 2, mb: 0, borderRadius: 1 }}>
+            Your subscription payment is pending. Please ensure a valid payment method is saved.
+          </Alert>
+        )}
 
-          <Grid container spacing={{ xs: 0.5, md: 2 }}>
-            <Grid xs={12} md={4} sx={{ color: 'text.secondary' }}>
-              Billing address
-            </Grid>
-            <Grid xs={12} md={8} sx={{ color: 'text.secondary' }}>
-              {selectedAddress?.fullAddress}
-            </Grid>
-          </Grid>
+        <Stack sx={{ px: 3, pb: 1, pt: 1 }}>
+          <Typography variant="overline" color="text.disabled" sx={{ mb: 1 }}>
+            Plan
+          </Typography>
 
-          <Grid container spacing={{ xs: 0.5, md: 2 }}>
-            <Grid xs={12} md={4} sx={{ color: 'text.secondary' }}>
-              Billing phone number
-            </Grid>
-            <Grid xs={12} md={8} sx={{ color: 'text.secondary' }}>
-              {selectedAddress?.phoneNumber}
-            </Grid>
-          </Grid>
+          {isEnterprise ? (
+            <Alert severity="info" sx={{ mb: 2, borderRadius: 1 }}>
+              Your <strong>Enterprise</strong> plan is managed by Ojaame (
+              {fCurrency(summary.base_fee)}/mo base, {fCurrency(seatPrice)}/extra seat). Contact
+              support to make changes.
+            </Alert>
+          ) : (
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
+              {plans.map((plan) => {
+                const selected = plan.plan_tier === currentTier;
+                return (
+                  <Card
+                    key={plan.plan_tier}
+                    variant="outlined"
+                    sx={{
+                      flex: 1,
+                      p: 2,
+                      borderWidth: selected ? 2 : 1,
+                      borderColor: selected ? 'primary.main' : 'divider',
+                    }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between">
+                        <Typography variant="subtitle2">{plan.label}</Typography>
+                        {selected && (
+                          <Chip label="Current" size="small" color="primary" variant="soft" />
+                        )}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {fCurrency(plan.base_fee)}/mo + {fCurrency(plan.seat_price)}/seat
+                      </Typography>
+                      <Stack component="ul" sx={{ m: 0, pl: 2, mt: 1 }} spacing={0.25}>
+                        {(PLAN_HIGHLIGHTS[plan.plan_tier] || []).map((item) => (
+                          <Typography key={item} component="li" variant="caption" color="text.secondary">
+                            {item}
+                          </Typography>
+                        ))}
+                      </Stack>
+                      {!selected && (
+                        restrictionsOn &&
+                        plan.plan_tier === 'basic' &&
+                        (summary.store_count ?? 0) > 1 &&
+                        currentTier !== 'basic' ? (
+                          <Tooltip title="Basic supports one store only. Remove extra stores before switching.">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled
+                                sx={{ mt: 1, alignSelf: 'flex-start' }}
+                              >
+                                Switch to {plan.label}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={{ mt: 1, alignSelf: 'flex-start' }}
+                            onClick={() => setPendingTier(plan.plan_tier)}
+                          >
+                            Switch to {plan.label}
+                          </Button>
+                        )
+                      )}
+                    </Stack>
+                  </Card>
+                );
+              })}
+            </Stack>
+          )}
 
-          <Grid container spacing={{ xs: 0.5, md: 2 }}>
-            <Grid xs={12} md={4} sx={{ color: 'text.secondary' }}>
-              Payment method
-            </Grid>
-            <Grid xs={12} md={8}>
-              <Button
-                onClick={openCards.onTrue}
-                endIcon={<Iconify width={16} icon="eva:arrow-ios-downward-fill" />}
-                sx={{ typography: 'subtitle2', p: 0, borderRadius: 0 }}
-              >
-                {selectedCard?.cardNumber}
-              </Button>
-            </Grid>
-          </Grid>
-        </Stack>
+          <Divider sx={{ mb: 1.5 }} />
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+          <BillingRow
+            label={`Base subscription (${tierLabel(currentTier)})`}
+            secondary={`${includedSeatsPerStore} seats included per store`}
+            value={`${fCurrency(summary.base_fee)}/mo`}
+          />
 
-        <Stack spacing={1.5} direction="row" justifyContent="flex-end" sx={{ p: 3 }}>
-          <Button variant="outlined">Cancel plan</Button>
-          <Button variant="contained">Upgrade plan</Button>
+          <BillingRow
+            label="Extra seat rate"
+            secondary={`per seat beyond ${includedSeatsPerStore} included per store`}
+            value={`${fCurrency(seatPrice)}/mo`}
+          />
+
+          <BillingRow
+            label="Total seats"
+            secondary={
+              maxSeatsPerStore
+                ? `sum across all stores (max ${maxSeatsPerStore} per store on Basic)`
+                : 'sum across all stores'
+            }
+            value={summary.total_seats ?? '—'}
+          />
+
+          {maxSeatsPerStore && (
+            <Alert severity="info" sx={{ mt: 1, borderRadius: 1 }}>
+              Basic includes {includedSeatsPerStore} seats per store and allows up to{' '}
+              {maxSeatsPerStore} total (extra seats are billed). Upgrade to Standard for unlimited
+              team size.
+            </Alert>
+          )}
+
+          <Divider sx={{ my: 1 }} />
+
+          <Typography variant="overline" color="text.disabled" sx={{ mb: 0.5 }}>
+            Stores ({summary.store_count} total — {freeStores} free)
+          </Typography>
+
+          {summary.store_breakdown?.map((store) => (
+            <Stack
+              key={store.store_id}
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ py: 0.5, pl: 1 }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Iconify
+                  icon={store.is_free ? 'solar:shop-bold' : 'solar:shop-2-bold'}
+                  width={16}
+                  sx={{ color: store.is_free ? 'success.main' : 'primary.main' }}
+                />
+                <Typography variant="body2">{store.store_name}</Typography>
+                {store.is_free && (
+                  <Chip label="Free" size="small" color="success" variant="soft" />
+                )}
+              </Stack>
+
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Tooltip
+                  title={
+                    store.paid_seats <= includedSeatsPerStore
+                      ? `${includedSeatsPerStore} included seats — cannot be removed`
+                      : 'Remove seat'
+                  }
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="soft"
+                      color="inherit"
+                      disabled={store.paid_seats <= includedSeatsPerStore || adjusting !== null}
+                      onClick={() => handleSeatChange(-1, 'store', store.store_id)}
+                      sx={{ minWidth: 24, px: 0.5 }}
+                    >
+                      {adjusting === `store-${store.store_id}--1` ? (
+                        <CircularProgress size={12} />
+                      ) : (
+                        <Iconify icon="mingcute:minus-line" width={12} />
+                      )}
+                    </Button>
+                  </span>
+                </Tooltip>
+
+                <Typography variant="caption" sx={{ minWidth: 20, textAlign: 'center' }}>
+                  {store.paid_seats} seat{store.paid_seats !== 1 ? 's' : ''}
+                </Typography>
+
+                <Tooltip
+                  title={
+                    maxSeatsPerStore && store.paid_seats >= maxSeatsPerStore
+                      ? `Basic plan limit: ${maxSeatsPerStore} seats per store`
+                      : `Add seat (+${fCurrency(seatPrice)}/mo)`
+                  }
+                >
+                  <span>
+                    <Button
+                      size="small"
+                      variant="soft"
+                      color="primary"
+                      disabled={
+                        adjusting !== null
+                        || (maxSeatsPerStore != null && store.paid_seats >= maxSeatsPerStore)
+                      }
+                      onClick={() => handleSeatChange(1, 'store', store.store_id)}
+                      sx={{ minWidth: 24, px: 0.5 }}
+                    >
+                    {adjusting === `store-${store.store_id}-1` ? (
+                      <CircularProgress size={12} />
+                    ) : (
+                      <Iconify icon="mingcute:add-line" width={12} />
+                    )}
+                  </Button>
+                  </span>
+                </Tooltip>
+
+                <Typography variant="body2" sx={{ ml: 1, minWidth: 80, textAlign: 'right' }}>
+                  {store.is_free && store.seat_fees === 0
+                    ? 'Free'
+                    : `${fCurrency((store.store_fee ?? 0) + (store.seat_fees ?? 0))}/mo`}
+                </Typography>
+              </Stack>
+            </Stack>
+          ))}
+
+          <Divider sx={{ my: 1.5 }} />
+
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="subtitle1">Total</Typography>
+            <Typography variant="h5" color="primary.main">
+              {fCurrency(summary.total)}
+              <Box component="span" sx={{ typography: 'body2', color: 'text.disabled', ml: 0.5 }}>
+                /mo
+              </Box>
+            </Typography>
+          </Stack>
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{
+              mt: 1.5,
+              px: 1.5,
+              py: 1,
+              borderRadius: 1,
+              bgcolor: 'background.neutral',
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="solar:calendar-bold" width={18} sx={{ color: 'primary.main' }} />
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
+                  Next charge date
+                </Typography>
+                <Typography variant="subtitle2">
+                  {billingDate ? fDate(billingDate) : '—'}
+                </Typography>
+              </Box>
+            </Stack>
+
+            {daysUntilBilling !== null && (
+              <Chip
+                size="small"
+                label={daysUntilBilling === 0 ? 'Today' : `${daysUntilBilling}d away`}
+                color={daysUntilBilling <= 3 ? 'warning' : 'default'}
+                variant="soft"
+              />
+            )}
+          </Stack>
+
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>
+            Seat changes are pro-rated. Invoices are auto-generated 3 days before your billing date.
+          </Typography>
         </Stack>
       </Card>
 
-      <PaymentCardListDialog
-        list={cardList}
-        open={openCards.value}
-        onClose={openCards.onFalse}
-        selected={(selectedId) => selectedCard?.id === selectedId}
-        onSelect={handleSelectCard}
-      />
-
-      <AddressListDialog
-        list={addressBook}
-        open={openAddress.value}
-        onClose={openAddress.onFalse}
-        selected={(selectedId) => selectedAddress?.id === selectedId}
-        onSelect={handleSelectAddress}
-        action={
-          <Button
-            size="small"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-            sx={{ alignSelf: 'flex-end' }}
-          >
-            New
+      <Dialog open={Boolean(pendingTier)} onClose={() => !changingPlan && setPendingTier(null)}>
+        <DialogTitle>Change subscription plan?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Switch from <strong>{tierLabel(currentTier)}</strong> to{' '}
+            <strong>{tierLabel(pendingTier)}</strong>.
+          </Typography>
+          {pendingTotal !== null && (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              Your estimated monthly total will change from{' '}
+              <strong>{fCurrency(summary.total)}</strong> to{' '}
+              <strong>{fCurrency(pendingTotal)}</strong>.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingTier(null)} disabled={changingPlan}>
+            Cancel
           </Button>
-        }
-      />
+          <Button
+            variant="contained"
+            onClick={handleConfirmPlanChange}
+            disabled={changingPlan}
+          >
+            {changingPlan ? 'Updating…' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

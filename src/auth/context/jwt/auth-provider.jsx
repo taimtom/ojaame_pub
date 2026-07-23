@@ -3,10 +3,10 @@ import { useMemo, useEffect, useCallback } from 'react';
 import { useSetState } from 'src/hooks/use-set-state';
 
 import axios, { endpoints } from 'src/utils/axios';
+import { getAuthToken } from 'src/utils/auth-storage';
 
-import { STORAGE_KEY } from './constant';
-import { AuthContext } from '../auth-context';
 import { setSession, isValidToken } from './utils';
+import { AuthContext } from '../auth-context';
 
 // ----------------------------------------------------------------------
 
@@ -18,10 +18,10 @@ export function AuthProvider({ children }) {
 
   const checkUserSession = useCallback(async () => {
     try {
-      const accessToken = sessionStorage.getItem(STORAGE_KEY);
+      const accessToken = await getAuthToken();
 
       if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
+        await setSession(accessToken);
 
         const res = await axios.get(endpoints.auth.me);
         // If the API returns the user data directly, use:
@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
             email: state.user?.email,
             displayName: state.user?.lastName,
             photoURL: state.user?.picture,
-            role: state.user?.role ?? 'admin',
+            role: state.user?.role ?? null,
           }
         : null,
 

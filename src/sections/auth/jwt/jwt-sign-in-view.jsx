@@ -18,6 +18,15 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useNetworkStatus } from 'src/hooks/use-network-status';
+
+import { getGoogleClientId, getGoogleAuthRedirectUrl } from 'src/utils/google-auth-env';
+import {
+  NETWORK_QUALITY,
+  isAxiosNetworkFailure,
+  getAxiosNetworkErrorMessage,
+  getConnectionQualityMessage,
+} from 'src/utils/network-quality';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -38,11 +47,41 @@ export const SignInSchema = zod.object({
     .min(6, { message: 'Password must be at least 6 characters!' }),
 });
 
+function resolveSignInError(error) {
+  if (isAxiosNetworkFailure(error) || error?.isNetworkError || error?.data?._network) {
+    return error?.message || getAxiosNetworkErrorMessage(error);
+  }
+
+  const response = error?.response;
+  if (response?.data?.detail) {
+    return typeof response.data.detail === 'string'
+      ? response.data.detail
+      : JSON.stringify(response.data.detail);
+  }
+
+  if (error?.detail) {
+    return typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+  }
+
+  if (error?.data?.detail) {
+    return typeof error.data.detail === 'string'
+      ? error.data.detail
+      : JSON.stringify(error.data.detail);
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'An error occurred while signing in.';
+}
+
 export function JwtSignInView() {
   const router = useRouter();
   const { checkUserSession } = useAuthContext();
   const [errorMsg, setErrorMsg] = useState('');
   const password = useBoolean();
+  const { quality, isOnline, message: connectionMessage } = useNetworkStatus();
 
   const defaultValues = {
     email: '',
@@ -61,37 +100,20 @@ export function JwtSignInView() {
 
   // Email/Password form submission handler.
   const onSubmit = handleSubmit(async (data) => {
+    if (!isOnline || quality === NETWORK_QUALITY.OFFLINE) {
+      const offlineMsg = getConnectionQualityMessage(NETWORK_QUALITY.OFFLINE);
+      setErrorMsg(offlineMsg);
+      toast.error(offlineMsg);
+      return;
+    }
+
     try {
       await signInWithPassword({ email: data.email, password: data.password });
       await checkUserSession();
       router.refresh();
     } catch (error) {
       console.error(error);
-
-      let errorMessage = '';
-
-      // Case 1: Axios error with response.data.detail
-      const response = error?.response;
-      if (response?.data?.detail) {
-        errorMessage =
-          typeof response.data.detail === 'string'
-            ? response.data.detail
-            : JSON.stringify(response.data.detail);
-      }
-      // Case 2: Interceptor already returned plain data object: { detail: '...' }
-      else if (error?.detail) {
-        errorMessage =
-          typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-      }
-      // Case 3: Standard Error instance
-      else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      // Fallback: generic message
-      else {
-        errorMessage = 'An error occurred while signing in.';
-      }
-
+      const errorMessage = resolveSignInError(error);
       setErrorMsg(errorMessage);
       toast.error(errorMessage);
     }
@@ -99,22 +121,28 @@ export function JwtSignInView() {
 
   // Handler for the Google sign-in button.
   const handleGoogleSignIn = () => {
-    // IMPORTANT: Update these values to match your Google Console settings.
-    const GOOGLE_CLIENT_ID = '181864963042-iu9uubcbthf2tncerkarlnp4ehepk7cr.apps.googleusercontent.com'; // Replace with your actual Client ID.
+    if (!isOnline || quality === NETWORK_QUALITY.OFFLINE) {
+      const offlineMsg = getConnectionQualityMessage(NETWORK_QUALITY.OFFLINE);
+      setErrorMsg(offlineMsg);
+      toast.error(offlineMsg);
+      return;
+    }
 
-    const redirectUri = encodeURIComponent('http://localhost:3030/auth/google');
+    const clientId = getGoogleClientId();
+    const redirectUrl = getGoogleAuthRedirectUrl();
+    if (!clientId || !redirectUrl) {
+      toast.error(
+        'Google sign-in is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URL in your .env file.'
+      );
+      return;
+    }
 
-
-    // We'll request basic profile, email, and OpenID.
+    const redirectUri = encodeURIComponent(redirectUrl);
     const scope = encodeURIComponent('openid email profile');
-
-    // A random nonce helps prevent replay attacks.
     const nonce = Math.random().toString(36).substring(2);
 
-    // Construct the Google OAuth URL.
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=${scope}&nonce=${nonce}`;
 
-    // Redirect the browser to start the Google OAuth flow.
     window.location.href = googleAuthUrl;
   };
   // Render header section.
@@ -224,6 +252,14 @@ export function JwtSignInView() {
     <>
       {renderHead}
 
+      {connectionMessage && (
+        <Alert
+          severity={quality === NETWORK_QUALITY.SLOW ? 'info' : 'warning'}
+          sx={{ mb: 3 }}
+        >
+          {connectionMessage}
+        </Alert>
+      )}
 
       {!!errorMsg && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -237,6 +273,25 @@ export function JwtSignInView() {
 
       {/* Google Sign In Button */}
       {renderGoogleSignIn}
+
+      <Typography
+        variant="caption"
+        align="center"
+        display="block"
+        mt={3}
+        color="text.disabled"
+      >
+        Are you a referral agent?{' '}
+        <Link
+          component={RouterLink}
+          to="/agent/login"
+          variant="caption"
+          color="text.secondary"
+          underline="hover"
+        >
+          Agent sign in
+        </Link>
+      </Typography>
     </>
   );
 }

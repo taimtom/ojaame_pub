@@ -1,26 +1,35 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import { useTheme } from '@mui/material/styles';
-import { iconButtonClasses } from '@mui/material/IconButton';
+import IconButton, { iconButtonClasses } from '@mui/material/IconButton';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useBusinessType } from 'src/hooks/use-business-type';
 
 import { allLangs } from 'src/locales';
 import { useGetStores } from 'src/actions/store';
-import { _contacts, _notifications } from 'src/_mock';
+import { _contacts } from 'src/_mock';
 import { varAlpha, stylesMode } from 'src/theme/styles';
+import { fDate } from 'src/utils/format-time';
 
 import { bulletColor } from 'src/components/nav-section';
 import { useSettingsContext } from 'src/components/settings';
 import { Iconify } from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { useGetSubscriptionStatus } from 'src/actions/billing';
+import { usePlanFeatures } from 'src/hooks/use-plan-features';
 
 import { Main } from './main';
 import { NavMobile } from './nav-mobile';
@@ -41,6 +50,7 @@ import { LayoutSection } from '../core/layout-section';
 export function DashboardLayout({ sx, children, data }) {
   const theme = useTheme();
   const router = useRouter();
+  const { t } = useBusinessType();
 
   const mobileNavOpen = useBoolean();
 
@@ -63,18 +73,76 @@ export function DashboardLayout({ sx, children, data }) {
   const { stores, storesLoading } = useGetStores();
   const { user } = useAuthContext();
 
+  const { status, paystackStatus, gracePeriodEnd, isOwner } = useGetSubscriptionStatus();
+  const { canAddStore } = usePlanFeatures();
+  const [quickModeAnchorEl, setQuickModeAnchorEl] = useState(null);
+  const [quickEntryMode, setQuickEntryMode] = useState('product'); // default
+  const quickModeMenuOpen = Boolean(quickModeAnchorEl);
+
+  useEffect(() => {
+    if (!user?.company_id) {
+      setQuickEntryMode('product');
+      return;
+    }
+    const stored = localStorage.getItem(`quick_entry_mode_${user.company_id}`);
+    setQuickEntryMode(stored === 'service' ? 'service' : 'product');
+  }, [user?.company_id]);
+
+  const handleSelectQuickMode = (mode) => {
+    if (!user?.company_id) return;
+    setQuickEntryMode(mode);
+    localStorage.setItem(`quick_entry_mode_${user.company_id}`, mode);
+    setQuickModeAnchorEl(null);
+  };
+
+  const quickActionPath =
+    quickEntryMode === 'service' ? paths.dashboard.serviceLog : paths.dashboard.quickDashboard;
+  const quickActionLabel = quickEntryMode === 'service' ? 'Service Log' : `Quick ${t('sale')}`;
+  const quickActionIcon = quickEntryMode === 'service' ? 'solar:clipboard-list-bold' : 'solar:bolt-bold';
+
   // Dynamically update the Profile link in the _account array
   const accountNav = useMemo(
     () =>
-      _account.map((item) =>
-        item.label === 'Profile'
-          ? { ...item, href: user?.user_id ? paths.dashboard.user.edit(user.user_id) : item.href }
-          : item
-      ),
-    [user]
+      _account
+        .filter((item) => item.label !== 'Add store' || canAddStore(stores?.length ?? 0))
+        .map((item) =>
+          item.label === 'Profile'
+            ? { ...item, href: user?.user_id ? paths.dashboard.user.edit(user.user_id) : item.href }
+            : item
+        ),
+    [user, stores, canAddStore]
   );
+  const showBillingBanner = isOwner && (status === 'unpaid' || status === 'deactivated');
+
   return (
     <>
+      {showBillingBanner && (
+        <Alert
+          severity={status === 'deactivated' ? 'error' : 'warning'}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() =>
+                router.push(`${paths.dashboard.user.account}?tab=billing`)
+              }
+            >
+              {status === 'deactivated' ? 'Go to Billing' : 'Update Payment'}
+            </Button>
+          }
+          sx={{ borderRadius: 0, position: 'sticky', top: 0, zIndex: 1300 }}
+        >
+          <AlertTitle>
+            {status === 'deactivated' ? 'Account Restricted' : 'Payment Failed'}
+          </AlertTitle>
+          {status === 'deactivated'
+            ? 'Your subscription is deactivated. Update your payment method to restore full access.'
+            : paystackStatus === 'attention'
+              ? `Paystack will automatically retry your payment on your next billing date.${gracePeriodEnd ? ` Your account will be restricted on ${fDate(gracePeriodEnd)} if not resolved.` : ''}`
+              : 'Your subscription payment is pending. Please update your payment method.'}
+        </Alert>
+      )}
+
       <NavMobile
         data={navData}
         open={mobileNavOpen.value}
@@ -98,7 +166,6 @@ export function DashboardLayout({ sx, children, data }) {
               contacts: _contacts,
               workspaces: storesLoading ? [] : stores,
               // workspaces: _workspaces,
-              notifications: _notifications,
             }}
             slotsDisplay={{
               signIn: false,
@@ -112,25 +179,88 @@ export function DashboardLayout({ sx, children, data }) {
                 </Alert>
               ),
               rightAreaStart: (
-                <Tooltip title="Quick Sale ⚡">
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="primary"
-                    onClick={() => router.push(paths.dashboard.quickDashboard)}
-                    startIcon={<Iconify icon="solar:bolt-bold" width={16} />}
-                    sx={{
-                      mr: 0.5,
-                      px: 1.5,
-                      minWidth: 0,
-                      height: 34,
-                      fontWeight: 700,
-                      display: { xs: 'none', sm: 'inline-flex' },
-                    }}
+                <>
+                  {/* Full button on sm+ screens */}
+                  <Tooltip title={quickActionLabel}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      onClick={() => router.push(quickActionPath)}
+                      startIcon={<Iconify icon={quickActionIcon} width={16} />}
+                      sx={{
+                        mr: 0.5,
+                        px: 1.5,
+                        minWidth: 0,
+                        height: 34,
+                        fontWeight: 700,
+                        display: { xs: 'none', sm: 'inline-flex' },
+                      }}
+                    >
+                      {quickActionLabel}
+                    </Button>
+                  </Tooltip>
+
+                  <Tooltip title="Set quick mode">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => setQuickModeAnchorEl(e.currentTarget)}
+                      sx={{
+                        mr: 0.5,
+                        width: 34,
+                        height: 34,
+                        bgcolor: 'background.neutral',
+                      }}
+                    >
+                      <Iconify icon="solar:tuning-2-bold" width={18} />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Menu
+                    anchorEl={quickModeAnchorEl}
+                    open={quickModeMenuOpen}
+                    onClose={() => setQuickModeAnchorEl(null)}
                   >
-                    Quick Sale
-                  </Button>
-                </Tooltip>
+                    <MenuItem
+                      selected={quickEntryMode === 'product'}
+                      onClick={() => handleSelectQuickMode('product')}
+                    >
+                      <ListItemIcon>
+                        <Iconify icon="solar:bolt-bold" width={18} />
+                      </ListItemIcon>
+                      <ListItemText primary={`Product (Quick ${t('sale')})`} />
+                    </MenuItem>
+                    <MenuItem
+                      selected={quickEntryMode === 'service'}
+                      onClick={() => handleSelectQuickMode('service')}
+                    >
+                      <ListItemIcon>
+                        <Iconify icon="solar:clipboard-list-bold" width={18} />
+                      </ListItemIcon>
+                      <ListItemText primary="Service (Service Log)" />
+                    </MenuItem>
+                  </Menu>
+
+                  {/* Icon-only button on mobile */}
+                  <Tooltip title={quickActionLabel}>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => router.push(quickActionPath)}
+                      sx={{
+                        mr: 0.5,
+                        display: { xs: 'inline-flex', sm: 'none' },
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        width: 34,
+                        height: 34,
+                        '&:hover': { bgcolor: 'primary.dark' },
+                      }}
+                    >
+                      <Iconify icon={quickActionIcon} width={18} />
+                    </IconButton>
+                  </Tooltip>
+                </>
               ),
               bottomArea: isNavHorizontal ? (
                 <NavHorizontal

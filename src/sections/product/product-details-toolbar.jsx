@@ -18,9 +18,13 @@ export function ProductDetailsToolbar({
   publish,
   backLink,
   editLink,
+  addQtyLink,
+  adjustLink,
+  changePriceLink,
   liveLink,
   publishOptions,
   onChangePublish,
+  canUpdate = true,
   sx,
   ...other
 }) {
@@ -39,7 +43,7 @@ export function ProductDetailsToolbar({
 
         <Box sx={{ flexGrow: 1 }} />
 
-        {publish === 'published' && (
+        {publish === 'publish' && (
           <Tooltip title="Go Live">
             <IconButton component={RouterLink} href={liveLink}>
               <Iconify icon="eva:external-link-fill" />
@@ -47,23 +51,62 @@ export function ProductDetailsToolbar({
           </Tooltip>
         )}
 
-        <Tooltip title="Edit">
-          <IconButton component={RouterLink} href={editLink}>
-            <Iconify icon="solar:pen-bold" />
-          </IconButton>
-        </Tooltip>
+        {canUpdate && addQtyLink && (
+          <Button
+            component={RouterLink}
+            href={addQtyLink}
+            variant="outlined"
+            startIcon={<Iconify icon="solar:add-square-bold" width={18} />}
+          >
+            Add Qty
+          </Button>
+        )}
 
-        <LoadingButton
-          color="inherit"
-          variant="contained"
-          loading={!publish}
-          loadingIndicator="Loading…"
-          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
-          onClick={popover.onOpen}
-          sx={{ textTransform: 'capitalize' }}
-        >
-          {publish}
-        </LoadingButton>
+        {canUpdate && adjustLink && (
+          <Button
+            component={RouterLink}
+            href={adjustLink}
+            variant="outlined"
+            color="error"
+            startIcon={<Iconify icon="solar:danger-triangle-bold" width={18} />}
+          >
+            Record Loss
+          </Button>
+        )}
+
+        {canUpdate && changePriceLink && (
+          <Button
+            component={RouterLink}
+            href={changePriceLink}
+            variant="outlined"
+            color="warning"
+            startIcon={<Iconify icon="solar:tag-price-bold" width={18} />}
+          >
+            Change Price
+          </Button>
+        )}
+
+        {canUpdate && editLink && (
+          <Tooltip title="Edit">
+            <IconButton component={RouterLink} href={editLink}>
+              <Iconify icon="solar:pen-bold" />
+            </IconButton>
+          </Tooltip>
+        )}
+
+        {canUpdate && (
+          <LoadingButton
+            color="inherit"
+            variant="contained"
+            loading={!publish}
+            loadingIndicator="Loading…"
+            endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
+            onClick={popover.onOpen}
+            sx={{ textTransform: 'capitalize' }}
+          >
+            {publish}
+          </LoadingButton>
+        )}
       </Stack>
 
       <CustomPopover
@@ -82,7 +125,7 @@ export function ProductDetailsToolbar({
                 onChangePublish(option.value);
               }}
             >
-              {option.value === 'published' && <Iconify icon="eva:cloud-upload-fill" />}
+              {option.value === 'publish' && <Iconify icon="eva:cloud-upload-fill" />}
               {option.value === 'draft' && <Iconify icon="solar:file-text-bold" />}
               {option.label}
             </MenuItem>

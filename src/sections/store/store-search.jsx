@@ -13,18 +13,20 @@ import { useRouter } from 'src/routes/hooks';
 
 import { paramCase } from 'src/utils/change-case';
 
+import { useAuthContext } from 'src/auth/hooks';
 import { Iconify } from 'src/components/iconify';
 import { SearchNotFound } from 'src/components/search-not-found';
 
 export function StoreSearch({ query, results, onSearch, loading }) {
   const router = useRouter();
+  const { user } = useAuthContext();
 
   // Build a store slug from storeName and id.
   const getStoreParam = (store) => `${paramCase(store.storeName)}-${store.id}`;
 
   const handleClick = (store) => {
-    // Save the selected store in localStorage as the active workspace.
-    localStorage.setItem('activeWorkspace', JSON.stringify(store));
+    // Save the selected store (with current user_id) in localStorage as the active workspace.
+    localStorage.setItem('activeWorkspace', JSON.stringify({ ...store, user_id: user?.user_id }));
     const storeParam = getStoreParam(store);
     // Build the URL by concatenating the dashboard root (assumed to be a string) with the store slug.
     const linkTo = `${paths.dashboard.root}/${storeParam}`;

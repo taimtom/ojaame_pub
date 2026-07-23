@@ -31,6 +31,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Field } from 'src/components/hook-form';
 import { ConfirmDialog } from 'src/components/custom-dialog';
+import { fCurrency } from 'src/utils/format-number';
 
 export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
   const { control, setValue, watch, getValues } = useFormContext();
@@ -79,9 +80,9 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
     return `${method.method_type.replace('_', ' ').toUpperCase()}${method.issuer ? ` — ${method.issuer}` : ''}`;
   };
 
-  // Initialize new payment with remaining amount for new invoices
+  // For new invoices keep the first payment row's amount in sync with the total
   useEffect(() => {
-    if (!currentInvoice && fields.length === 1) {
+    if (!currentInvoice && fields.length === 1 && totalAmount > 0) {
       setValue(`payments.0.amount`, totalAmount);
     }
   }, [currentInvoice, fields.length, totalAmount, setValue]);
@@ -144,7 +145,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
     const newTotal = existingPaymentsTotal - (editingPayment?.amount || 0) + newAmount;
     if (newTotal < totalAmount && status === 'paid') {
       toast.warning(
-        `Reducing payment will change status to Credit. New balance: $${(totalAmount - newTotal).toFixed(2)}`
+        `Reducing payment will change status to Credit. New balance: ${fCurrency(totalAmount - newTotal)}`
       );
     }
     setEditFormData(prev => ({ ...prev, amount: newAmount }));
@@ -234,7 +235,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Chip
-                    label={`$${payment.amount?.toFixed(2) || '0.00'}`}
+                    label={fCurrency(payment.amount || 0)}
                     color="success"
                     size="small"
                   />
@@ -287,7 +288,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
       {currentInvoice && status === 'credit' && remainingAmount > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="body2">
-            This is a credit sale. Remaining balance: <strong>${remainingAmount.toFixed(2)}</strong>
+            This is a credit sale. Remaining balance: <strong>{fCurrency(remainingAmount)}</strong>
           </Typography>
           <Typography variant="body2" sx={{ mt: 0.5 }}>
             You can add additional payments below to reduce the outstanding balance.
@@ -348,7 +349,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
                 }}
                 helperText={
                   currentInvoice && remainingAmount > 0
-                    ? `Remaining balance: $${remainingAmount.toFixed(2)}`
+                    ? `Remaining balance: ${fCurrency(remainingAmount)}`
                     : status === 'credit'
                       ? 'Credit sales allow partial or no payment'
                       : 'Enter payment amount'
@@ -386,7 +387,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2">Total Amount:</Typography>
                 <Typography variant="body2" fontWeight="medium">
-                  ${totalAmount.toFixed(2)}
+                  {fCurrency(totalAmount)}
                 </Typography>
               </Stack>
               {existingPayments.length > 0 && (
@@ -395,7 +396,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
                     Previous Payments:
                   </Typography>
                   <Typography variant="body2" color="success.main" fontWeight="medium">
-                    ${existingPaymentsTotal.toFixed(2)}
+                    {fCurrency(existingPaymentsTotal)}
                   </Typography>
                 </Stack>
               )}
@@ -408,7 +409,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
                   fontWeight="medium"
                   color={remainingAmount > 0 ? 'warning.main' : 'success.main'}
                 >
-                  {remainingAmount > 0 ? `$${remainingAmount.toFixed(2)}` : 'Fully Paid'}
+                  {remainingAmount > 0 ? fCurrency(remainingAmount) : 'Fully Paid'}
                 </Typography>
               </Stack>
             </Stack>
@@ -453,7 +454,7 @@ export function InvoiceNewEditPayments({ storeId, currentInvoice }) {
         handlePaymentAmountChange(Number(e.target.value))
       }
       inputProps={{ min: 0, step: 0.01 }}
-      helperText={`Current total: $${totalAmount.toFixed(2)}`}
+      helperText={`Current total: ${fCurrency(totalAmount)}`}
     />
 
     <TextField

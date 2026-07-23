@@ -1,6 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
+
+import { buildReceiptPdfDocument } from 'src/utils/receipt-pdf-document';
+import { getPreferredThermalWidthMm } from 'src/utils/receipt-preferences';
+import { getPrintResultMessage, printReceipt } from 'src/utils/print-receipt';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -22,9 +26,14 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { paramCase } from 'src/utils/change-case';
 
 import { Iconify } from 'src/components/iconify';
+import { toast } from 'src/components/snackbar';
+import { ReceiptShareDialog } from 'src/components/receipt/receipt-share-dialog';
+import { ReceiptOutputFlowDialogs } from 'src/components/receipt/receipt-output-flow-dialogs';
+import { useReceiptOutputFlow } from 'src/hooks/use-receipt-output-flow';
 
-import { InvoicePDF } from './invoice-pdf';
-
+function invoiceFileLabel(invoice) {
+  return invoice?.invoice_number || invoice?.invoiceNumber || invoice?.id || 'invoice';
+}
 
 // Helper function to get storeSlug from either props, URL params or localStorage
 function getStoreSlug(propStoreSlug, storeParam) {
@@ -49,23 +58,90 @@ function getStoreSlug(propStoreSlug, storeParam) {
   return storeSlug;
 }
 
-export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChangeStatus, storeSlug: propStoreSlug }) {
+export function InvoiceToolbar({
+  invoice,
+  currentStatus,
+  statusOptions,
+  onChangeStatus,
+  storeSlug: propStoreSlug,
+  /** 'thermal' | 'a4' — default A4 for dashboard invoice list; POS receipt passes thermal by default. */
+  receiptFormat = 'a4',
+  /** 'pos' uses A4ReceiptPDF for A4; 'invoice' keeps classic InvoicePDF for A4. */
+  pdfFlavor = 'invoice',
+}) {
   const router = useRouter();
   const { storeParam } = useParams();
   const storeSlug = getStoreSlug(propStoreSlug, storeParam);
 
   const view = useBoolean();
+  const shareDialog = useBoolean();
+  const [shareReceipt, setShareReceipt] = useState(null);
+  const { runWithReceiptOutput, activeReceipt, dialogs } = useReceiptOutputFlow({
+    storeId: invoice?.store_id,
+  });
+
+  const getReceiptPdfDocument = useCallback(() => (
+    buildReceiptPdfDocument({
+      invoice,
+      currentStatus,
+      receiptFormat,
+      pdfFlavor,
+      thermalWidthMm: getPreferredThermalWidthMm(),
+    })
+  ), [invoice, currentStatus, receiptFormat, pdfFlavor]);
 
   const handleEdit = useCallback(() => {
-    // Use the computed storeSlug and invoice id to navigate to the edit page
     router.push(paths.dashboard.pos.edit(storeSlug, invoice?.id));
   }, [invoice?.id, router, storeSlug]);
+
+  const handlePrint = useCallback(async () => {
+    if (!invoice) {
+      toast.error('No invoice data available to print.');
+      return;
+    }
+
+    runWithReceiptOutput(invoice, async (outputReceipt) => {
+      try {
+        const fileName = `${invoiceFileLabel(outputReceipt)}.pdf`;
+        const result = await printReceipt({
+          receipt: outputReceipt,
+          fileName,
+          receiptFormat,
+          thermalWidthMm: getPreferredThermalWidthMm(),
+          currentStatus,
+          pdfFlavor,
+          preferBluetooth: receiptFormat === 'thermal',
+        });
+
+        const message = getPrintResultMessage(result);
+        if (message) {
+          toast.info(message);
+        }
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          toast.error('Failed to prepare invoice for printing.');
+        }
+      }
+    });
+  }, [invoice, receiptFormat, currentStatus, pdfFlavor, runWithReceiptOutput]);
+
+  const handleShare = useCallback(() => {
+    if (!invoice) {
+      toast.error('No invoice data available to share.');
+      return;
+    }
+
+    runWithReceiptOutput(invoice, (outputReceipt) => {
+      setShareReceipt(outputReceipt);
+      shareDialog.onTrue();
+    });
+  }, [invoice, shareDialog, runWithReceiptOutput]);
 
   const renderDownload = (
     <NoSsr>
       <PDFDownloadLink
-        document={invoice ? <InvoicePDF invoice={invoice} currentStatus={currentStatus} /> : <span />}
-        fileName={invoice?.invoiceNumber}
+        document={invoice ? getReceiptPdfDocument() : <span />}
+        fileName={`${receiptFormat}-${invoiceFileLabel(invoice)}.pdf`}
         style={{ textDecoration: 'none' }}
       >
         {({ loading }) => (
@@ -103,7 +179,7 @@ export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChange
           {renderDownload}
 
           <Tooltip title="Print">
-            <IconButton>
+            <IconButton onClick={handlePrint}>
               <Iconify icon="solar:printer-minimalistic-bold" />
             </IconButton>
           </Tooltip>
@@ -115,7 +191,7 @@ export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChange
           </Tooltip>
 
           <Tooltip title="Share">
-            <IconButton>
+            <IconButton onClick={handleShare}>
               <Iconify icon="solar:share-bold" />
             </IconButton>
           </Tooltip>
@@ -149,11 +225,31 @@ export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChange
 
           <Box sx={{ flexGrow: 1, height: 1, overflow: 'hidden' }}>
             <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
-              {invoice && <InvoicePDF invoice={invoice} currentStatus={currentStatus} />}
+              {invoice && getReceiptPdfDocument()}
             </PDFViewer>
           </Box>
         </Box>
       </Dialog>
+
+      <ReceiptShareDialog
+        open={shareDialog.value}
+        onClose={() => {
+          shareDialog.onFalse();
+          setShareReceipt(null);
+        }}
+        receipt={shareReceipt || invoice}
+        receiptFormat={receiptFormat}
+        pdfFlavor={pdfFlavor}
+        thermalWidthMm={getPreferredThermalWidthMm()}
+        currentStatus={currentStatus}
+        shareText={receiptFormat === 'thermal' ? 'Receipt' : 'Invoice'}
+      />
+
+      <ReceiptOutputFlowDialogs
+        receipt={activeReceipt || invoice}
+        storeId={invoice?.store_id}
+        dialogs={dialogs}
+      />
     </>
   );
 }

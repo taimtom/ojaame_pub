@@ -5,8 +5,16 @@ import { CONFIG } from 'src/config-global';
 import { DashboardLayout } from 'src/layouts/dashboard';
 
 import { LoadingScreen } from 'src/components/loading-screen';
+import { PlanFeatureGuard } from 'src/components/plan/plan-feature-guard';
 
-import { AuthGuard } from 'src/auth/guard';
+import { SubscriptionInactiveStaffView } from 'src/sections/error';
+
+import { SubscriptionGuard } from 'src/auth/guard/subscription-guard';
+import { AuthGuard, PermissionGuard, HotelLodgingGuard } from 'src/auth/guard';
+
+function withPlanFeature(feature, title, element) {
+  return <PlanFeatureGuard feature={feature} title={title}>{element}</PlanFeatureGuard>;
+}
 
 
 // ----------------------------------------------------------------------
@@ -15,6 +23,14 @@ import { AuthGuard } from 'src/auth/guard';
 const IndexPage = lazy(() => import('src/pages/dashboard'));
 const DashboardRootRedirect = lazy(() => import('src/components/dashboard/dashboardRootRedirect'));
 const QuickDashboardPage = lazy(() => import('src/pages/dashboard/quick-dashboard'));
+const AiAgentPage = lazy(() => import('src/pages/dashboard/ai-agent'));
+const ServiceLogPage = lazy(() => import('src/pages/dashboard/service-log'));
+const FrontDeskPage = lazy(() => import('src/pages/dashboard/front-desk'));
+const FrontDeskSetupPage = lazy(() => import('src/pages/dashboard/front-desk-setup'));
+const FrontDeskCalendarPage = lazy(() => import('src/pages/dashboard/front-desk-calendar'));
+const FrontDeskHousekeepingPage = lazy(() => import('src/pages/dashboard/front-desk-housekeeping'));
+const QuickRestockPage = lazy(() => import('src/pages/dashboard/quick-restock'));
+const UsageDashboardPage = lazy(() => import('src/pages/dashboard/usage-dashboard'));
 // const StoreRootRedirect = lazy(() => import('src/components/dashboard/RequireStoreParam'));
 const OverviewEcommercePage = lazy(() => import('src/pages/dashboard/ecommerce'));
 const OverviewAnalyticsPage = lazy(() => import('src/pages/dashboard/analytics'));
@@ -34,8 +50,14 @@ const ProductListPage = lazy(() => import('src/pages/dashboard/product/list'));
 const ProductCreatePage = lazy(() => import('src/pages/dashboard/product/new'));
 const ProductEditPage = lazy(() => import('src/pages/dashboard/product/edit'));
 const ProductAddQuantityPage = lazy(() => import('src/pages/dashboard/product/addqty'));
+const ProductAdjustStockPage = lazy(() => import('src/pages/dashboard/product/adjust'));
+const ProductChangePricePage = lazy(() => import('src/pages/dashboard/product/change-price'));
+const ProductBulkAddPage = lazy(() => import('src/pages/dashboard/product/bulk-add'));
 const ProductHistoryListPage = lazy(() => import('src/pages/dashboard/product/history'));
+const ProductRestockHistoryPage = lazy(() => import('src/pages/dashboard/product/restock-history'));
 const ProductHistoryMovementPage = lazy(() => import('src/pages/dashboard/product/movement'));
+const TransferListPage = lazy(() => import('src/pages/dashboard/transfer/list'));
+const ConsignmentListPage = lazy(() => import('src/pages/dashboard/consignment/list'));
 
 // Category
 const CategoryListPage = lazy(() => import('src/pages/dashboard/category/list'));
@@ -58,6 +80,11 @@ const PaymentMethodEditPage = lazy(() => import('src/pages/dashboard/payment-met
 const ServiceListPage = lazy(() => import('src/pages/dashboard/service/list'));
 const ServiceCreatePage = lazy(() => import('src/pages/dashboard/service/new'));
 const ServiceEditPage = lazy(() => import('src/pages/dashboard/service/edit'));
+const ServiceDetailsPage = lazy(() => import('src/pages/dashboard/service/details'));
+
+const DigitalProductListPage = lazy(() => import('src/pages/dashboard/digital-product/list'));
+const DigitalProductCreatePage = lazy(() => import('src/pages/dashboard/digital-product/new'));
+const DigitalProductEditPage = lazy(() => import('src/pages/dashboard/digital-product/edit'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
@@ -149,13 +176,41 @@ const BlankPage = lazy(() => import('src/pages/dashboard/blank'));
 // Store website settings
 const StoreWebsiteSettingsPage = lazy(() => import('src/pages/dashboard/store/website'));
 
+// Notifications
+const NotificationsPage = lazy(() => import('src/pages/dashboard/notifications'));
+const HelpSupportPage = lazy(() => import('src/pages/dashboard/help-support'));
+
+// Reports
+const StoreGeneralReportPage = lazy(() => import('src/pages/dashboard/reports/store-general'));
+const StoreInventoryReportPage = lazy(() => import('src/pages/dashboard/reports/store-inventory'));
+const StoreFinancialReportPage = lazy(() => import('src/pages/dashboard/reports/store-financial'));
+const StoreProfitLossReportPage = lazy(() => import('src/pages/dashboard/reports/store-profit-loss'));
+const StoreCashFlowReportPage = lazy(() => import('src/pages/dashboard/reports/store-cash-flow'));
+const StoreTaxEstimatesPage = lazy(() => import('src/pages/dashboard/reports/store-tax-estimates'));
+const StoreVatReturnPage = lazy(() => import('src/pages/dashboard/reports/store-vat-return'));
+const StoreTaxAnnualPage = lazy(() => import('src/pages/dashboard/reports/store-tax-annual'));
+const LoansPage = lazy(() => import('src/pages/dashboard/finance/loans'));
+const PayrollPage = lazy(() => import('src/pages/dashboard/finance/payroll'));
+const WhtLedgerPage = lazy(() => import('src/pages/dashboard/finance/wht-ledger'));
+const StoreBalanceSheetReportPage = lazy(() => import('src/pages/dashboard/reports/store-balance-sheet'));
+const StoreTrialBalanceReportPage = lazy(() => import('src/pages/dashboard/reports/store-trial-balance'));
+const StoreSalesTrendsReportPage = lazy(() => import('src/pages/dashboard/reports/store-sales-trends'));
+const EndOfDayReportPage = lazy(() => import('src/pages/dashboard/reports/end-of-day'));
+const StoreCustomerReportPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report'));
+const StoreCustomerReportDetailPage = lazy(() => import('src/pages/dashboard/reports/store-customer-report-detail'));
+const StorePartnerReportPage = lazy(() => import('src/pages/dashboard/reports/store-partner-report'));
+const StorePartnerReportDetailPage = lazy(() => import('src/pages/dashboard/reports/store-partner-report-detail'));
+const CompanyReportsPage = lazy(() => import('src/pages/dashboard/reports/company-reports'));
+
 // ----------------------------------------------------------------------
 
 const layoutContent = (
   <DashboardLayout>
-    <Suspense fallback={<LoadingScreen />}>
-      <Outlet />
-    </Suspense>
+    <SubscriptionGuard>
+      <Suspense fallback={<LoadingScreen />}>
+        <Outlet />
+      </Suspense>
+    </SubscriptionGuard>
   </DashboardLayout>
 );
 
@@ -164,8 +219,60 @@ export const dashboardRoutes = [
     path: 'app',
     element: CONFIG.auth.skip ? <>{layoutContent}</> : <AuthGuard>{layoutContent}</AuthGuard>,
     children: [
-      { path: 'analytics', element: <OverviewAnalyticsPage /> },
+      {
+        path: 'analytics',
+        element: (
+          <PermissionGuard anyOf={['reports.read', 'stores.read', 'stores.update']}>
+            <OverviewAnalyticsPage />
+          </PermissionGuard>
+        ),
+      },
       { path: 'quick-dashboard', element: <QuickDashboardPage /> },
+      { path: 'ai-agent', element: <AiAgentPage /> },
+      { path: 'subscription-inactive', element: <SubscriptionInactiveStaffView /> },
+      { path: 'service-log', element: withPlanFeature('service_log', 'Service Log', <ServiceLogPage />) },
+      {
+        path: 'front-desk',
+        element: (
+          <HotelLodgingGuard>
+            <PermissionGuard anyOf={['rooms.read', 'rooms.create', 'rooms.update', 'sales.read', 'sales.create']}>
+              <Outlet />
+            </PermissionGuard>
+          </HotelLodgingGuard>
+        ),
+        children: [
+          { index: true, element: <FrontDeskPage /> },
+          { path: 'calendar', element: <FrontDeskCalendarPage /> },
+          { path: 'housekeeping', element: <FrontDeskHousekeepingPage /> },
+          {
+            path: 'setup',
+            element: (
+              <PermissionGuard anyOf={['rooms.manage', 'rooms.delete']}>
+                <FrontDeskSetupPage />
+              </PermissionGuard>
+            ),
+          },
+        ],
+      },
+      { path: 'quick-restock', element: (
+        <PermissionGuard anyOf={['products.update', 'inventory.update', 'inventory.manage']}>
+          <QuickRestockPage />
+        </PermissionGuard>
+      ) },
+      {
+        path: 'usage-dashboard',
+        element: withPlanFeature(
+          'usage_dashboard',
+          'Usage dashboard',
+          (
+          <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+            <UsageDashboardPage />
+          </PermissionGuard>
+          )
+        ),
+      },
+      { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'help-support', element: <HelpSupportPage /> },
 
       { index: true, element: <DashboardRootRedirect /> },
       {
@@ -180,11 +287,98 @@ export const dashboardRoutes = [
             { index: true, element: <ProductListPage /> },
             { path: 'list', element: <ProductListPage /> },
             { path: 'history', element: <ProductHistoryListPage /> },
+            {
+              path: 'restock-history',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update', 'inventory.manage']}>
+                  <ProductRestockHistoryPage />
+                </PermissionGuard>
+              ),
+            },
             { path: ':id', element: <ProductDetailsPage /> },
             { path: ':id/movement', element: <ProductHistoryMovementPage /> },
-            { path: 'new', element: <ProductCreatePage /> },
-            { path: ':id/edit', element: <ProductEditPage /> },
-            { path: ':id/addqty', element: <ProductAddQuantityPage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['products.create']}>
+                  <ProductCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'bulk-add',
+              element: (
+                <PermissionGuard anyOf={['products.create']}>
+                  <ProductBulkAddPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['products.update']}>
+                  <ProductEditPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/addqty',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update']}>
+                  <ProductAddQuantityPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/adjust',
+              element: (
+                <PermissionGuard anyOf={['products.update', 'inventory.update']}>
+                  <ProductAdjustStockPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/change-price',
+              element: (
+                <PermissionGuard anyOf={['products.update']}>
+                  <ProductChangePricePage />
+                </PermissionGuard>
+              ),
+            },
+          ],
+        },
+        {
+          path: 'transfer',
+          children: [
+            {
+              index: true,
+              element: withPlanFeature(
+                'store_transfers',
+                'Store Transfers',
+                (
+                <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+                  <TransferListPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+          ],
+        },
+        {
+          path: 'consignment',
+          children: [
+            {
+              index: true,
+              element: withPlanFeature(
+                'consignment',
+                'Consignment',
+                (
+                <PermissionGuard anyOf={['inventory.read', 'inventory.update', 'inventory.manage']}>
+                  <ConsignmentListPage />
+                </PermissionGuard>
+                )
+              ),
+            },
           ],
         },
         {
@@ -201,7 +395,29 @@ export const dashboardRoutes = [
             { index: true, element: <ServiceListPage /> },
             { path: 'list', element: <ServiceListPage /> },
             { path: 'new', element: <ServiceCreatePage /> },
+            { path: ':id', element: <ServiceDetailsPage /> },
             { path: ':id/edit', element: <ServiceEditPage /> },
+          ],
+        },
+        {
+          path: 'digital-product',
+          children: [
+            {
+              index: true,
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductListPage />),
+            },
+            {
+              path: 'list',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductListPage />),
+            },
+            {
+              path: 'new',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductCreatePage />),
+            },
+            {
+              path: ':id/edit',
+              element: withPlanFeature('digital_products', 'Digital Products', <DigitalProductEditPage />),
+            },
           ],
         },
         {
@@ -242,8 +458,22 @@ export const dashboardRoutes = [
             { index: true, element: <ExpenseListPage /> },
             { path: 'list', element: <ExpenseListPage /> },
             { path: ':id', element: <ExpenseDetailsPage /> },
-            { path: 'new', element: <ExpenseCreatePage /> },
-            { path: ':id/edit', element: <ExpenseEditPage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['expenses.create']}>
+                  <ExpenseCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['expenses.update']}>
+                  <ExpenseEditPage />
+                </PermissionGuard>
+              ),
+            },
           ],
         },
         {
@@ -251,8 +481,218 @@ export const dashboardRoutes = [
           children: [
             { index: true, element: <PaymentMethodListPage /> },
             { path: 'list', element: <PaymentMethodListPage /> },
-            { path: 'new', element: <PaymentMethodCreatePage /> },
-            { path: ':id/edit', element: <PaymentMethodEditPage /> },
+            {
+              path: 'new',
+              element: (
+                <PermissionGuard anyOf={['payment_methods.create']}>
+                  <PaymentMethodCreatePage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: ':id/edit',
+              element: (
+                <PermissionGuard anyOf={['payment_methods.update']}>
+                  <PaymentMethodEditPage />
+                </PermissionGuard>
+              ),
+            },
+          ],
+        },
+        {
+          path: 'reports',
+          children: [
+            { index: true, element: <StoreGeneralReportPage /> },
+            { path: 'general', element: <StoreGeneralReportPage /> },
+            { path: 'inventory', element: <StoreInventoryReportPage /> },
+            {
+              path: 'financial',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreFinancialReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'profit-loss',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Profit & Loss',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreProfitLossReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'cash-flow',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Cash Flow',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCashFlowReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'tax-estimates',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Tax Estimates',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTaxEstimatesPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'vat-return',
+              element: withPlanFeature(
+                'advanced_reports',
+                'VAT Return',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreVatReturnPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'tax-annual',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Annual Tax Summary',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTaxAnnualPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'loans',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Loans',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <LoansPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'payroll',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Payroll',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <PayrollPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'wht',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Withholding Tax',
+                (
+                <PermissionGuard anyOf={['reports.read', 'settings.update']}>
+                  <WhtLedgerPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'balance-sheet',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Balance Sheet',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreBalanceSheetReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'trial-balance',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Trial Balance',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreTrialBalanceReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'sales-trends',
+              element: withPlanFeature(
+                'advanced_reports',
+                'Sales Trends',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreSalesTrendsReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'end-of-day',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <EndOfDayReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'customers',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCustomerReportPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'customers/:customerId',
+              element: (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update']}>
+                  <StoreCustomerReportDetailPage />
+                </PermissionGuard>
+              ),
+            },
+            {
+              path: 'partners',
+              element: withPlanFeature(
+                'consignment',
+                'Partner Report',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
+                  <StorePartnerReportPage />
+                </PermissionGuard>
+                )
+              ),
+            },
+            {
+              path: 'partners/:partnerId',
+              element: withPlanFeature(
+                'consignment',
+                'Partner Report',
+                (
+                <PermissionGuard anyOf={['reports.read', 'reports.create', 'reports.update', 'inventory.read']}>
+                  <StorePartnerReportDetailPage />
+                </PermissionGuard>
+                )
+              ),
+            },
           ],
         },
       ],
@@ -264,7 +704,7 @@ export const dashboardRoutes = [
           { index: true, element: <StoreListPage /> },
           { path: 'new', element: <StoreCreatePage /> },
           { path: ':id/account', element: <StoreAccountPage /> },
-          { path: ':id/website', element: <StoreWebsiteSettingsPage /> },
+          { path: ':id/website', element: withPlanFeature('store_website', 'Store Website', <StoreWebsiteSettingsPage />) },
           { path: 'list', element: <StoreListPage /> },
         ],
       },
@@ -286,7 +726,14 @@ export const dashboardRoutes = [
               { path: 'profile', element: <UserProfilePage /> },
               { path: 'cards', element: <UserCardsPage /> },
               { path: 'list', element: <UserListPage /> },
-              { path: 'invite', element: <UserCreatePage /> },
+              {
+                path: 'invite',
+                element: (
+                  <PermissionGuard anyOf={['users.create']}>
+                    <UserCreatePage />
+                  </PermissionGuard>
+                ),
+              },
               { path: ':id/edit', element: <UserEditPage /> },
               { path: 'account', element: <UserAccountPage /> },
             ],
@@ -294,6 +741,7 @@ export const dashboardRoutes = [
 
           {
             path: 'integration',
+            element: withPlanFeature('integrations', 'Integrations', <Outlet />),
             children: [
               { index: true, element: <IntegrationListPage /> },
               { path: 'list', element: <IntegrationListPage /> },
@@ -352,7 +800,7 @@ export const dashboardRoutes = [
               { index: true, element: <RoleListPage /> },
               { path: 'list', element: <RoleListPage /> },
               { path: ':id', element: <RoleDetailsPage /> },
-              { path: 'new', element: <RoleCreatePage /> },
+              { path: 'new', element: withPlanFeature('custom_roles', 'Custom roles', <RoleCreatePage />) },
               { path: ':id/edit', element: <RoleEditPage /> },
             ],
           },
@@ -388,6 +836,18 @@ export const dashboardRoutes = [
               { path: 'new', element: <TourCreatePage /> },
               { path: ':id/edit', element: <TourEditPage /> },
             ],
+          },
+          {
+            path: 'company-reports',
+            element: withPlanFeature(
+              'company_reports',
+              'Company Reports',
+              (
+              <PermissionGuard anyOf={['reports.create', 'reports.update']}>
+                <CompanyReportsPage />
+              </PermissionGuard>
+              )
+            ),
           },
           { path: 'file-manager', element: <FileManagerPage /> },
           { path: 'mail', element: <MailPage /> },

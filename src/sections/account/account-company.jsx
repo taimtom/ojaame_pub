@@ -16,7 +16,8 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { withOnboardingQuery } from 'src/utils/onboarding-routes';
+import { clearSetupPrefill, getSetupPrefill } from 'src/utils/setup-prefill';
 
 import { fData } from 'src/utils/format-number';
 
@@ -36,14 +37,14 @@ export const UpdateCompanySchema = zod.object({
   companyName: zod.string().min(1, { message: 'Name is required!' }),
   companyLogo: schemaHelper.file1({ message: { required_error: 'Company logo is required!' } }),
   companyLocation: zod.string().min(1, { message: 'Address is required!' }),
+  rcCacRegNumber: zod.string().optional(),
   primaryIndustry: zod.string().min(1, { message: 'Industry is required!' }),
   subIndustry: zod.string().min(1, { message: 'Sub Industry is required!' }),
   exactBusiness: zod.string().min(1, { message: 'Exact Business is required!' }),
 });
 
 export function AccountCompany() {
-  const router = useRouter();
-  const { user } = useAuthContext();
+  const { user, checkUserSession } = useAuthContext();
   // Skip fetching if user has no company_id
   const skipFetch = user?.company_id == null;
 
@@ -55,6 +56,8 @@ export function AccountCompany() {
   } = useCompany({ skip: skipFetch });
 
   const [companyLogoUrlInput, setCompanyLogoUrlInput] = useState('');
+  const [companyLogoUploading, setCompanyLogoUploading] = useState(false);
+  const [setupPrefill, setSetupPrefill] = useState(null);
   const isInitialLoad = useRef(true);
 
   const methods = useForm({
@@ -64,6 +67,7 @@ export function AccountCompany() {
       companyName: '',
       companyLogo: null,
       companyLocation: '',
+      rcCacRegNumber: '',
       primaryIndustry: '',
       subIndustry: '',
       exactBusiness: '',
@@ -91,6 +95,7 @@ export function AccountCompany() {
         companyName: company.companyName || '',
         companyLogo: logoValue,
         companyLocation: company.companyLocation || '',
+        rcCacRegNumber: company.rcCacRegNumber || '',
         primaryIndustry: company.primaryIndustry || '',
         subIndustry: company.subIndustry || '',
         exactBusiness: company.exactBusiness || '',
@@ -106,6 +111,27 @@ export function AccountCompany() {
         isInitialLoad.current = false;
       }, 100);
     }
+  }, [company, reset]);
+
+  useEffect(() => {
+    if (company) return;
+    const payload = getSetupPrefill();
+    if (!payload) return;
+
+    setSetupPrefill(payload);
+    isInitialLoad.current = true;
+    reset({
+      companyName: payload.companyName || '',
+      companyLogo: null,
+      companyLocation: '',
+      rcCacRegNumber: '',
+      primaryIndustry: payload.primaryIndustry || '',
+      subIndustry: payload.subIndustry || '',
+      exactBusiness: payload.exactBusiness || '',
+    });
+    setTimeout(() => {
+      isInitialLoad.current = false;
+    }, 100);
   }, [company, reset]);
 
   // Reset sub-industry and exact-business when industry changes
@@ -164,11 +190,18 @@ export function AccountCompany() {
       const formData = new FormData();
       formData.append('companyName', data.companyName);
       formData.append('companyLocation', data.companyLocation);
+      formData.append('rcCacRegNumber', data.rcCacRegNumber || '');
       formData.append('primaryIndustry', data.primaryIndustry);
       formData.append('subIndustry', data.subIndustry);
       formData.append('exactBusiness', data.exactBusiness);
       if (data.companyLogo) {
         formData.append('companyLogo', data.companyLogo);
+      }
+      if (setupPrefill?.builderPrefill) {
+        formData.append('builder_prefill', 'true');
+      }
+      if (setupPrefill?.builderCompletedAt) {
+        formData.append('builder_completed_at', setupPrefill.builderCompletedAt);
       }
 
       if (company && company.id) {
@@ -181,10 +214,10 @@ export function AccountCompany() {
       } else {
         // Create flow
         await createCompany(formData);
+        setSetupPrefill(null);
+        await checkUserSession?.();
         toast.success('Company created successfully!');
-        setTimeout(() => {
-          window.location.href = paths.dashboard.root;
-        }, 2000);
+        window.location.href = withOnboardingQuery(`${paths.dashboard.user.account}?tab=billing`);
       }
     } catch (error) {
       console.error('Submission error:', error);
@@ -243,10 +276,32 @@ export function AccountCompany() {
 
         <Grid xs={12} md={8}>
           <Card sx={{ p: 3 }}>
+            {!company && setupPrefill && (
+              <Box
+                sx={{
+                  mb: 2.5,
+                  p: 2,
+                  borderRadius: 1.5,
+                  bgcolor: 'primary.lighter',
+                  color: 'primary.darker',
+                }}
+              >
+                <Typography variant="subtitle2">We saved your setup from ojaa.me.</Typography>
+                <Typography variant="body2">
+                  Confirm your business profile and continue to create your first store.
+                </Typography>
+              </Box>
+            )}
             <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }}>
               <Field.Text name="companyName" label="Company Name" />
               <Field.Text name="companyLocation" label="Company Location" />
-              
+              <Field.Text
+                name="rcCacRegNumber"
+                label="RC/CAC Reg number"
+                placeholder="e.g. RC123456"
+                helperText="Optional — shown on sales receipts when set"
+              />
+
               <Field.Select 
                 name="primaryIndustry" 
                 label="Industry" 
@@ -296,7 +351,24 @@ export function AccountCompany() {
             </Box>
 
             <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              {!company && setupPrefill && (
+                <Button
+                  color="inherit"
+                  sx={{ mr: 'auto' }}
+                  onClick={() => {
+                    clearSetupPrefill();
+                    setSetupPrefill(null);
+                  }}
+                >
+                  Clear saved setup
+                </Button>
+              )}
+              <LoadingButton
+                type="submit"
+                variant="contained"
+                loading={isSubmitting || companyLogoUploading}
+                disabled={companyLogoUploading}
+              >
                 {company && company.id ? 'Update Company' : 'Create Company'}
               </LoadingButton>
             </Stack>

@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { useParams } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 
 import { CONFIG } from 'src/config-global';
 import { useGetSale } from 'src/actions/sale';
+import { normalizeReceiptFromSale } from 'src/utils/escpos/receipt-from-sale';
 
 import { ReceiptView } from 'src/sections/pos/view';
 
@@ -19,8 +21,8 @@ export default function Page() {
 
   const saleId = id ? parseInt(id, 10) : null;
 
-  // Destructure "sale" from the hook and rename it to "receipt"
-  const { sale: receipt, saleLoading, saleError } = useGetSale(saleId, numericStoreId);
+  const { sale, saleLoading, saleError } = useGetSale(saleId, numericStoreId);
+  const receipt = useMemo(() => normalizeReceiptFromSale(sale), [sale]);
   return (
     <>
       <Helmet>

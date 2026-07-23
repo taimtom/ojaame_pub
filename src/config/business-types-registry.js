@@ -22,6 +22,15 @@ const DEFAULT_CONFIG = {
     discount: 'Discount',
     shipping: 'Shipping',
     taxes: 'Taxes',
+    productionInput: 'Production input',
+    salePlural: 'Sales',
+    todaySalesTitle: "Today's Sales",
+    weeklySalesTitle: 'Total Weekly Sales',
+    monthlySalesTitle: 'Total Monthly Sales',
+    salesByPaymentTitle: 'Sales by Payment Method',
+    heroActionHint: 'Tap to open Quick Sales',
+    invoicePlural: 'Invoices',
+    productPlural: 'Products',
   },
   fields: {
     product: {
@@ -32,6 +41,7 @@ const DEFAULT_CONFIG = {
         quantity: 'Quantity',
         price: 'Price',
         category: 'Category',
+        code: 'Barcode',
       },
     },
     service: {
@@ -48,8 +58,125 @@ const DEFAULT_CONFIG = {
     serviceManagement: 'Service Management',
     pointOfSales: 'Point of Sales',
     salesInvoice: 'Sales Invoice',
+    usageDashboard: 'Usage dashboard',
+    quickDashboard: 'Quick Dashboard',
+    serviceLog: 'Service Log',
+    frontDesk: 'Front Desk',
+    quickRestock: 'Quick Restock',
+    salesAndOrdersSection: 'Sales & Orders',
+    inventorySection: 'Inventory',
+    storeTransfers: 'Store Transfers',
+    consignment: 'Consignment',
+    partnerReport: 'Partner Report',
   },
 };
+
+const WHOLESALE_PRODUCT_FIELDS = {
+  show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images', 'is_pack', 'quantity_per_pack', 'costPrice', 'expiry_date'],
+  hide: ['gender', 'colors', 'sizes', 'prescription_info', 'dosage', 'duration', 'appointment_time', 'harvest_date'],
+  labels: {
+    name: 'SKU name',
+    quantity: 'Stock on hand',
+    price: 'Unit price',
+    category: 'Product line',
+    code: 'Barcode',
+    costPrice: 'Landed cost',
+  },
+};
+
+const WHOLESALE_DISTRIBUTOR_NAV = {
+  productManagement: 'SKU Catalogue',
+  serviceManagement: 'Service Management',
+  pointOfSales: 'Sales Desk',
+  salesInvoice: 'Invoices',
+  usageDashboard: 'Usage dashboard',
+  quickDashboard: 'Quick Sales',
+  serviceLog: 'Service Log',
+  quickRestock: 'Goods Received',
+  salesAndOrdersSection: 'Sales & Dispatch',
+  inventorySection: 'Stock & Depots',
+  storeTransfers: 'Depot Dispatch',
+  consignment: 'Sub-dealer Stock',
+  partnerReport: 'Dealer Accounts',
+};
+
+const WHOLESALE_DISTRIBUTOR_TERMINOLOGY = {
+  product: 'SKU',
+  service: 'Service',
+  invoice: 'Sales Invoice',
+  sale: 'Dispatch',
+  quantity: 'Stock Qty',
+  price: 'Unit Price',
+  category: 'Product Line',
+  customer: 'Dealer',
+  pos: 'Sales Desk',
+  addItem: 'Add SKU',
+  item: 'SKU',
+  description: 'Description',
+  total: 'Total',
+  subtotal: 'Subtotal',
+  discount: 'Discount',
+  shipping: 'Delivery',
+  taxes: 'Taxes',
+  productionInput: 'Production input',
+  salePlural: 'Dispatches',
+  todaySalesTitle: "Today's Dispatches",
+  weeklySalesTitle: 'Total Weekly Dispatches',
+  monthlySalesTitle: 'Total Monthly Dispatches',
+  salesByPaymentTitle: 'Dispatches by Payment Method',
+  heroActionHint: 'Tap to open Quick Sales',
+  invoicePlural: 'Invoices',
+  productPlural: 'SKUs',
+};
+
+const IMPORT_TRADE_TERMINOLOGY = {
+  ...WHOLESALE_DISTRIBUTOR_TERMINOLOGY,
+  customer: 'Buyer',
+  sale: 'Sale',
+  invoice: 'Invoice',
+};
+
+const IMPORT_TRADE_NAV = {
+  ...WHOLESALE_DISTRIBUTOR_NAV,
+  quickRestock: 'Import Receipt',
+  salesAndOrdersSection: 'Sales & Trade',
+};
+
+function wholesaleDistributorConfig(terminologyOverrides = {}, navigationOverrides = {}) {
+  return {
+    terminology: { ...WHOLESALE_DISTRIBUTOR_TERMINOLOGY, ...terminologyOverrides },
+    fields: {
+      product: WHOLESALE_PRODUCT_FIELDS,
+      service: DEFAULT_CONFIG.fields.service,
+    },
+    navigation: { ...WHOLESALE_DISTRIBUTOR_NAV, ...navigationOverrides },
+    dashboardShortcuts: [
+      'quick-dispatch',
+      'goods-received',
+      'customers',
+      'pos',
+      'products',
+      'transfers',
+      'invoices',
+      'customer-report',
+      'consignment',
+      'partner-report',
+      'service-log',
+      'expenses',
+    ],
+  };
+}
+
+function importTradeConfig(terminologyOverrides = {}, navigationOverrides = {}) {
+  return {
+    terminology: { ...IMPORT_TRADE_TERMINOLOGY, ...terminologyOverrides },
+    fields: {
+      product: WHOLESALE_PRODUCT_FIELDS,
+      service: DEFAULT_CONFIG.fields.service,
+    },
+    navigation: { ...IMPORT_TRADE_NAV, ...navigationOverrides },
+  };
+}
 
 // Helper function to create a registry key
 const createKey = (industry, subIndustry, exactBusiness) => `${industry}|${subIndustry}|${exactBusiness}`;
@@ -86,6 +213,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -134,6 +262,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Aisle',
+          code: 'Barcode',
         },
       },
     },
@@ -174,6 +303,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Stock',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -184,6 +314,22 @@ const BUSINESS_TYPE_CONFIGS = {
       salesInvoice: 'Orders',
     },
   },
+
+  // ========== WHOLESALE / B2B / DISTRIBUTOR ==========
+  [createKey('Trade & Commerce', 'Wholesale trade', 'Wholesale distribution')]:
+    wholesaleDistributorConfig(),
+  [createKey('Trade & Commerce', 'Wholesale trade', 'B2B trading')]:
+    wholesaleDistributorConfig({ customer: 'Buyer', sale: 'Sale' }),
+  [createKey('Trade & Commerce', 'Wholesale trade', 'Wholesale supply')]:
+    wholesaleDistributorConfig({ sale: 'Supply' }),
+  [createKey('Trade & Commerce', 'Import & export', 'Import business')]:
+    importTradeConfig(),
+  [createKey('Trade & Commerce', 'Import & export', 'Trading company')]:
+    importTradeConfig({ customer: 'Dealer' }),
+  [createKey('Trade & Commerce', 'Import & export', 'Export business')]:
+    importTradeConfig({ customer: 'Buyer', pos: 'Export Desk' }, { pointOfSales: 'Export Desk' }),
+  [createKey('Trade & Commerce', 'Import & export', 'International trade')]:
+    importTradeConfig({ customer: 'Trade Partner' }),
 
   // ========== HEALTHCARE ==========
   [createKey('Health & Social Services', 'Hospitals', 'Private hospital')]: {
@@ -215,6 +361,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -230,6 +377,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Service Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },
@@ -264,6 +412,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Dosage',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -279,6 +428,7 @@ const BUSINESS_TYPE_CONFIGS = {
     navigation: {
       productManagement: 'Medication Management',
       serviceManagement: 'Treatment Management',
+      serviceLog: 'Visit Log',
       pointOfSales: 'Billing',
       salesInvoice: 'Bills',
     },
@@ -313,6 +463,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -327,6 +478,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== RESTAURANT ==========
   [createKey('Tourism & Hospitality', 'Restaurants', 'Restaurant')]: {
     terminology: {
+      productionInput: 'Ingredient',
       product: 'Menu Item',
       service: 'Service',
       invoice: 'Check',
@@ -354,6 +506,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -362,6 +515,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Order Entry',
       salesInvoice: 'Checks',
+      usageDashboard: 'Ingredient usage',
     },
   },
 
@@ -394,6 +548,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Portions',
           price: 'Menu Price',
           category: 'Menu Category',
+          code: 'Barcode',
         },
       },
       service: {
@@ -442,6 +597,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -483,6 +639,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Fee',
           category: 'Department',
+          code: 'Barcode',
         },
       },
       service: {
@@ -537,6 +694,7 @@ const BUSINESS_TYPE_CONFIGS = {
           batch_number: 'Batch Number',
           harvest_date: 'Harvest Date',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -551,6 +709,7 @@ const BUSINESS_TYPE_CONFIGS = {
   // ========== MANUFACTURING ==========
   [createKey('Manufacturing (Light & Heavy)', 'Food processing (flour, sugar, beverages)', 'Food manufacturing')]: {
     terminology: {
+      productionInput: 'Raw material',
       product: 'Product',
       service: 'Service',
       invoice: 'Invoice',
@@ -580,6 +739,7 @@ const BUSINESS_TYPE_CONFIGS = {
           category: 'Category',
           batch_number: 'Batch Number',
           expiry_date: 'Expiry Date',
+          code: 'Barcode',
         },
       },
     },
@@ -588,6 +748,7 @@ const BUSINESS_TYPE_CONFIGS = {
       serviceManagement: 'Service Management',
       pointOfSales: 'Sales Entry',
       salesInvoice: 'Invoices',
+      usageDashboard: 'Raw material usage',
     },
   },
 
@@ -621,6 +782,7 @@ const BUSINESS_TYPE_CONFIGS = {
           quantity: 'Quantity',
           price: 'Price',
           category: 'Category',
+          code: 'Barcode',
         },
       },
     },
@@ -631,6 +793,216 @@ const BUSINESS_TYPE_CONFIGS = {
       salesInvoice: 'Invoices',
     },
   },
+
+  // ========== TRANSPORTATION & LOGISTICS ==========
+  [createKey('Transportation & Logistics', 'Courier services', 'Courier company')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Delivery Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Delivery Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Delivery Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Delivery Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
+    },
+  },
+
+  [createKey('Transportation & Logistics', 'Courier services', 'Package delivery')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Delivery Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Delivery Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Delivery Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Delivery Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
+    },
+  },
+
+  [createKey('Transportation & Logistics', 'Courier services', 'Express delivery')]: {
+    terminology: {
+      product: 'Package',
+      service: 'Express Service',
+      invoice: 'Waybill',
+      sale: 'Shipment',
+      quantity: 'Pieces',
+      price: 'Shipping Rate',
+      category: 'Shipment Type',
+      customer: 'Sender',
+      pos: 'Dispatch Counter',
+      addItem: 'Add Package',
+      item: 'Package',
+      description: 'Description',
+      total: 'Total',
+      subtotal: 'Subtotal',
+      discount: 'Discount',
+      shipping: 'Express Fee',
+      taxes: 'Taxes',
+      productionInput: 'Logistics Input',
+    },
+    fields: {
+      product: {
+        show: ['name', 'description', 'price', 'quantity', 'category', 'sku', 'code', 'images'],
+        hide: ['batch_number', 'harvest_date', 'expiry_date', 'prescription_info', 'dosage', 'duration', 'appointment_time'],
+        labels: {
+          name: 'Package name',
+          quantity: 'Pieces',
+          price: 'Shipping Rate',
+          category: 'Shipment Type',
+          code: 'Tracking Code',
+        },
+      },
+      service: {
+        show: ['name', 'description', 'price', 'duration'],
+        hide: ['appointment_required', 'session_count'],
+        labels: {
+          name: 'Express Service name',
+          price: 'Shipping Rate',
+          duration: 'Transit Time (days)',
+        },
+      },
+    },
+    navigation: {
+      productManagement: 'Package Management',
+      serviceManagement: 'Express Services',
+      pointOfSales: 'Dispatch Counter',
+      salesInvoice: 'Waybills',
+      usageDashboard: 'Usage dashboard',
+      quickDashboard: 'Quick Tracking',
+      quickRestock: 'Quick Booking',
+      salesAndOrdersSection: 'Dispatch & Operations',
+      inventorySection: 'Cargo Management',
+    },
+  },
+
+  // ---- Hotels / Lodging (Front Desk) ----
+  ...Object.fromEntries(
+    [
+      ['Hotels', 'Hotel'],
+      ['Hotels', 'Lodge'],
+      ['Hotels', 'Guest house'],
+      ['Hotels', 'Boutique hotel'],
+      ['Resorts', 'Resort'],
+      ['Resorts', 'Beach resort'],
+      ['Resorts', 'Spa resort'],
+      ['Resorts', 'Holiday resort'],
+    ].map(([sub, exact]) => [
+      createKey('Tourism & Hospitality', sub, exact),
+      {
+        features: { frontDesk: true },
+        terminology: {
+          ...DEFAULT_CONFIG.terminology,
+          customer: 'Guest',
+          sale: 'Folio',
+          invoice: 'Folio / Invoice',
+          // Services = spa, laundry, etc. Rooms live under Front Desk → Setup.
+          service: 'Service',
+          product: 'Amenity / Product',
+          pos: 'Front Desk / POS',
+          salePlural: 'Folios',
+          invoicePlural: 'Folios',
+          todaySalesTitle: "Today's Folios",
+        },
+        fields: DEFAULT_CONFIG.fields,
+        navigation: {
+          ...DEFAULT_CONFIG.navigation,
+          frontDesk: 'Front Desk',
+          serviceLog: 'Service Log',
+          serviceManagement: 'Other Services',
+          salesAndOrdersSection: 'Front Desk & Sales',
+          customer: 'Guests',
+        },
+      },
+    ])
+  ),
 };
 
 // Function to get business type configuration

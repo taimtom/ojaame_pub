@@ -17,10 +17,24 @@
     "re:start": "yarn rm:all && yarn install && yarn dev",
     "re:build": "yarn rm:all && yarn install && yarn build",
     "re:build-npm": "npm run rm:all && npm install && npm run build",
-    "dev:host": "vite --host"
+    "dev:host": "vite --host",
+    "build:mobile": "vite build --config vite.config.mobile.js --mode mobile",
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios",
+    "mobile:android": "npm run build:mobile && cap sync android && cap open android"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.2.4",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/ios": "^8.4.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -46,6 +60,8 @@
     "@mui/x-data-grid": "^7.7.0",
     "@mui/x-date-pickers": "^7.7.0",
     "@mui/x-tree-view": "^7.7.0",
+    "@paystack/inline-js": "^2.22.2",
+    "@point-of-sale/receipt-printer-encoder": "^3.0.3",
     "@react-oauth/google": "^0.12.1",
     "@react-pdf/renderer": "^3.4.4",
     "@supabase/supabase-js": "^2.43.4",
@@ -72,6 +88,9 @@
     "firebase": "^10.12.2",
     "framer-motion": "^11.2.10",
     "history": "^5.3.0",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "i": "^0.3.7",
     "i18next": "^23.11.5",
     "i18next-browser-languagedetector": "^8.0.0",
@@ -80,6 +99,7 @@
     "mapbox-gl": "^3.4.0",
     "mui-one-time-password-input": "^2.0.2",
     "nprogress": "^0.2.0",
+    "pdfjs-dist": "^4.10.38",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-apexcharts": "^1.4.1",
@@ -105,10 +125,12 @@
     "stylis-plugin-rtl": "^2.1.1",
     "swr": "^2.2.5",
     "turndown": "^7.2.0",
+    "xlsx": "^0.18.5",
     "yet-another-react-lightbox": "^3.20.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.7",
     "@types/react": "^18.3.3",
     "@vitejs/plugin-react-swc": "^3.7.0",
     "eslint": "^8.57.0",
@@ -125,6 +147,7 @@
     "prettier": "^3.3.2",
     "typescript": "^5.4.5",
     "vite": "^5.3.0",
-    "vite-plugin-checker": "^0.6.4"
+    "vite-plugin-checker": "^0.6.4",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }

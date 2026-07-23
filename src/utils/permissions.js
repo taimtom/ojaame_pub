@@ -3,6 +3,20 @@
  * Helper functions for checking user permissions
  */
 
+import { expandAliasPermissions } from './permission-aliases';
+
+/** Grant digital_products.* when user already has matching products.* or services.* */
+export function expandImpliedPermissions(permissions) {
+  if (!permissions?.length) return [];
+  const expanded = new Set(permissions);
+  ['read', 'create', 'update', 'delete', 'manage'].forEach((action) => {
+    if (expanded.has(`products.${action}`)) expanded.add(`digital_products.${action}`);
+    if (expanded.has(`services.${action}`)) expanded.add(`digital_products.${action}`);
+    if (expanded.has(`sales.${action}`)) expanded.add(`service_logs.${action}`);
+  });
+  return expandAliasPermissions([...expanded]);
+}
+
 /**
  * Check if user has a specific permission
  * @param {string[]} userPermissions - Array of user's permissions (e.g., ['users.read', 'products.create'])
@@ -13,7 +27,14 @@ export function hasPermission(userPermissions, permission) {
   if (!userPermissions || !Array.isArray(userPermissions)) {
     return false;
   }
-  return userPermissions.includes(permission);
+  if (userPermissions.includes(permission)) {
+    return true;
+  }
+  const [feature] = permission.split('.');
+  if (feature && userPermissions.includes(`${feature}.*`)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -24,12 +45,12 @@ export function hasPermission(userPermissions, permission) {
  */
 export function hasAnyPermission(userPermissions, requiredPermissions) {
   if (!requiredPermissions || requiredPermissions.length === 0) {
-    return true; // No requirements means always visible
+    return true;
   }
   if (!userPermissions || !Array.isArray(userPermissions)) {
     return false;
   }
-  return requiredPermissions.some((permission) => userPermissions.includes(permission));
+  return requiredPermissions.some((permission) => hasPermission(userPermissions, permission));
 }
 
 /**
@@ -40,12 +61,12 @@ export function hasAnyPermission(userPermissions, requiredPermissions) {
  */
 export function hasAllPermissions(userPermissions, requiredPermissions) {
   if (!requiredPermissions || requiredPermissions.length === 0) {
-    return true; // No requirements means always visible
+    return true;
   }
   if (!userPermissions || !Array.isArray(userPermissions)) {
     return false;
   }
-  return requiredPermissions.every((permission) => userPermissions.includes(permission));
+  return requiredPermissions.every((permission) => hasPermission(userPermissions, permission));
 }
 
 /**

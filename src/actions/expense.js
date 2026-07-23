@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axiosInstance, { fetcher, endpoints } from 'src/utils/axios';
+import { normalizePaginatedResponse } from './pagination';
 
 // ----------------------------------------------------------------------
 // SWR global options for expenses
@@ -15,9 +16,9 @@ const swrOptions = {
 
 // ----------------------------------------------------------------------
 // useGetExpenses — Fetch all expenses for a given store.
-export function useGetExpenses(storeId) {
+export function useGetExpenses(storeId, queryParams = {}) {
   const key = storeId
-    ? [endpoints.expense.list, { params: { store_id: storeId } }]
+    ? [endpoints.expense.list, { params: { store_id: storeId, ...queryParams } }]
     : null;
 
   const {
@@ -28,13 +29,17 @@ export function useGetExpenses(storeId) {
   } = useSWR(key, fetcher, swrOptions);
 
   return useMemo(
-    () => ({
-      expenses:     data || [],
+    () => {
+      const paged = normalizePaginatedResponse(data);
+      return {
+      expenses: paged.items,
+      expensesPagination: paged.pagination,
       expensesLoading: isLoading,
       expensesError: error,      // expose the raw error here
       isValidating,
-      isEmpty:      !isLoading && Array.isArray(data) && data.length === 0,
-    }),
+      isEmpty: !isLoading && paged.items.length === 0,
+    };
+    },
     [data, error, isLoading, isValidating]
   );
 }

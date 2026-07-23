@@ -3,6 +3,7 @@ import { Page, View, Text, Font, Image, Document, StyleSheet } from '@react-pdf/
 
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
+import { resolveReceiptSubtotal } from 'src/utils/escpos/receipt-from-sale';
 
 // ----------------------------------------------------------------------
 
@@ -190,15 +191,25 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     customer_state,
     customer_country,
     customer_phone,
+    company_name,
     store_name,
     store_address,
     store_state,
     store_country,
     store_phone,
+    rc_cac_reg_number,
     user_fullname,
   } = receipt || {};
 
+  const resolvedSubtotal = useMemo(
+    () => resolveReceiptSubtotal({ items, subtotal, total_amount, taxes, discount, shipping }),
+    [items, subtotal, total_amount, taxes, discount, shipping]
+  );
+
   const styles = useStyles();
+
+  const displayCompanyName = company_name || store_name || 'Your Store';
+  const showStoreName = Boolean(store_name && company_name);
 
   // Calculate payment totals
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -239,12 +250,18 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
       {/* Store details */}
       <View style={{ width: '50%' }}>
         <Text style={[styles.subtitle2, styles.mb4]}>From</Text>
-        <Text style={[styles.h4, styles.mb4]}>{store_name || 'Your Store'}</Text>
+        <Text style={[styles.h4, styles.mb4]}>{displayCompanyName}</Text>
+        {showStoreName ? (
+          <Text style={[styles.body2, styles.mb4]}>Store: {store_name}</Text>
+        ) : null}
         <Text style={styles.body2}>{store_address}</Text>
         <Text style={styles.body2}>
           {store_state && store_country ? `${store_state}, ${store_country}` : ''}
         </Text>
         <Text style={styles.body2}>Phone: {store_phone}</Text>
+        {rc_cac_reg_number ? (
+          <Text style={styles.body2}>{rc_cac_reg_number}</Text>
+        ) : null}
       </View>
 
       {/* Customer details */}
@@ -332,7 +349,7 @@ export function A4ReceiptPDF({ receipt, currentStatus }) {
     <View style={styles.summarySection}>
       <View style={[styles.container, styles.mb4]}>
         <Text style={styles.body1}>Subtotal</Text>
-        <Text style={styles.body1}>{fCurrency(subtotal)}</Text>
+        <Text style={styles.body1}>{fCurrency(resolvedSubtotal)}</Text>
       </View>
       {discount > 0 && (
         <View style={[styles.container, styles.mb4]}>

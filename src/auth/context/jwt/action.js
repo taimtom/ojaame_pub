@@ -1,7 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import { setSession } from './utils';
-import { STORAGE_KEY } from './constant';
 
 /** **************************************
  * Sign in
@@ -18,7 +17,7 @@ export const signInWithPassword = async ({ email, password }) => {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -38,8 +37,7 @@ export const signInWithGoogle = async (idToken) => {
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
-    setSession(accessToken);
+    await setSession(accessToken);
     return accessToken;
   } catch (error) {
     console.error('Error during Google sign in:', error);
@@ -57,6 +55,7 @@ export const signUp = async ({
   firstName,
   lastName,
   phoneNumber,
+  referral_code_used,
 }) => {
   const params = {
     email,
@@ -65,6 +64,7 @@ export const signUp = async ({
     firstName,
     lastName,
     phoneNumber,
+    ...(referral_code_used ? { referral_code_used } : {}),
   };
 
   try {
@@ -76,7 +76,7 @@ export const signUp = async ({
       throw new Error('Access token not found in response');
     }
 
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
+    await setSession(accessToken);
   } catch (error) {
     console.error('Error during sign up:', error);
     // Check if the error response includes a "detail" property.
@@ -171,18 +171,14 @@ export const resetPassword = async ({ email, code, new_password, re_password}) =
     if (code.length < 6) {
       throw new Error('Code must be at least 6 characters long');
     }
-    // If all validations pass, proceed with the API call
+    // Backend ResetModel.otp is str; VerificationCode.code is also a string column
     const params = {
-    email,
-    otp: Number(code),          // ensure it’s numeric if your backend stores it as int
-    new_password,
-    re_password,
+      email,
+      otp: String(code),
+      new_password,
+      re_password,
     };
-    // console.log('Reset Password Params:', params);
-    // console.log('Reset Password Endpoint:', endpoints.auth.resetPassword);
-    // console.log('Reset Password URL:', endpoints.auth.resetPassword);
-    // const res = await axiosInstance.patch(endpoints.auth.resetPassword, payload);
-    const res = await axios.post(endpoints.auth.resetPassword, params);
+    const res = await axios.patch(endpoints.auth.resetPassword, params);
     if (res.status !== 200) {
       throw new Error('Password reset failed');
     }
